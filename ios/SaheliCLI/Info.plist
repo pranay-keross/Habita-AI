@@ -35,6 +35,12 @@
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
 	<string></string>
+
+	<key>NSCameraUsageDescription</key>
+	<string>Saheli requires camera access to take profile photos and scan documents.</string>
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>Saheli requires photo library access to select your profile picture.</string>
+
 	<key>RCTNewArchEnabled</key>
 	<true/>
 	<key>UILaunchStoryboardName</key>

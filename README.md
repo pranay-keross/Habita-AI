@@ -1,97 +1,174 @@
-This is a new [**React Native**](https://reactnative.dev) project, bootstrapped using [`@react-native-community/cli`](https://github.com/react-native-community/cli).
+# SaheliCLI
 
-# Getting Started
+**Saheli** is a comprehensive AI-powered life assistant designed for Indian women and their families — a single app that consolidates finance, health, home, safety, style, and payments into one intuitive experience.
 
-> **Note**: Make sure you have completed the [Set Up Your Environment](https://reactnative.dev/docs/set-up-your-environment) guide before proceeding.
+> This README currently documents the first three core story areas: Authentication & Session, Home Dashboard, and Family Groups & Sharing.
 
-## Step 1: Start Metro
+## 🔐 Authentication & Session
 
-First, you will need to run **Metro**, the JavaScript build tool for React Native.
+- Phone OTP login — any Indian phone number; demo OTP `123456`
+- Forced OTP verification — no bypass; user must enter the code
+- 15-minute idle auto-logout — session expires if the app is unused
+- 24-hour absolute session lifetime — hard cap regardless of activity
+- Re-auth UX — phone number pre-filled, amber "Session expired" banner
+- Manual sign-out available from Profile screen
+- 6-language onboarding — English, Hindi, Bengali, Tamil, Spanish, Arabic
+- Account deletion with DELETE confirmation phrase
 
-To start the Metro dev server, run the following command from the root of your React Native project:
+## 🏠 Home Dashboard
+
+- Glossy hero card — personalized greeting + due/pending badges
+- Today's snapshot — 30-day spend + 7-day medicine adherence
+- Quick actions strip — Scan bill, Pay UPI, Take medicine, Add expense, Add fuel, Go Premium
+- 3-column tile grid — Scan, UPI Pay, Family, Money, Documents, Safety, Wellness, Style, Events
+- In-context tooltips (❓) on section headers
+- Profile completion path to the dashboard
+
+## 🧑‍🤝‍🧑 Family Groups & Sharing
+
+- Invite family members by phone number
+- Fine-grained module permissions per member:
+  - Documents (view / edit)
+  - Vehicles (view / edit)
+  - Medicine Chest (view / edit)
+  - Expense Groups (view / edit)
+  - Resources (view / edit)
+  - Events (view / edit)
+- Role-based access — Viewer / Editor
+- Accept / decline invitations
+- Leave family anytime
+- Owner-only delete guardrails for critical actions
+- Strict multi-tenant isolation — no accidental data leaks
+
+## Current project scope
+
+The app is being built in phases. Right now the focus is on:
+
+1. Authentication & onboarding flow
+2. Home dashboard experience
+3. Family sharing and group permissions
+
+Other app domains will be added later: documents, medicine, expenses, UPI payments, vehicles, wellness, style, events, and AI integrations.
+
+## Design principles
+
+- Keep a central theme system with colors, font styles, spacing, and reusable tokens.
+- Store theme definitions in `src/theme` and use them throughout the UI.
+- Build reusable components in `src/components` for buttons, cards, forms, and layout containers.
+- Organize feature screens in `src/screens` or `src/app`, and keep navigation logic separate.
+- Prefer composition over duplication so color, typography, and spacing are consistent across the app.
+- Use a clean file structure: `src/theme`, `src/components`, `src/screens`, `src/features`, `src/hooks`, `src/utils`.
+
+## Recommended source structure
+
+```
+src/
+  app/                 # app-specific screens, navigation, onboarding
+    _layout.tsx
+    onboarding/
+      language.tsx
+      phone.tsx
+      otp.tsx
+      profile.tsx
+  components/          # reusable UI components and design system atoms
+    Button.tsx
+    Card.tsx
+    Header.tsx
+    IconButton.tsx
+  features/            # feature modules, each with its own domain logic
+    auth/
+      auth.ts
+      auth.types.ts
+    family/
+      family.ts
+      permissions.ts
+  hooks/               # shared React hooks
+    useAuth.ts
+    useTheme.ts
+    useSession.ts
+  i18n/                # localization resources and helpers
+    index.ts
+    locales/
+      en.json
+      hi.json
+      bn.json
+      ta.json
+      es.json
+      ar.json
+  styles/              # shared styles and screen-specific style sheets
+    onboarding.ts
+  theme/               # theme tokens, palettes, and font definitions
+    index.ts
+    colors.ts
+    typography.ts
+  utils/               # helpers, formatters, and generic utility functions
+    storage.ts
+    validators.ts
+```
+
+## Getting started
+
+### Install dependencies
 
 ```sh
-# Using npm
+npm install
+```
+
+### Run Metro
+
+```sh
 npm start
-
-# OR using Yarn
-yarn start
 ```
 
-## Step 2: Build and run your app
-
-With Metro running, open a new terminal window/pane from the root of your React Native project, and use one of the following commands to build and run your Android or iOS app:
-
-### Android
+### Run iOS
 
 ```sh
-# Using npm
-npm run android
-
-# OR using Yarn
-yarn android
-```
-
-### iOS
-
-For iOS, remember to install CocoaPods dependencies (this only needs to be run on first clone or after updating native deps).
-
-The first time you create a new project, run the Ruby bundler to install CocoaPods itself:
-
-```sh
-bundle install
-```
-
-Then, and every time you update your native dependencies, run:
-
-```sh
-bundle exec pod install
-```
-
-For more information, please visit [CocoaPods Getting Started guide](https://guides.cocoapods.org/using/getting-started.html).
-
-```sh
-# Using npm
 npm run ios
-
-# OR using Yarn
-yarn ios
 ```
 
-If everything is set up correctly, you should see your new app running in the Android Emulator, iOS Simulator, or your connected device.
+### Run Android
 
-This is one way to run your app — you can also build it directly from Android Studio or Xcode.
+```sh
+npm run android
+```
 
-## Step 3: Modify your app
+## Project status
 
-Now that you have successfully run the app, let's make changes!
+- ✅ Authentication & onboarding scaffolded
+- ✅ Language support and i18n setup
+- ✅ Native module linking and CocoaPods installation
+- ✅ TypeScript validation passing
+- ⚠️ Home dashboard UI and feature polish in progress
+- ⚠️ Family sharing permission model still under development
+- ⏳ Other major app modules pending
+## Project status board
 
-Open `App.tsx` in your text editor of choice and make some changes. When you save, your app will automatically update and reflect these changes — this is powered by [Fast Refresh](https://reactnative.dev/docs/fast-refresh).
+| Area | Status | Notes |
+| --- | --- | --- |
+| Authentication & Session | ✅ Completed | OTP auto-advance 6-box login, session storage |
+| Home Dashboard | ✅ Completed | Scroll-transforming sticky header & compact due/pending status |
+| Profile & Settings | ✅ Completed | Camera/Gallery crop options, name, phone, language picker, sign-out & account deletion |
+| Family Groups & Sharing | ✅ Completed | Group members overview, roles, permission toggles, invite modal |
+| AI Agent Master Context | ✅ Created | `AI_CONTEXT.md` single-source guide for AI models |
+| Medicine & Health | ⏳ Pending | Next Sprint |
+| Document Hub | ⏳ Pending | Sprint 3 |
+| Money & Payments | ⏳ Pending | Sprint 3 |
 
-When you want to forcefully reload, for example to reset the state of your app, you can perform a full reload:
 
-- **Android**: Press the <kbd>R</kbd> key twice or select **"Reload"** from the **Dev Menu**, accessed via <kbd>Ctrl</kbd> + <kbd>M</kbd> (Windows/Linux) or <kbd>Cmd ⌘</kbd> + <kbd>M</kbd> (macOS).
-- **iOS**: Press <kbd>R</kbd> in iOS Simulator.
+## Next sprint
 
-## Congratulations! :tada:
+- Finish the phone OTP login flow and session expiration behavior
+- Add the onboarding language selection screen and persistence
+- Build the Home dashboard hero card and quick-action strip
+- Create the first Family invite flow and a basic Viewer/Editor model
+- Keep the app launch flow stable on iOS with Metro
 
-You've successfully run and modified your React Native App. :partying_face:
+## How to contribute
 
-### Now what?
+1. Read the current app story in `README.md`.
+2. Review feature status in `agent.md`.
+3. Update the relevant section with progress, new tasks, or blocking issues.
+4. Keep the story summary aligned with the actual code and UI.
+## Notes
 
-- If you want to add this new React Native code to an existing application, check out the [Integration guide](https://reactnative.dev/docs/integration-with-existing-apps).
-- If you're curious to learn more about React Native, check out the [docs](https://reactnative.dev/docs/getting-started).
-
-# Troubleshooting
-
-If you're having issues getting the above steps to work, see the [Troubleshooting](https://reactnative.dev/docs/troubleshooting) page.
-
-# Learn More
-
-To learn more about React Native, take a look at the following resources:
-
-- [React Native Website](https://reactnative.dev) - learn more about React Native.
-- [Getting Started](https://reactnative.dev/docs/environment-setup) - an **overview** of React Native and how setup your environment.
-- [Learn the Basics](https://reactnative.dev/docs/getting-started) - a **guided tour** of the React Native **basics**.
-- [Blog](https://reactnative.dev/blog) - read the latest official React Native **Blog** posts.
-- [`@facebook/react-native`](https://github.com/facebook/react-native) - the Open Source; GitHub **repository** for React Native.
+Use `README.md` as the primary app story summary. Keep this file updated when new sections are added or behavior changes.

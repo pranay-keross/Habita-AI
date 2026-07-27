@@ -1,0 +1,69 @@
+import { I18n } from 'i18n-js';
+import { I18nManager } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import en from './locales/en.json';
+import bn from './locales/bn.json';
+import hi from './locales/hi.json';
+import ta from './locales/ta.json';
+import es from './locales/es.json';
+import ar from './locales/ar.json';
+
+const listeners = new Set<() => void>();
+let currentLocale = 'en';
+
+export const SUPPORTED_LANGS = [
+  { code: 'en', label: 'English', native: 'English', flag: '🇬🇧' },
+  { code: 'hi', label: 'Hindi', native: 'हिन्दी', flag: '🇮🇳' },
+  { code: 'bn', label: 'Bengali', native: 'বাংলা', flag: '🇮🇳' },
+  { code: 'ta', label: 'Tamil', native: 'தமிழ்', flag: '🇮🇳' },
+  { code: 'es', label: 'Spanish', native: 'Español', flag: '🇪🇸' },
+  { code: 'ar', label: 'Arabic', native: 'العربية', flag: '🇸🇦' },
+];
+
+export const RTL_LANGS = ['ar'];
+
+export const i18n = new I18n({ en, bn, hi, ta, es, ar });
+i18n.defaultLocale = 'en';
+i18n.enableFallback = true;
+i18n.locale = 'en';
+
+const LANG_KEY = 'saheli.lang';
+
+export const t = (key: string, options?: Record<string, any>) => i18n.t(key, options);
+
+export function subscribeToLanguageChanges(listener: () => void) {
+  listeners.add(listener);
+  return () => listeners.delete(listener);
+}
+
+export function getCurrentLanguage() {
+  return currentLocale;
+}
+
+export async function loadSavedLanguage(): Promise<string> {
+  try {
+    const saved = await AsyncStorage.getItem(LANG_KEY);
+    const code = saved && SUPPORTED_LANGS.find((l) => l.code === saved) ? saved : 'en';
+    applyLanguage(code);
+    return code;
+  } catch {
+    return 'en';
+  }
+}
+
+export async function setLanguage(code: string) {
+  await AsyncStorage.setItem(LANG_KEY, code);
+  applyLanguage(code);
+}
+
+function applyLanguage(code: string) {
+  currentLocale = code;
+  i18n.locale = code;
+  try {
+    // Keep standard LTR layout structure so navigation headers, back buttons, and flex directions stay left-aligned
+    I18nManager.allowRTL(false);
+    I18nManager.forceRTL(false);
+  } catch {}
+  listeners.forEach((listener) => listener());
+}
+
