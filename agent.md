@@ -1,130 +1,92 @@
-# Saheli Agent Workflow
+# Saheli — Agent Working Agreement
 
-This file defines the AI agent workflow and project status tracking for the SaheliCLI app.
+How AI agents work in this repository. Product context is in `AI_CONTEXT.md`; this file is about *process*.
 
-## Purpose
+**Last updated:** 2026-07-30
 
-The AI agent is responsible for:
+---
 
-- maintaining a clear architecture for the app and codebase
-- tracking completed work, in-progress work, and pending milestones
-- preserving the Saheli story across prompts without requiring the user to re-explain the project constantly
-- creating and updating project documentation with the current app scope and status
+## 1. The session ritual
 
-## Current focus areas
+Every session has three phases, each backed by a prompt in `prompts/`:
 
-1. Authentication & Session
-2. Home Dashboard
-3. Family Groups & Sharing
+| Phase | Prompt | Purpose |
+| --- | --- | --- |
+| Start | `prompts/session-start-context-load.md` | Load context, verify docs against code, report the next ready tasks |
+| Work | `prompts/backlog-task-kickoff.md` (once per task) | Execute one tracked task to its acceptance criteria |
+| Close | `prompts/session-close-doc-sync.md` | Make the docs true again before committing |
 
-## Work status
+Skipping the close phase is what caused the documentation drift recorded in `docs/DECISIONS.md` D-006. Do not skip it.
 
-### Done
+Specialised prompts: `new-feature-module.md` (M4–M7), `i18n-localization-pass.md`, `tech-debt-cleanup.md` (M1), `doc-only-change.md`.
 
-- App scaffold created with React Native CLI
-- Root app entrypoint and navigation shell established
-- i18n and localization support added for 6 languages
-- `react-native-gesture-handler`, `react-native-screens`, and `react-native-safe-area-context` linked
-- iOS CocoaPods integration completed
-- TypeScript validation passes (`npx tsc --noEmit`)
-- Fixed navigation layout direction and standardized top-left back button positioning across screens
-- Implemented Home Dashboard scroll-driven header transformation (hero card collapses into sticky AppBar with due & pending status)
-- Overhauled OTP screen to auto-advance to next box on digit entry, support backspace focusing, and 6-digit code pasting
-- Added language-mapped country code prefill (`+91 `, `+34 `, `+966 `) on Mobile Number screen while allowing custom edits
-- Configured mobile number prefill on Profile onboarding screen from phone step while keeping name as hint placeholder
-- Integrated real device Camera (`launchCamera`) & Gallery (`launchImageLibrary`) photo selection via `react-native-image-picker` with photo rendering
-- Configured Language Selection visibility (hidden during onboarding profile setup, visible when editing profile inside the app)
-- Built Family Groups & Sharing module (`src/features/family/FamilyScreen.tsx`) with role badges (Owner/Editor/Viewer), permission toggles, and invite modal
-- Maintained single-source `AI_CONTEXT.md` master documentation for AI model workflows
+---
 
+## 2. What the agent is responsible for
 
+- **Keeping the project legible across sessions.** No session should need the user to re-explain Saheli. If `AI_CONTEXT.md` was not enough to start, fix `AI_CONTEXT.md`.
+- **Executing tracked tasks, not adjacent ones.** Work comes from `docs/BACKLOG.md`. Discovered work becomes new backlog rows, not scope creep.
+- **Reporting honestly.** If a check fails, show the output. If a criterion is unmet, say so. If something is unverified, call it unverified.
+- **Keeping docs and code in the same commit.** A feature that ships without its doc update is unfinished.
 
+---
 
-### Pending
+## 3. Document ownership
 
-- Medicine & Health modules
-- Document Hub and OCR workflows
-- Expense tracking and UPI payments
-- Vehicle manager and staff management
-- Wellness, style, events, and safety modules
-- AI integration with Gemini / GPT-4o-mini for OCR and parsing
-- Real external integrations for SMS, payment, and voice
+Each document has one job. Do not duplicate content between them — cross-reference.
 
-## Agent architecture
+| Document | Owns | Never contains |
+| --- | --- | --- |
+| `README.md` | Product story, verified current state, setup | Aspirational features in the feature list |
+| `AI_CONTEXT.md` | Cold-start brief, active patterns, traps | Long-form architecture detail |
+| `docs/ARCHITECTURE.md` | Structure, contracts, known gaps | Task planning |
+| `docs/BACKLOG.md` | Milestones, tasks, status, open questions | Prose status updates |
+| `docs/DECISIONS.md` | Append-only decision log | Rewritten history — supersede instead |
+| `agent.md` | This working agreement | Product or architecture content |
+| `prompts/` | Repeatable session rituals | One-off instructions |
 
-### Primary responsibilities
+---
 
-- Track active story / scope in this file and `README.md`
-- Keep task state separated from code implementation
-- Use clear labels for what is complete, in-progress, and not started
-- Avoid asking the user to repeat the app story when context is full
-- Maintain the app-wide theme system and reusable component architecture
-- Ensure the file structure supports consistent UI, feature isolation, and long-term maintainability
+## 4. Hard rules
 
-### How the agent should work
+These apply to every change. An agent should stop and ask rather than break one.
 
-1. Read current project files and existing docs first.
-2. Update `README.md` with app story and current scope.
-3. Update `agent.md` with milestones and progress status.
-4. Preserve the core story in docs; add new sections instead of rewriting the whole story every time.
-5. Use concise, explicit status markers for each major feature area.
+1. **`npx tsc --noEmit` must pass** before a task is called done. Run `npm run lint` and `npm test` too, and report the real output.
+2. **Six locales or none.** Any new user-facing string is added to all of `en, hi, bn, ta, es, ar`, namespaced by screen. A partly localized screen is a defect.
+3. **Design tokens only.** Import from `src/theme.ts` — never `src/theme/` (dead, shadowed) and never inline hex in a screen.
+4. **LTR everywhere.** Layout direction stays left-to-right in all languages including Arabic; the back arrow is a top-left `Pressable` on every screen. See `docs/DECISIONS.md` D-003.
+5. **Storage discipline.** `saheli.` prefix, access via `src/utils/storage.ts`, key documented in `docs/ARCHITECTURE.md` §5.
+6. **Routes are registered in pairs** — `RootStackParamList` and `_layout.tsx`, same change.
+7. **No new dependency without asking**, including what already-installed package was ruled out and why.
+8. **No backend or network calls in this phase** (`docs/DECISIONS.md` D-002). Needs remote data? Define the interface, stub it, add an M8 backlog row.
+9. **Never mark a doc claim done without pointing at the implementing code.**
+10. **One task per run.** If it turns out to be bigger than a session, stop, report, and propose a split into new backlog rows.
 
-## Recommended file structure
+---
 
-The agent should encourage a stable `src/` organization with:
+## 5. Current state at a glance
 
-- `src/app` for app-level navigation and onboarding flow
-- `src/components` for reusable UI building blocks
-- `src/features` for domain-specific modules
-- `src/theme` for palette and typography tokens
-- `src/hooks` for shared custom hooks
-- `src/i18n` for localization
-- `src/styles` for shared style sheets
-- `src/utils` for generic utilities
+Full detail in `docs/BACKLOG.md`; this table is the summary.
 
-## Milestones
+| Area | Status |
+| --- | --- |
+| Onboarding UI — language, phone, OTP input, profile | ✅ Built (UI only) |
+| Home dashboard with scroll-driven sticky header | ✅ Built (static data) |
+| Family groups — members, roles, permission toggles, bottom sheet | ✅ Built (English-only, local storage) |
+| Design system — 3 palettes, tokens, 4 shared components | ✅ Built (runtime switching does not work; fonts not bundled) |
+| Localization — 6 locales, live switching | ✅ Built (Family screen not covered) |
+| Documentation & prompt library | ✅ M0 complete, 2026-07-30 |
+| OTP verification, session lifecycle, auth guard | ❌ Not built — M2 |
+| Medicine, Documents, Money/UPI, Safety, Wellness, Style, Events, Vehicles | ❌ Not built — M4–M7 |
+| Backend, real invites, AI/OCR | ❌ Not built — M8, decisions open |
 
-### Milestone 1: Core launch
+---
 
-- [x] App bootstrap and native project setup
-- [x] Navigation container and onboarding flow
-- [x] i18n setup for six languages
-- [ ] Stable login + session lifecycle
-- [ ] Reliable app startup on iOS/Android with Metro
+## 6. Escalate to the user when
 
-### Milestone 2: Dashboard & family
-
-- [ ] Home dashboard UX with actions and cards
-- [ ] Family groups model and invitation flow
-- [ ] Permission controls and role-based access
-- [ ] Profile and sign-out flow
-
-### Milestone 3: Expand modules
-
-- [ ] Medicine chest and reminders
-- [ ] Document hub with OCR and tags
-- [ ] Household expense tracking
-- [ ] UPI payments and QR scanning
-- [ ] Vehicle and staff management
-- [ ] Safety SOS and location features
-
-## Next sprint
-
-- Complete phone OTP login and session expiry behavior
-- Build onboarding language selection + persistence
-- Implement the Home dashboard hero card and quick action strip
-- Create Family invite flow and basic role-based permissions
-- Stabilize iOS app startup with Metro connectivity
-
-## How to contribute
-
-- Read `README.md` first for the app story and current scope.
-- Update `agent.md` when a milestone advances or a new work area is added.
-- Keep new work aligned with the three active focus areas: Authentication, Home Dashboard, and Family Sharing.
-- Use `README.md` for product story and `agent.md` for progress tracking.
-
-## Usage notes
-
-- Keep this file as the agent’s internal task tracker.
-- Update the status sections when work completes or changes.
-- Add new feature areas under `Pending` instead of expanding the scope without confirmation.
+- A task is 🔒 blocked or ❓ needs-decision in `docs/BACKLOG.md`.
+- The work would contradict an accepted decision in `docs/DECISIONS.md`.
+- A refactor would touch every screen — show the pattern on one screen and get agreement first.
+- Docs and code disagree in a way that changes what should be built.
+- A translation is a guess rather than a translation.
+- The task needs a new dependency, a native module, or a platform permission.

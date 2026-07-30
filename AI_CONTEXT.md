@@ -1,149 +1,104 @@
-# Saheli CLI - AI Master Context & Architecture Guide
+# Saheli — AI Context Brief
 
-> **Note for AI Models / Agents**: This document serves as the single source of truth for the **Saheli** React Native codebase. Any AI model or coding assistant reading this file can instantly understand the application purpose, architectural structure, completed features, pending roadmap, and design system rules without requiring user re-explanation.
-
----
-
-## 1. Product Identity & Purpose
-
-**Saheli** ("Friend" in Hindi) is a smart AI companion app designed for household management, personal health, family coordination, and lifestyle automation. It empowers users—particularly household CEOs and individuals—to streamline everyday living through localized AI tools.
-
-### Core Value Pillars
-1. **Multilingual & Localized**: Complete support for English, Hindi, Bengali, Tamil, Spanish, and Arabic with instantaneous language switching and standard left-aligned navigation.
-2. **Family Collaboration**: Role-based household sharing with granular module access permissions for family members, kids, and staff.
-3. **Smart Household Management**: Medicine reminders, bill scanning, expense tracking, document vault, and emergency safety SOS.
-4. **Delightful Aesthetics**: Curated color palettes (Terracotta, Ocean, Midnight dark mode), custom typography, micro-animations, and scroll-driven sticky headers.
+> **Read this first.** It is the cold-start brief for any AI agent working on this repo — enough to be productive without the user re-explaining the project. Depth lives elsewhere; this file points you there.
+>
+> **Last synced:** 2026-07-30 · branch `initial-static` · commit `3646fcf` · `npx tsc --noEmit` passes.
 
 ---
 
-## 2. Work Status & Roadmap
+## 1. What this is
 
-| Feature Area | Status | Key Components / Files |
-| :--- | :---: | :--- |
-| **App Scaffold & Native Linking** | ✅ Done | `App.tsx`, `index.js`, iOS CocoaPods, Android Gradle |
-| **Localization & i18n** | ✅ Done | `src/i18n/index.ts`, `src/i18n/locales/*.json` (6 Languages) |
-| **Navigation Shell & Stack** | ✅ Done | `src/app/_layout.tsx` (React Navigation Stack with LTR layout) |
-| **Onboarding Flow** | ✅ Done | Language picker, Phone entry, Auto-advancing OTP, Profile setup |
-| **Home Dashboard UI** | ✅ Done | `src/app/dashboard.tsx` with scroll-driven sticky AppBar & status pills |
-| **Profile & Settings Management** | ✅ Done | `src/app/onboarding/profile.tsx` (Camera/Gallery crop options, name, phone, language picker, sign-out, account deletion) |
-| **Family & Sharing Module** | 🚧 In Progress | `src/features/family/FamilyScreen.tsx` (Group members list, role badges, permission toggles, invite modal) |
-| **Medicine Chest & Reminders** | ⏳ Pending | Scheduled for Next Sprint |
-| **Document Vault & OCR** | ⏳ Pending | Scheduled for Sprint 3 |
-| **Household Expense Tracker & UPI** | ⏳ Pending | Scheduled for Sprint 3 |
-| **Safety SOS & Emergency Alerts** | ⏳ Pending | Scheduled for Sprint 4 |
+**Saheli** ("friend" in Hindi) is an AI life assistant for Indian households — finance, health, home, safety, style, and payments in one app. The audience is the household manager, with family sharing built in and six-language support from day one.
 
----
+This repository is the React Native 0.86 client (CLI, not Expo). React 19.2, TypeScript 5.8, React Navigation v7 native stack, `i18n-js`, `AsyncStorage`.
 
-## 3. Directory Structure
+## 2. What state it is in — read this before planning anything
+
+It is a **static, front-end-only prototype**. Screens, navigation, theming, and localization are real. There is **no backend, no working authentication, and no AI integration**.
+
+Specifically, do not assume these exist — they do not:
+
+- **OTP verification.** `src/app/onboarding/otp.tsx:85` — Verify calls `navigation.navigate('Profile')` unconditionally. No code check, no attempt limit.
+- **Session lifecycle.** No idle timeout, no expiry, no auth guard. `src/hooks/useAuth.ts` and `src/features/auth/auth.ts` are stubs imported by nothing.
+- **Any API layer.** Screens read and write `AsyncStorage` directly.
+- **AI / OCR / assistant features.** None.
+- **Invite lifecycle.** "Send invitation" writes a local record and shows an alert.
+
+Earlier versions of this document claimed several of these were done. They were not. Verify before you build on top of anything.
+
+## 3. Document map
+
+| File | Answers |
+| --- | --- |
+| `README.md` | What the product is, what works today, how to run it |
+| `docs/ARCHITECTURE.md` | How it is built — navigation, theming, i18n, storage contract, **known gaps (§7)** |
+| `docs/BACKLOG.md` | What to build next — milestones M0–M9 with task IDs |
+| `docs/DECISIONS.md` | Why things are the way they are; do not relitigate |
+| `agent.md` | The working agreement for AI sessions in this repo |
+| `prompts/` | Session start · task kickoff · doc sync, plus module/i18n/refactor prompts |
+
+## 4. File map
 
 ```
-SaheliCLI/
-├── App.tsx                    # Root entrypoint wrapped with GestureHandlerRootView
-├── agent.md                   # Agent progress tracker & sprint tasks
-├── README.md                  # User-facing documentation & project story
-├── AI_CONTEXT.md              # THIS FILE - Master context guide for AI models
-├── package.json               # Dependencies (React Native 0.86, React 19, React Navigation v7)
-└── src/
-    ├── app/                   # App routes & layouts
-    │   ├── _layout.tsx        # Navigation Stack container & screen definitions
-    │   ├── dashboard.tsx      # Main Home Dashboard with scroll transformation header
-    │   └── onboarding/        # Setup flow screens
-    │       ├── language.tsx   # Language selection screen
-    │       ├── phone.tsx      # Phone entry screen (hint placeholder)
-    │       ├── otp.tsx        # Auto-focusing OTP 6-box input screen
-    │       └── profile.tsx    # Profile setup & edit screen with Camera/Gallery picker
-    ├── components/            # Reusable UI elements (Button, Card, SectionHeader)
-    ├── features/              # Domain-specific modules
-    │   ├── auth/              # Auth state & session logic
-    │   └── family/            # Family group management & permissions (`FamilyScreen.tsx`)
-    ├── hooks/                 # Custom React hooks (`useTheme.ts`, `useAuth.ts`)
-    ├── i18n/                  # Localization engine (`index.ts` & `locales/*.json`)
-    ├── theme.ts               # Theme system: Terracotta, Ocean, Midnight palettes & typography
-    └── utils/                 # Utility functions & AsyncStorage helpers (`storage.ts`)
+App.tsx · index.js               entry
+src/app/_layout.tsx              NavigationContainer + native stack + RootStackParamList
+src/app/dashboard.tsx            home dashboard (scroll-driven sticky header)
+src/app/onboarding/              language · phone · otp · profile
+src/features/family/FamilyScreen.tsx   family members, roles, permissions, bottom sheet
+src/components/                  Button · Card · SectionHeader · BottomSheet
+src/i18n/index.ts + locales/     6 locales, LTR enforced, manual change listeners
+src/theme.ts                     ACTIVE design tokens — 3 palettes
+src/utils/storage.ts             AsyncStorage JSON helpers
 ```
 
----
+**Dead code — do not read, do not edit, do not extend** (deletion tracked as `M1-T1`):
+`src/theme/` (shadowed by `src/theme.ts`), `src/styles/onboarding.ts`, `src/shared/components/index.ts`, `src/hooks/useAuth.ts`, `src/features/auth/auth.ts`, `src/features/family/index.ts`.
 
-## 4. Key Architectural Patterns & Guidelines for AI Agents
+## 5. Patterns you must follow
 
-When modifying or extending this codebase, all AI models MUST follow these established patterns:
+**Theme.** Import `{ colors, fonts, radius, shadow, spacing }` from `src/theme` — the file, never the directory. `colors` is a mutable singleton mutated by `applyPalette()`. Because `StyleSheet.create` snapshots values at module load, palette changes do not restyle mounted screens; that is a known limitation (`docs/DECISIONS.md` D-004, fix tracked as `M1-T3`). Never hardcode hex in a screen.
 
-### A. Navigation & Back Button Positioning
-- **Navigation Container**: Defined in `src/app/_layout.tsx`.
-- **LTR Rule**: `I18nManager.allowRTL(false)` and `I18nManager.forceRTL(false)` are strictly enforced in `src/i18n/index.ts` so back buttons stay left-aligned (`top-left`) across all languages.
-- **Screen Transitions**: Native stack uses standard push transitions (`slide_from_right`).
+**i18n.** Six locales: en, hi, bn, ta, es, ar. Every new user-facing string goes into **all six** files, namespaced by screen. `i18n-js` is not reactive, so screens call `subscribeToLanguageChanges()`, bump a `localeVersion` counter, and pass `key={localeVersion}` to their root view. Translated arrays are built inside the render body, not at module scope.
 
-### B. Dashboard Header Transformation
-- `src/app/dashboard.tsx` uses `Animated.ScrollView` with an interpolated `scrollY` value.
-- When scrolled at `y = 0`, the full hero card ("due and pending") is visible.
-- As `scrollY` increases, the hero card scales and fades out while a sticky AppBar (`top: 0`) fades in with compact status pills (`2 Pending • 4 Due`) and a top-right profile button.
+**Layout direction is pinned to LTR in every language, including Arabic** (`I18nManager.forceRTL(false)` on every switch). The back arrow is always a custom top-left `Pressable`. This is deliberate — `docs/DECISIONS.md` D-003.
 
-### C. Onboarding vs Edit Profile Modes
-- **Phone Entry** (`src/app/onboarding/phone.tsx`):
-  - Prefills the default country code based on the user's selected onboarding language (`en`/`hi`/`bn`/`ta` -> `+91 `, `es` -> `+34 `, `ar` -> `+966 `), while allowing user to edit or rewrite it freely.
-  - Stores the entered mobile number in `AsyncStorage` (`saheli.user_phone`).
-- **Profile Onboarding Setup** (`src/app/onboarding/profile.tsx` with `isEditing = false`):
-  - `phone` input is automatically **prefilled** with the mobile number from the phone setup step.
-  - `name` input starts empty, showing a clear hint placeholder (`e.g. Priya Sharma`).
-  - Language selection grid is **hidden** during onboarding (since language was selected in step 1).
-  - Sign Out and Delete Account buttons are **hidden**.
-  - Main button reads `Finish setup →`.
-- **In-App Profile Edit** (`src/app/onboarding/profile.tsx` with `isEditing = true`):
-  - Prefills saved profile data from `AsyncStorage`.
-  - Displays the Language selection grid for live language switching.
-  - Displays `Sign Out` (resets stack to `Language`) and `Delete Account` (clears storage & resets stack) buttons with confirmation alerts.
+**Navigation.** Native stack, `headerShown: false` — every screen draws its own header and handles its own `useSafeAreaInsets()`. Register new routes in `RootStackParamList` and `_layout.tsx` together. Destructive flows use `navigation.reset` to `Language`, not `goBack`.
 
-### D. Real Device Camera & Gallery Photo Picker
-- `src/app/onboarding/profile.tsx` integrates native `react-native-image-picker` helpers:
-  - `launchCamera({ mediaType: 'photo', cameraType: 'front', quality: 0.8 })` for real camera photo capture.
-  - `launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.8 })` for real device gallery photo selection.
-  - Displays `<Image source={{ uri: photoUri }} />` when a photo is selected.
+**Storage.** Prefix `saheli.`, go through `src/utils/storage.ts`, and document the key in `docs/ARCHITECTURE.md` §5. Current keys: `saheli.lang`, `saheli.theme.palette`, `saheli.user_phone`, `saheli.user_profile`, `saheli.family_members`.
 
+**Bottom sheets, not modals.** Add/edit flows use `src/components/BottomSheet.tsx` (drag-to-dismiss, optional blur backdrop), matching the Family screen.
 
-### D. OTP Input UX Rules
-- `src/app/onboarding/otp.tsx` uses a 6-box input array with `inputRefs`.
-- Entering a digit automatically focuses the next input (`inputRefs.current[index + 1]?.focus()`).
-- Pressing `Backspace` on an empty box automatically focuses the previous input.
-- Pasting a full 6-digit code populates all 6 boxes at once.
+## 6. Data models
 
----
-
-## 5. Primary Data Models
-
-### Family Member Schema (`src/features/family/FamilyScreen.tsx`)
-```typescript
-export interface FamilyMember {
-  id: string;
-  name: string;
-  phone: string;
-  relation: string; // 'Self' | 'Spouse' | 'Parent' | 'Child' | 'Staff'
-  role: 'owner' | 'editor' | 'viewer';
-  avatar: string;
-  permissions: {
-    medicines: boolean;
-    expenses: boolean;
-    documents: boolean;
-    safety: boolean;
-  };
-}
-```
-
-### Profile Storage Schema (`saheli.user_profile`)
-```typescript
-export interface UserProfile {
-  name: string;
-  phone: string;
+```ts
+// src/app/onboarding/profile.tsx — stored at saheli.user_profile
+interface UserProfile {
+  name: string; phone: string;
   role: 'household_ceo' | 'individual';
-  location: string;
-  avatar: string;
+  location: string; avatar: string; photoUri: string | null;
+}
+
+// src/features/family/FamilyScreen.tsx — authoritative; stored at saheli.family_members
+interface FamilyMember {
+  id: string; name: string; phone: string;
+  relation: string;                       // Self | Spouse | Parent | Child | Staff
+  role: 'owner' | 'editor' | 'viewer';
+  avatar: string;                         // emoji
+  permissions: { medicines: boolean; expenses: boolean; documents: boolean; safety: boolean };
 }
 ```
 
----
+## 7. How to work here
 
-## 6. How AI Models Should Execute Tasks
+1. Start with `prompts/session-start-context-load.md`.
+2. Pick a ⏳ Ready task from `docs/BACKLOG.md` and run `prompts/backlog-task-kickoff.md` with its ID.
+3. Close with `prompts/session-close-doc-sync.md` so the next session can trust these docs.
 
-1. **Check Type Validity**: Always verify TypeScript types with `npx tsc --noEmit`.
-2. **Preserve Navigation Direction**: Keep headers and back buttons left-aligned (`←` top-left).
-3. **Maintain Localization**: Add new UI strings to `src/i18n/locales/en.json` (and corresponding locale files).
-4. **Update Documentation**: Update `README.md`, `agent.md`, and this `AI_CONTEXT.md` file whenever milestones advance or architectural decisions change.
+Non-negotiables for every change:
+
+- `npx tsc --noEmit` must pass.
+- New strings in all six locale files.
+- Tokens from `src/theme.ts`; no inline hex.
+- Back arrow top-left in every language.
+- Update `docs/BACKLOG.md` and any affected doc in the same change as the code.
+- Never mark something done in a doc without pointing at the code that implements it.

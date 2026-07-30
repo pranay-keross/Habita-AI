@@ -1,174 +1,137 @@
-# SaheliCLI
+# Saheli
 
-**Saheli** is a comprehensive AI-powered life assistant designed for Indian women and their families — a single app that consolidates finance, health, home, safety, style, and payments into one intuitive experience.
+**Saheli** ("friend" in Hindi) is an AI-powered life assistant for Indian households — one app for finance, health, home, safety, style, and payments.
 
-> This README currently documents the first three core story areas: Authentication & Session, Home Dashboard, and Family Groups & Sharing.
+This repository (`SaheliCLI`) is the React Native 0.86 client. It is currently a **static, front-end-only prototype**: screens, navigation, theming, and localization are real; there is no backend, no authentication, and no AI integration yet. All data lives in `AsyncStorage` on the device.
 
-## 🔐 Authentication & Session
+| | |
+| --- | --- |
+| Stack | React Native 0.86 (CLI, not Expo) · React 19.2 · TypeScript 5.8 |
+| Navigation | React Navigation v7 (native stack) |
+| Persistence | `@react-native-async-storage/async-storage` |
+| Localization | `i18n-js` — 6 languages |
+| Branch | `initial-static` |
+| Last verified | 2026-07-30 (`npx tsc --noEmit` passes) |
 
-- Phone OTP login — any Indian phone number; demo OTP `123456`
-- Forced OTP verification — no bypass; user must enter the code
-- 15-minute idle auto-logout — session expires if the app is unused
-- 24-hour absolute session lifetime — hard cap regardless of activity
-- Re-auth UX — phone number pre-filled, amber "Session expired" banner
-- Manual sign-out available from Profile screen
-- 6-language onboarding — English, Hindi, Bengali, Tamil, Spanish, Arabic
-- Account deletion with DELETE confirmation phrase
+---
 
-## 🏠 Home Dashboard
+## Documentation map
 
-- Glossy hero card — personalized greeting + due/pending badges
-- Today's snapshot — 30-day spend + 7-day medicine adherence
-- Quick actions strip — Scan bill, Pay UPI, Take medicine, Add expense, Add fuel, Go Premium
-- 3-column tile grid — Scan, UPI Pay, Family, Money, Documents, Safety, Wellness, Style, Events
-- In-context tooltips (❓) on section headers
-- Profile completion path to the dashboard
+| Document | Purpose |
+| --- | --- |
+| `README.md` (this file) | Product story, what actually works today, how to run |
+| `AI_CONTEXT.md` | Single-source context brief for AI agents starting a session |
+| `docs/ARCHITECTURE.md` | Layers, navigation, theming, i18n, storage contracts, known gaps |
+| `docs/BACKLOG.md` | Milestone-based backlog tracker — the source of truth for what to build next |
+| `docs/DECISIONS.md` | Decision log (why things are the way they are) |
+| `agent.md` | How the AI agent works in this repo: workflow, guardrails, doc-sync duties |
+| `prompts/` | Reusable prompts — session start, task kickoff, session-close doc sync |
 
-## 🧑‍🤝‍🧑 Family Groups & Sharing
+---
 
-- Invite family members by phone number
-- Fine-grained module permissions per member:
-  - Documents (view / edit)
-  - Vehicles (view / edit)
-  - Medicine Chest (view / edit)
-  - Expense Groups (view / edit)
-  - Resources (view / edit)
-  - Events (view / edit)
-- Role-based access — Viewer / Editor
-- Accept / decline invitations
-- Leave family anytime
-- Owner-only delete guardrails for critical actions
-- Strict multi-tenant isolation — no accidental data leaks
+## What works today (verified against source)
 
-## Current project scope
+### Onboarding flow
+- **Language picker** (`src/app/onboarding/language.tsx`) — 6 languages (English, Hindi, Bengali, Tamil, Spanish, Arabic); selection persists to `saheli.lang` and switches the UI live.
+- **Phone entry** (`src/app/onboarding/phone.tsx`) — country code pre-filled from the chosen language (`+91` for en/hi/bn/ta, `+34` for es, `+966` for ar); the number is saved to `saheli.user_phone`.
+- **OTP screen** (`src/app/onboarding/otp.tsx`) — 6-box input with auto-advance, backspace-to-previous, and full-code paste support.
+- **Profile setup / edit** (`src/app/onboarding/profile.tsx`) — one screen in two modes (`isEditing`): name, phone, role (Household CEO / Individual), location, emoji avatar or real photo via camera/gallery (`react-native-image-picker`). Edit mode additionally shows the language grid, Sign Out, and Delete Account.
 
-The app is being built in phases. Right now the focus is on:
+### Home dashboard
+`src/app/dashboard.tsx` — scroll-driven header: the hero card scales and fades out while a sticky AppBar fades in with compact `2 Pending · 4 Due` pills and a profile button. Below it: a horizontal quick-actions strip (6 actions) and a 3-column tile grid (9 tiles). Only the **Family** tile navigates; the rest are static.
 
-1. Authentication & onboarding flow
-2. Home dashboard experience
-3. Family sharing and group permissions
+### Family & sharing
+`src/features/family/FamilyScreen.tsx` — member list with role badges (Owner / Editor / Viewer), permission pills, an add/edit bottom sheet (name, phone, relationship, role, four module permission toggles), and member removal. Members persist to `saheli.family_members`, seeded with three demo members.
 
-Other app domains will be added later: documents, medicine, expenses, UPI payments, vehicles, wellness, style, events, and AI integrations.
+### Design system
+- Three palettes in `src/theme.ts`: Terracotta (default), Ocean Breeze, Midnight (dark).
+- Shared tokens: `colors`, `spacing`, `radius`, `fonts`, `shadow`.
+- Reusable components: `Button`, `Card`, `SectionHeader`, and a draggable `BottomSheet` with optional backdrop blur.
 
-## Design principles
+---
 
-- Keep a central theme system with colors, font styles, spacing, and reusable tokens.
-- Store theme definitions in `src/theme` and use them throughout the UI.
-- Build reusable components in `src/components` for buttons, cards, forms, and layout containers.
-- Organize feature screens in `src/screens` or `src/app`, and keep navigation logic separate.
-- Prefer composition over duplication so color, typography, and spacing are consistent across the app.
-- Use a clean file structure: `src/theme`, `src/components`, `src/screens`, `src/features`, `src/hooks`, `src/utils`.
+## What does **not** work yet
 
-## Recommended source structure
+These are intentionally listed so nobody plans around them. Each is tracked in `docs/BACKLOG.md`.
 
-```
-src/
-  app/                 # app-specific screens, navigation, onboarding
-    _layout.tsx
-    onboarding/
-      language.tsx
-      phone.tsx
-      otp.tsx
-      profile.tsx
-  components/          # reusable UI components and design system atoms
-    Button.tsx
-    Card.tsx
-    Header.tsx
-    IconButton.tsx
-  features/            # feature modules, each with its own domain logic
-    auth/
-      auth.ts
-      auth.types.ts
-    family/
-      family.ts
-      permissions.ts
-  hooks/               # shared React hooks
-    useAuth.ts
-    useTheme.ts
-    useSession.ts
-  i18n/                # localization resources and helpers
-    index.ts
-    locales/
-      en.json
-      hi.json
-      bn.json
-      ta.json
-      es.json
-      ar.json
-  styles/              # shared styles and screen-specific style sheets
-    onboarding.ts
-  theme/               # theme tokens, palettes, and font definitions
-    index.ts
-    colors.ts
-    typography.ts
-  utils/               # helpers, formatters, and generic utility functions
-    storage.ts
-    validators.ts
-```
+- **No OTP verification.** The Verify button navigates onward regardless of what was typed. There is no `123456` check.
+- **No session lifecycle.** No idle timeout, no absolute expiry, no re-auth banner, no auth guard on the navigation stack. `src/hooks/useAuth.ts` and `src/features/auth/auth.ts` are unwired stubs.
+- **No backend or API layer.** Everything is device-local `AsyncStorage`.
+- **No AI features.** No OCR, no bill parsing, no assistant.
+- **No invite lifecycle.** "Send invitation" writes a local record and shows an alert; there is no accept/decline, no real SMS, no multi-tenant isolation.
+- **Family screen is English-only** — its strings are hardcoded, not routed through `i18n`.
+- **Custom fonts are not bundled.** `theme.fonts` names Fraunces/DM Sans, but no font files are linked, so text renders in the platform default.
+- **Palette switching has no UI** and would not restyle already-mounted screens (see `docs/ARCHITECTURE.md` → Known gaps).
+- **Modules not started:** Medicine, Documents, Money/UPI, Vehicles, Safety SOS, Wellness, Style, Events.
+
+---
 
 ## Getting started
 
-### Install dependencies
+Requires Node ≥ 22.11, and the standard React Native CLI environment (Android Studio / Xcode).
 
 ```sh
-npm install
+npm install                 # install JS dependencies
+cd ios && pod install && cd ..   # iOS only, first run and after native dep changes
+
+npm start                   # Metro bundler
+npm run android             # build & run on Android
+npm run ios                 # build & run on iOS
 ```
 
-### Run Metro
+Checks:
 
 ```sh
-npm start
+npx tsc --noEmit            # type check — must pass before any commit
+npm run lint                # eslint
+npm test                    # jest (currently one render smoke test)
 ```
 
-### Run iOS
+---
 
-```sh
-npm run ios
+## Source layout
+
+```
+App.tsx                     # root, wraps AppLayout in GestureHandlerRootView
+index.js                    # AppRegistry entry
+src/
+  app/
+    _layout.tsx             # NavigationContainer + native stack, RootStackParamList
+    dashboard.tsx           # home dashboard
+    onboarding/
+      language.tsx  phone.tsx  otp.tsx  profile.tsx
+  components/               # Button, Card, SectionHeader, BottomSheet
+  features/
+    auth/auth.ts            # stub (unused)
+    family/FamilyScreen.tsx # family module screen
+    family/index.ts         # stub (unused)
+  hooks/
+    useTheme.ts             # used by _layout
+    useAuth.ts              # stub (unused)
+  i18n/
+    index.ts                # i18n-js setup, language listeners, LTR enforcement
+    locales/{en,hi,bn,ta,es,ar}.json
+  theme.ts                  # ACTIVE theme: palettes + tokens
+  theme/                    # legacy tokens — shadowed by theme.ts, do not edit
+  styles/onboarding.ts      # legacy styles (unused)
+  shared/components/        # legacy barrel (unused)
+  utils/storage.ts          # AsyncStorage JSON helpers
 ```
 
-### Run Android
+See `docs/ARCHITECTURE.md` for why the shadowed/unused paths exist and what to do about them.
 
-```sh
-npm run android
-```
+---
 
-## Project status
+## Working in this repo
 
-- ✅ Authentication & onboarding scaffolded
-- ✅ Language support and i18n setup
-- ✅ Native module linking and CocoaPods installation
-- ✅ TypeScript validation passing
-- ⚠️ Home dashboard UI and feature polish in progress
-- ⚠️ Family sharing permission model still under development
-- ⏳ Other major app modules pending
-## Project status board
+1. Start a session with `prompts/session-start-context-load.md`.
+2. Pick the next task from `docs/BACKLOG.md` and kick it off with `prompts/backlog-task-kickoff.md`.
+3. Close the session with `prompts/session-close-doc-sync.md` so the docs match the code.
 
-| Area | Status | Notes |
-| --- | --- | --- |
-| Authentication & Session | ✅ Completed | OTP auto-advance 6-box login, session storage |
-| Home Dashboard | ✅ Completed | Scroll-transforming sticky header & compact due/pending status |
-| Profile & Settings | ✅ Completed | Camera/Gallery crop options, name, phone, language picker, sign-out & account deletion |
-| Family Groups & Sharing | ✅ Completed | Group members overview, roles, permission toggles, invite modal |
-| AI Agent Master Context | ✅ Created | `AI_CONTEXT.md` single-source guide for AI models |
-| Medicine & Health | ⏳ Pending | Next Sprint |
-| Document Hub | ⏳ Pending | Sprint 3 |
-| Money & Payments | ⏳ Pending | Sprint 3 |
+Rules that apply to every change:
 
-
-## Next sprint
-
-- Finish the phone OTP login flow and session expiration behavior
-- Add the onboarding language selection screen and persistence
-- Build the Home dashboard hero card and quick-action strip
-- Create the first Family invite flow and a basic Viewer/Editor model
-- Keep the app launch flow stable on iOS with Metro
-
-## How to contribute
-
-1. Read the current app story in `README.md`.
-2. Review feature status in `agent.md`.
-3. Update the relevant section with progress, new tasks, or blocking issues.
-4. Keep the story summary aligned with the actual code and UI.
-## Notes
-
-Use `README.md` as the primary app story summary. Keep this file updated when new sections are added or behavior changes.
+- Keep `npx tsc --noEmit` green.
+- Add every new user-facing string to all six locale files.
+- Use tokens from `src/theme.ts` — no hardcoded hex values in screens.
+- Keep navigation LTR (back arrow top-left) in all languages, including Arabic.
+- Update `docs/BACKLOG.md` status and the relevant docs in the same change as the code.
