@@ -78,6 +78,20 @@ Format: `D-NNN — Title` · Status · Date · Context → Decision → Conseque
 
 ---
 
+## D-007 — One storage path, everything JSON-encoded
+
+**Status:** Accepted · **Date:** 2026-07-30 (`M1-T2`)
+
+**Context.** `src/utils/storage.ts` JSON-serializes every value, but `src/theme.ts` and `src/i18n/index.ts` bypassed it and wrote `saheli.lang` and `saheli.theme.palette` as bare strings. Two access paths meant two error-handling styles and a storage contract with exceptions in it — and any future audit of "what is on disk" had to know which keys were special.
+
+**Decision.** Both modules go through `getItem`/`setItem`. `src/utils/storage.ts` is now the only module in the app that imports `AsyncStorage`, and every persisted value is JSON. Both reads validate the loaded value against the known set (`SUPPORTED_LANGS`, `palettes`) and fall back to the default.
+
+The alternative — a compatibility shim that reads a legacy bare string when `JSON.parse` fails — was **rejected**. It protects users who do not exist (the app has never shipped, D-002) at the cost of migration code that would have to be found and deleted later.
+
+**Consequences.** On a device that already has the app, `saheli.lang` and `saheli.theme.palette` stop parsing once. This fails safely — `getItem` catches the `JSON.parse` throw and returns the fallback — so the effect is that **language resets to English and palette to Terracotta exactly once**, on dev devices only. Callers no longer need their own try/catch, since the helpers never throw. Any new persisted value must go through the helper; a raw `AsyncStorage` import outside `src/utils/storage.ts` is now a defect.
+
+---
+
 ## Open decisions
 
 Tracked in `docs/BACKLOG.md` → Open questions. Move each here once answered.

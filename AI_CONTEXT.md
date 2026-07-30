@@ -66,7 +66,7 @@ jest.config.js · jest.setup.js   test harness — transform allowlist + native 
 
 **Navigation.** Native stack, `headerShown: false` — every screen draws its own header and handles its own `useSafeAreaInsets()`. Register new routes in `RootStackParamList` and `_layout.tsx` together. Destructive flows use `navigation.reset` to `Language`, not `goBack`.
 
-**Storage.** Prefix `saheli.`, go through `src/utils/storage.ts`, and document the key in `docs/ARCHITECTURE.md` §5. Current keys: `saheli.lang`, `saheli.theme.palette`, `saheli.user_phone`, `saheli.user_profile`, `saheli.family_members`.
+**Storage.** Prefix `saheli.`, go through `src/utils/storage.ts`, and document the key in `docs/ARCHITECTURE.md` §5. Everything on disk is JSON, and `storage.ts` is the only module that may import `AsyncStorage` (D-007) — the helpers swallow errors and return your fallback, so callers need no try/catch. Current keys: `saheli.lang`, `saheli.theme.palette`, `saheli.user_phone`, `saheli.user_profile`, `saheli.family_members`.
 
 **Bottom sheets, not modals.** Add/edit flows use `src/components/BottomSheet.tsx` (drag-to-dismiss, optional blur backdrop), matching the Family screen.
 

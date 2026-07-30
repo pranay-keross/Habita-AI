@@ -1,5 +1,5 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Platform } from 'react-native';
+import { getItem, setItem } from './utils/storage';
 
 export interface PaletteColors {
   primary: string;
@@ -120,20 +120,15 @@ export function applyPalette(paletteKey: string) {
 const THEME_KEY = 'saheli.theme.palette';
 
 export async function loadSavedTheme(): Promise<string> {
-  try {
-    const saved = await AsyncStorage.getItem(THEME_KEY);
-    if (saved) applyPalette(saved);
-    return saved || 'terracotta';
-  } catch {
-    return 'terracotta';
-  }
+  const saved = await getItem<string>(THEME_KEY, 'terracotta');
+  const key = palettes.find((p) => p.key === saved) ? saved : 'terracotta';
+  applyPalette(key);
+  return key;
 }
 
 export async function saveTheme(paletteKey: string) {
   applyPalette(paletteKey);
-  try {
-    await AsyncStorage.setItem(THEME_KEY, paletteKey);
-  } catch {}
+  await setItem(THEME_KEY, paletteKey);
 }
 
 export const spacing = {

@@ -1,6 +1,6 @@
 import { I18n } from 'i18n-js';
 import { I18nManager } from 'react-native';
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { getItem, setItem } from '../utils/storage';
 import en from './locales/en.json';
 import bn from './locales/bn.json';
 import hi from './locales/hi.json';
@@ -41,18 +41,14 @@ export function getCurrentLanguage() {
 }
 
 export async function loadSavedLanguage(): Promise<string> {
-  try {
-    const saved = await AsyncStorage.getItem(LANG_KEY);
-    const code = saved && SUPPORTED_LANGS.find((l) => l.code === saved) ? saved : 'en';
-    applyLanguage(code);
-    return code;
-  } catch {
-    return 'en';
-  }
+  const saved = await getItem<string>(LANG_KEY, 'en');
+  const code = SUPPORTED_LANGS.find((l) => l.code === saved) ? saved : 'en';
+  applyLanguage(code);
+  return code;
 }
 
 export async function setLanguage(code: string) {
-  await AsyncStorage.setItem(LANG_KEY, code);
+  await setItem(LANG_KEY, code);
   applyLanguage(code);
 }
 

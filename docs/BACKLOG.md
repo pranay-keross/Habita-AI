@@ -19,7 +19,7 @@ Every task is sized to be completed in one focused session and is executable wit
 | # | Milestone | Status | Tasks | Theme |
 | --- | --- | --- | --- | --- |
 | M0 | Documentation & working agreements | ✅ Done | 4 / 4 | Docs, prompts, decision log |
-| M1 | Foundation hardening | 🚧 In progress | 1 / 9 | Theme, dead code, fonts, typing |
+| M1 | Foundation hardening | 🚧 In progress | 2 / 9 | Theme, dead code, fonts, typing |
 | M2 | Auth & session (make it real) | ⏳ Ready | 0 / 6 | OTP, session lifecycle, guards |
 | M3 | Family module completion | ⏳ Ready | 0 / 6 | i18n, invite lifecycle, guardrails |
 | M4 | Medicine & health | ⏳ Ready | 0 / 5 | First new domain module |
@@ -54,7 +54,7 @@ Goal: remove the traps that will otherwise cost every future session. No new use
 | ID | Task | Acceptance criteria | Status |
 | --- | --- | --- | --- |
 | M1-T1 | Delete shadowed and unused code: `src/theme/`, `src/styles/onboarding.ts`, `src/shared/components/index.ts`, `src/features/family/index.ts` | Files removed; `tsc --noEmit`, `npm run lint`, `npm test` all pass; nothing imported them beforehand (verify with grep) | ✅ 2026-07-30 |
-| M1-T2 | Route `saheli.lang` and `saheli.theme.palette` through `src/utils/storage.ts` instead of raw `AsyncStorage`, or document why they stay raw strings | One storage access path; `docs/ARCHITECTURE.md` §5 updated | ⏳ |
+| M1-T2 | Route `saheli.lang` and `saheli.theme.palette` through `src/utils/storage.ts` instead of raw `AsyncStorage`, or document why they stay raw strings | One storage access path; `docs/ARCHITECTURE.md` §5 updated | ✅ 2026-07-30 |
 | M1-T3 | Make theme switching work at runtime: theme Context or `useThemedStyles(fn)` hook; styles resolve per render | Changing palette restyles mounted screens with no restart; all screens migrated off module-scope `StyleSheet.create` reads of `colors` | ⏳ |
 | M1-T4 | Add a palette picker to the profile edit screen (Terracotta / Ocean / Midnight with swatches) | Selection persists, applies live, survives restart | 🔒 needs M1-T3 |
 | M1-T5 | Bundle Fraunces + DM Sans fonts, or replace `theme.fonts` with the platform stack | Text renders in the intended typeface on both platforms, or the token honestly names what renders | ⏳ |
@@ -185,7 +185,7 @@ Runs alongside every other milestone; gates any store release.
 | M9-T5 | Accessibility pass: labels on icon-only buttons, contrast check across all three palettes, dynamic type sanity | Screen reader can navigate onboarding and dashboard | ⏳ |
 | M9-T6 | Release prep: app icons, splash, versioning, signed Android/iOS builds | Installable build produced | ⏳ |
 | M9-T7 | Repair the jest harness: install the missing `@react-native/jest-preset`, widen `transformIgnorePatterns` for the RN-ecosystem ESM packages, and mock gesture-handler / async-storage / safe-area-context | `npm test` runs and passes; documented in `ARCHITECTURE.md` §8 | ✅ 2026-07-30 |
-| M9-T8 | Silence the React `act()` warning in the smoke test — `language.tsx` bumps `localeVersion` from the async `loadSavedLanguage()` callback, outside `act` | `npm test` passes with no console warnings | ⏳ |
+| M9-T8 | Clean up the smoke test: (a) the React `act()` warning — `language.tsx` bumps `localeVersion` from the async `loadSavedLanguage()` callback, outside `act`; (b) the test never unmounts, so `@react-navigation/native`'s `useLinking` `setTimeout` stays pending and jest reports "did not exit" (surfaced by `M1-T2`'s extra async hop; exit code is still 0, but it will hang CI in `M9-T4`) | `npm test` passes with no console warnings and no open-handle notice | ⏳ |
 
 ---
 

@@ -108,12 +108,14 @@ Screens subscribe, bump a `localeVersion` counter, and pass `key={localeVersion}
 
 ## 5. Persistence contract
 
-**Helper:** `src/utils/storage.ts` — `getItem<T>(key, fallback)`, `setItem<T>(key, value)`, `removeItem(key)`, `clearAll()`. All swallow errors and fall back silently; all JSON-serialize. **Exception:** `src/theme.ts` and `src/i18n/index.ts` call `AsyncStorage` directly with raw strings, not through these helpers.
+**Helper:** `src/utils/storage.ts` — `getItem<T>(key, fallback)`, `setItem<T>(key, value)`, `removeItem(key)`, `clearAll()`. All swallow errors and fall back silently; all JSON-serialize.
+
+Since `M1-T2` (2026-07-30) this is the **only** path to storage — `src/utils/storage.ts` is the single module that imports `AsyncStorage`, and every value on disk is JSON. Because the helpers already swallow errors and return the fallback, callers do not need their own try/catch (see `loadSavedLanguage` / `loadSavedTheme`). See `docs/DECISIONS.md` D-007.
 
 | Key | Written by | Shape | Notes |
 | --- | --- | --- | --- |
-| `saheli.lang` | `i18n/index.ts` | raw string (`"hi"`) | not JSON-encoded |
-| `saheli.theme.palette` | `theme.ts` | raw string (`"ocean"`) | not JSON-encoded |
+| `saheli.lang` | `i18n/index.ts` | JSON string (`"hi"`) | validated against `SUPPORTED_LANGS` on read; falls back to `en` |
+| `saheli.theme.palette` | `theme.ts` | JSON string (`"ocean"`) | validated against `palettes` on read; falls back to `terracotta` |
 | `saheli.user_phone` | `onboarding/phone.tsx` | JSON string | pre-fills the profile step |
 | `saheli.user_profile` | `onboarding/profile.tsx` | `UserProfile` JSON | read by dashboard (avatar) and profile edit |
 | `saheli.family_members` | `features/family/FamilyScreen.tsx` | `FamilyMember[]` JSON | seeded with 3 demo members on first read |
