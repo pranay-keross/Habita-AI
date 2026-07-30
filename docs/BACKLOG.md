@@ -19,7 +19,7 @@ Every task is sized to be completed in one focused session and is executable wit
 | # | Milestone | Status | Tasks | Theme |
 | --- | --- | --- | --- | --- |
 | M0 | Documentation & working agreements | ✅ Done | 4 / 4 | Docs, prompts, decision log |
-| M1 | Foundation hardening | 🚧 In progress | 2 / 9 | Theme, dead code, fonts, typing |
+| M1 | Foundation hardening | 🚧 In progress | 4 / 11 | Theme, dead code, fonts, typing |
 | M2 | Auth & session (make it real) | ⏳ Ready | 0 / 6 | OTP, session lifecycle, guards |
 | M3 | Family module completion | ⏳ Ready | 0 / 6 | i18n, invite lifecycle, guardrails |
 | M4 | Medicine & health | ⏳ Ready | 0 / 5 | First new domain module |
@@ -55,13 +55,15 @@ Goal: remove the traps that will otherwise cost every future session. No new use
 | --- | --- | --- | --- |
 | M1-T1 | Delete shadowed and unused code: `src/theme/`, `src/styles/onboarding.ts`, `src/shared/components/index.ts`, `src/features/family/index.ts` | Files removed; `tsc --noEmit`, `npm run lint`, `npm test` all pass; nothing imported them beforehand (verify with grep) | ✅ 2026-07-30 |
 | M1-T2 | Route `saheli.lang` and `saheli.theme.palette` through `src/utils/storage.ts` instead of raw `AsyncStorage`, or document why they stay raw strings | One storage access path; `docs/ARCHITECTURE.md` §5 updated | ✅ 2026-07-30 |
-| M1-T3 | Make theme switching work at runtime: theme Context or `useThemedStyles(fn)` hook; styles resolve per render | Changing palette restyles mounted screens with no restart; all screens migrated off module-scope `StyleSheet.create` reads of `colors` | ⏳ |
-| M1-T4 | Add a palette picker to the profile edit screen (Terracotta / Ocean / Midnight with swatches) | Selection persists, applies live, survives restart | 🔒 needs M1-T3 |
+| M1-T3a | Runtime theme switching mechanism: `subscribeToThemeChanges` observer, `useThemedStyles(factory)` hook, fix `useTheme`'s no-op `setState`; migrate `dashboard.tsx` as the pilot | A mounted component restyles when the palette changes, proven by a test that switches palette without unmounting | ✅ 2026-07-30 |
+| M1-T3b | Migrate the remaining nine files to the `useThemedStyles(makeStyles)` factory pattern: `language/phone/otp/profile.tsx`, `FamilyScreen.tsx`, `BottomSheet/Button/Card/SectionHeader.tsx` | No module-scope `StyleSheet.create` reads `colors` anywhere; every screen restyles on palette change | ⏳ |
+| M1-T4 | Add a palette picker to the profile edit screen (Terracotta / Ocean / Midnight with swatches) | Selection persists, applies live, survives restart | 🔒 needs M1-T3b (the picker lives in `profile.tsx`, which must be migrated to restyle live) |
 | M1-T5 | Bundle Fraunces + DM Sans fonts, or replace `theme.fonts` with the platform stack | Text renders in the intended typeface on both platforms, or the token honestly names what renders | ⏳ |
 | M1-T6 | Unify navigation typing on `NativeStackScreenProps` from `@react-navigation/native-stack`; drop `@react-navigation/stack` if unused | Single nav package in `package.json` deps; `tsc` green | ⏳ |
 | M1-T7 | Give dashboard tiles and quick actions stable IDs; route on ID, not translated label | Family tile still navigates when the app is in Hindi; adding a route needs no string matching | ⏳ |
 | M1-T8 | Replace the `key={localeVersion}` remount pattern with a proper i18n hook/Context (`useTranslation()`) | Language switch re-renders without remounting subtrees; state is not lost on switch | ⏳ |
 | M1-T9 | Add a `textOnPrimary` role to `PaletteColors` and all three palettes; replace the three inline `{ color: '#FFF' }` in `language.tsx:83` and `profile.tsx:256,262` | No inline hex left in any screen; the active-card label stays legible in Midnight, where `surfaceElevated` is `#2A2440` and is *not* a valid substitute | ⏳ |
+| M1-T10 | Wire `shadow.soft`/`shadow.medium` to each palette's `shadowColor` instead of hardcoding `#C96B5D`/`#7D3F3F`, so Midnight casts a black shadow | `shadow` follows the active palette; no hardcoded hex in the shadow tokens | ✅ 2026-07-30 |
 
 ---
 

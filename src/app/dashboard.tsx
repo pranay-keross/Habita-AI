@@ -3,7 +3,8 @@ import { View, Text, ScrollView, Pressable, StyleSheet, Animated } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from './_layout';
-import { colors, fonts, radius, shadow, spacing } from '../theme';
+import type { ThemeTokens } from '../theme';
+import useThemedStyles from '../hooks/useThemedStyles';
 import SectionHeader from '../components/SectionHeader';
 import Card from '../components/Card';
 import { subscribeToLanguageChanges, t } from '../i18n';
@@ -14,6 +15,7 @@ type Props = StackScreenProps<RootStackParamList, 'Dashboard'>;
 const PROFILE_STORAGE_KEY = 'saheli.user_profile';
 
 export default function DashboardScreen({ navigation }: Props) {
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const scrollY = useRef(new Animated.Value(0)).current;
   const [avatar, setAvatar] = useState('👩‍💼');
@@ -212,7 +214,10 @@ export default function DashboardScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+// Wrapped in a factory so the palette is read per render, not at module load.
+// The destructured parameter shadows the module imports, so the block below is
+// unchanged from when it was a plain StyleSheet.create call.
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: colors.background,

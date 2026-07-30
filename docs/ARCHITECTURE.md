@@ -77,7 +77,29 @@ export function applyPalette(key) { Object.assign(colors, p.colors); }  // mutat
 
 `applyPalette` mutates the exported `colors` object rather than replacing it, so every module holding a reference sees the new values. The selected key persists to `saheli.theme.palette`; `loadSavedTheme()` restores it, `saveTheme()` writes it. `src/hooks/useTheme.ts` wraps both and is consumed once, in `_layout.tsx`, to set the stack's `contentStyle.backgroundColor`.
 
-**Why runtime switching does not actually work yet:** screens build their styles with `StyleSheet.create({...})` at *module load*, reading `colors.x` once. Mutating `colors` afterwards does not re-create those frozen style objects. So a palette change only takes effect on a fresh app start, and there is no UI to trigger one. Fixing this means either moving to a theme Context with styles built inside the render, or a `useThemedStyles(fn)` hook. Tracked as `M1-T3`.
+**Runtime switching — how it works since `M1-T3a` (2026-07-30).** The blocker was that screens build styles with `StyleSheet.create({...})` at *module load*, reading `colors.x` once; mutating `colors` afterwards cannot re-create those frozen style objects, and remounting does not help because module scope is evaluated once per module load, not per mount. Styles therefore have to be built in the render path.
+
+Three pieces make that work, with no Provider and no change to D-004's mutable singleton:
+
+1. **An observer in `theme.ts`** — `subscribeToThemeChanges(listener)`, with `applyPalette()` notifying every listener. Deliberately the same shape as `subscribeToLanguageChanges` in §4.
+2. **`src/hooks/useThemedStyles.ts`** — `useThemedStyles(factory)` subscribes via `useSyncExternalStore` (the right primitive for an external mutable store) keyed on `currentPaletteMeta.key`, and `useMemo`s the built StyleSheet so it is only rebuilt when the palette actually changes.
+3. **A factory-shaped style block.** Screens keep their style block verbatim and wrap it:
+
+```ts
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
+  StyleSheet.create({ /* unchanged */ });
+
+// inside the component:
+const styles = useThemedStyles(makeStyles);
+```
+
+Destructuring the factory parameter shadows the module-level imports, so the body needs no edits — the migration is about three lines per file regardless of how large the style block is.
+
+**Migration status:** `dashboard.tsx` is migrated as the pilot. The other nine files still read tokens at module scope and will not restyle until `M1-T3b` lands.
+
+`useTheme()` previously held `theme` in `useState` and re-set it after a change; since `theme.colors` is the same mutable object every time, React bailed out on identity and never re-rendered — so even its one consumer (`_layout.tsx`) did not update. It now subscribes on the palette *key*, which is the value that actually changes.
+
+**Shadows follow the palette** (`M1-T10`). `shadow.soft`/`shadow.medium` used to hardcode `#C96B5D`/`#7D3F3F` while each `Palette.shadowColor` went unread, so Midnight cast a terracotta shadow. `shadow` is now a mutable singleton rebuilt by `applyPalette` from the active palette's `shadowColor`.
 
 `src/theme.ts` is the only theme source. The older shadowed `src/theme/` directory was deleted in `M1-T1` (2026-07-30); all 12 `../theme` imports in the repo resolve to the file.
 
@@ -188,7 +210,7 @@ Ordered by how much they will hurt later. All are tracked in `docs/BACKLOG.md`.
 
 1. **Auth is theatre.** `otp.tsx`'s Verify button calls `navigation.navigate('Profile')` unconditionally — no code comparison, no attempt limit, no resend timer wiring. `useAuth`/`authService` are stubs returning `{ success: true }` and are imported by nothing. There is no auth guard, so the Dashboard is reachable by back/forward navigation without any credential. (`M2`)
 2. **No session lifecycle.** The idle timeout, absolute expiry, and re-auth banner described in earlier documentation were never implemented. (`M2-T3`)
-3. **Theme cannot change at runtime** (§3) and there is no palette picker UI. (`M1-T3`)
+3. **Theme switching works, but only on `dashboard.tsx`** — the other nine files still read tokens at module scope, so they do not restyle until `M1-T3b`. There is still no palette picker UI (`M1-T4`). (§3)
 4. **Auth stubs are unused.** `src/hooks/useAuth.ts` and `src/features/auth/auth.ts` are imported by nothing (`useAuth` imports `authService`, and nothing imports `useAuth`). They are deliberately kept as the scaffolding `M2-T3`/`M2-T4` will build the real session model into. The other four dead paths were deleted in `M1-T1` (2026-07-30).
 5. **Family screen not localized** — breaks the 6-language promise on a shipped screen. (`M3-T1`)
 6. **Fonts not bundled** — the visual design in the palette definitions is not what renders. (`M1-T4`)
@@ -207,6 +229,8 @@ Ordered by how much they will hurt later. All are tracked in `docs/BACKLOG.md`.
 
 - **`transformIgnorePatterns`** — the preset only lets `react-native` and `@react-native*` through babel. Every other RN-ecosystem package in this app ships untranspiled ESM, so `@react-navigation`, `react-native-gesture-handler`, `react-native-safe-area-context`, `react-native-screens`, `react-native-image-picker` and `@react-native-async-storage` are added to the allowlist. **Adding a new RN dependency that ships ESM means adding it here too.**
 - **`jest.setup.js`** — swaps native modules for the mocks each package ships: `react-native-gesture-handler/jestSetup`, `@react-native-async-storage/async-storage/jest`, and `react-native-safe-area-context/jest/mock`. The safe-area mock is a default-exported object while consumers use named imports, so it is unwrapped with `.default`.
+
+`__tests__/theme.test.tsx` (added in `M1-T3a`) is the pattern to copy for behavioural tests: it mounts a component, calls `applyPalette()` **while it stays mounted**, and asserts the resolved `backgroundColor` actually changed — proving the mechanism rather than asserting it. Unmount inside `act()` before any `afterEach` that changes global state, or the reset pushes a store update into a live tree.
 
 The suite passes but prints a React `act()` warning: `language.tsx` bumps `localeVersion` from the async `loadSavedLanguage()` callback, outside `act`. Tracked as `M9-T7`.
 

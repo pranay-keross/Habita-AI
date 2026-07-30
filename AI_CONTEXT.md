@@ -58,7 +58,16 @@ jest.config.js · jest.setup.js   test harness — transform allowlist + native 
 
 ## 5. Patterns you must follow
 
-**Theme.** Import `{ colors, fonts, radius, shadow, spacing }` from `src/theme`. `colors` is a mutable singleton mutated by `applyPalette()`. Because `StyleSheet.create` snapshots values at module load, palette changes do not restyle mounted screens; that is a known limitation (`docs/DECISIONS.md` D-004, fix tracked as `M1-T3`). Never hardcode hex in a screen.
+**Theme.** `colors` and `shadow` are mutable singletons mutated by `applyPalette()`. Because `StyleSheet.create` snapshots values at module load, a style block written at module scope will **not** restyle when the palette changes. Write it as a factory instead and call it from the render (D-004, D-008):
+
+```ts
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
+  StyleSheet.create({ /* body unchanged — the params shadow the imports */ });
+
+const styles = useThemedStyles(makeStyles);   // src/hooks/useThemedStyles.ts
+```
+
+Only `dashboard.tsx` is migrated so far; the other nine files are `M1-T3b`. Follow the factory pattern in any **new** screen. Never hardcode hex in a screen.
 
 **i18n.** Six locales: en, hi, bn, ta, es, ar. Every new user-facing string goes into **all six** files, namespaced by screen. `i18n-js` is not reactive, so screens call `subscribeToLanguageChanges()`, bump a `localeVersion` counter, and pass `key={localeVersion}` to their root view. Translated arrays are built inside the render body, not at module scope.
 

@@ -1,23 +1,40 @@
-import {useEffect, useState} from 'react';
-import {loadSavedTheme, saveTheme, theme as defaultTheme} from '../theme';
+import {useEffect, useSyncExternalStore} from 'react';
+import {
+  currentPaletteMeta,
+  loadSavedTheme,
+  saveTheme,
+  subscribeToThemeChanges,
+  theme,
+} from '../theme';
 
+let hydrated = false;
+
+/**
+ * Tracks the active palette.
+ *
+ * This used to hold `theme` in `useState` and re-set it after a change, but
+ * `theme.colors` is the same mutable object every time, so React bailed out on
+ * identity and never re-rendered. The palette *key* is the value that actually
+ * changes, so that is what drives the subscription.
+ */
 export default function useTheme() {
-  const [palette, setPalette] = useState(defaultTheme);
+  const paletteKey = useSyncExternalStore(
+    subscribeToThemeChanges,
+    () => currentPaletteMeta.key,
+  );
 
   useEffect(() => {
-    async function loadTheme() {
-      await loadSavedTheme();
-      setPalette(defaultTheme);
-    }
-
-    loadTheme();
+    // Guarded at module scope so several consumers do not each re-read storage.
+    // Restoring the saved palette notifies subscribers, which re-renders us.
+    if (hydrated) return;
+    hydrated = true;
+    loadSavedTheme();
   }, []);
 
   return {
-    theme: palette,
-    setTheme: async (key: string) => {
-      await saveTheme(key);
-      setPalette(defaultTheme);
-    },
+    theme,
+    paletteKey,
+    isDark: currentPaletteMeta.isDark,
+    setTheme: (key: string) => saveTheme(key),
   };
 }

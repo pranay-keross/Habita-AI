@@ -44,7 +44,7 @@ Format: `D-NNN — Title` · Status · Date · Context → Decision → Conseque
 
 ## D-004 — Mutable singleton palette instead of a theme Context
 
-**Status:** Accepted, but **known-limited** · **Date:** 2026-07
+**Status:** Accepted · **Date:** 2026-07 · the limitation described below was resolved by **D-008**, which keeps this decision intact
 
 **Context.** Three palettes (Terracotta, Ocean, Midnight) needed to be readable from `StyleSheet.create` blocks at the top of every screen file without threading a provider through the tree.
 
@@ -89,6 +89,20 @@ Format: `D-NNN — Title` · Status · Date · Context → Decision → Conseque
 The alternative — a compatibility shim that reads a legacy bare string when `JSON.parse` fails — was **rejected**. It protects users who do not exist (the app has never shipped, D-002) at the cost of migration code that would have to be found and deleted later.
 
 **Consequences.** On a device that already has the app, `saheli.lang` and `saheli.theme.palette` stop parsing once. This fails safely — `getItem` catches the `JSON.parse` throw and returns the fallback — so the effect is that **language resets to English and palette to Terracotta exactly once**, on dev devices only. Callers no longer need their own try/catch, since the helpers never throw. Any new persisted value must go through the helper; a raw `AsyncStorage` import outside `src/utils/storage.ts` is now a defect.
+
+---
+
+## D-008 — Style factories + `useSyncExternalStore`, not a theme Context
+
+**Status:** Accepted · **Date:** 2026-07-30 (`M1-T3a`)
+
+**Context.** D-004's mutable `colors` singleton could not restyle mounted screens, because `StyleSheet.create` at module scope reads the palette once at module load. The `key={localeVersion}` remount trick used for i18n (D-003, §4) does **not** transfer: remounting re-runs the render, not module scope, so the frozen style object survives. Styles had to move into the render path.
+
+**Decision.** Keep the mutable singleton. Add an observer to `theme.ts` (`subscribeToThemeChanges`), and a `useThemedStyles(factory)` hook built on `useSyncExternalStore` keyed on the palette key, memoising the built StyleSheet. Screens wrap their existing style block in a factory whose destructured parameter shadows the module imports, so the block body is untouched.
+
+A React Context Provider was **rejected**: it would mean threading a provider through the tree and rewriting every token reference, for no behaviour the observer does not already give. `useSyncExternalStore` exists precisely for an external mutable store, which is what D-004 chose to have.
+
+**Consequences.** Migration is ~3 lines per file no matter how large the style block — important, since `FamilyScreen.tsx` and `profile.tsx` carry ~365 and ~276 lines of styles. A **new screen must use the factory form**; a module-scope `StyleSheet.create` reading `colors` is now a defect, and one that is invisible until someone switches palette. Only `dashboard.tsx` is migrated (`M1-T3a`); the rest is `M1-T3b`, and until it lands the app restyles inconsistently. Two bugs were fixed on the way: `useTheme` re-set state to the same object identity so it never re-rendered, and `shadow` hardcoded terracotta colours while every `Palette.shadowColor` went unread (`M1-T10`).
 
 ---
 

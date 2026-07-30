@@ -110,11 +110,24 @@ export const palettes: Palette[] = [
 export const colors: PaletteColors = { ...palettes[0].colors };
 export const currentPaletteMeta = { key: palettes[0].key, isDark: palettes[0].isDark };
 
+// Same hand-rolled observer i18n uses for language changes: the tokens below are
+// mutable singletons, so nothing in React notices a change without a nudge.
+const themeListeners = new Set<() => void>();
+
+export function subscribeToThemeChanges(listener: () => void) {
+  themeListeners.add(listener);
+  return () => {
+    themeListeners.delete(listener);
+  };
+}
+
 export function applyPalette(paletteKey: string) {
   const p = palettes.find((x) => x.key === paletteKey) || palettes[0];
   Object.assign(colors, p.colors);
   currentPaletteMeta.key = p.key;
   currentPaletteMeta.isDark = p.isDark;
+  applyShadowColor(p.shadowColor);
+  themeListeners.forEach((listener) => listener());
 }
 
 const THEME_KEY = 'saheli.theme.palette';
@@ -157,29 +170,57 @@ export const fonts = {
   sansBold: 'DMSans_700Bold',
 };
 
-export const shadow = Platform.OS === 'web'
-  ? {
-      soft: { boxShadow: '0 4px 16px rgba(201,107,93,0.08)' } as any,
-      medium: { boxShadow: '0 6px 20px rgba(125,63,63,0.12)' } as any,
-    }
-  : {
-      soft: {
-        shadowColor: '#C96B5D',
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.08,
-        shadowRadius: 16,
-        elevation: 3,
-      },
-      medium: {
-        shadowColor: '#7D3F3F',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.12,
-        shadowRadius: 20,
-        elevation: 6,
-      },
-    };
+function hexToRgba(hex: string, alpha: number) {
+  const h = hex.replace('#', '');
+  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
+  const r = parseInt(full.slice(0, 2), 16);
+  const g = parseInt(full.slice(2, 4), 16);
+  const b = parseInt(full.slice(4, 6), 16);
+  return `rgba(${r},${g},${b},${alpha})`;
+}
 
-export const theme = {
+function buildShadow(shadowColor: string) {
+  return Platform.OS === 'web'
+    ? {
+        soft: { boxShadow: `0 4px 16px ${hexToRgba(shadowColor, 0.08)}` } as any,
+        medium: { boxShadow: `0 6px 20px ${hexToRgba(shadowColor, 0.12)}` } as any,
+      }
+    : {
+        soft: {
+          shadowColor,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 16,
+          elevation: 3,
+        },
+        medium: {
+          shadowColor,
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.12,
+          shadowRadius: 20,
+          elevation: 6,
+        },
+      };
+}
+
+// Mutable, like `colors` — each palette declares its own shadowColor.
+export const shadow = buildShadow(palettes[0].shadowColor);
+
+function applyShadowColor(shadowColor: string) {
+  const next = buildShadow(shadowColor);
+  Object.assign(shadow.soft, next.soft);
+  Object.assign(shadow.medium, next.medium);
+}
+
+export interface ThemeTokens {
+  colors: PaletteColors;
+  spacing: typeof spacing;
+  radius: typeof radius;
+  fonts: typeof fonts;
+  shadow: typeof shadow;
+}
+
+export const theme: ThemeTokens = {
   colors,
   spacing,
   radius,
