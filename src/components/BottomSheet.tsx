@@ -12,7 +12,7 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { colors, fonts, radius, shadow, spacing } from '../theme';
+import { colors, fonts, shadow, spacing } from '../theme';
 
 interface BottomSheetProps {
   visible: boolean;
@@ -97,7 +97,8 @@ export default function BottomSheet({
         }),
       ]).start();
     }
-  }, [visible]);
+    // translateY and opacity are useRef(...).current — stable across renders.
+  }, [visible, translateY, opacity]);
 
   const dismissSheet = () => {
     Animated.parallel([

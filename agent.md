@@ -53,7 +53,7 @@ These apply to every change. An agent should stop and ask rather than break one.
 
 1. **`npx tsc --noEmit` must pass** before a task is called done. Run `npm run lint` and `npm test` too, and report the real output.
 2. **Six locales or none.** Any new user-facing string is added to all of `en, hi, bn, ta, es, ar`, namespaced by screen. A partly localized screen is a defect.
-3. **Design tokens only.** Import from `src/theme.ts` — never `src/theme/` (dead, shadowed) and never inline hex in a screen.
+3. **Design tokens only.** Import from `src/theme.ts`, never inline hex in a screen.
 4. **LTR everywhere.** Layout direction stays left-to-right in all languages including Arabic; the back arrow is a top-left `Pressable` on every screen. See `docs/DECISIONS.md` D-003.
 5. **Storage discipline.** `saheli.` prefix, access via `src/utils/storage.ts`, key documented in `docs/ARCHITECTURE.md` §5.
 6. **Routes are registered in pairs** — `RootStackParamList` and `_layout.tsx`, same change.

@@ -1,6 +1,6 @@
 # Saheli — Backlog Tracker
 
-**Source of truth for what to build next.** Updated 2026-07-30 against branch `initial-static` (commit `3646fcf`).
+**Source of truth for what to build next.** Updated 2026-07-30 against branch `initial-static`, after `M1-T1`.
 
 Every task is sized to be completed in one focused session and is executable with a reusable prompt from `prompts/`. Start any task with `prompts/backlog-task-kickoff.md`, passing the task ID.
 
@@ -19,7 +19,7 @@ Every task is sized to be completed in one focused session and is executable wit
 | # | Milestone | Status | Tasks | Theme |
 | --- | --- | --- | --- | --- |
 | M0 | Documentation & working agreements | ✅ Done | 4 / 4 | Docs, prompts, decision log |
-| M1 | Foundation hardening | ⏳ Ready | 0 / 8 | Theme, dead code, fonts, typing |
+| M1 | Foundation hardening | 🚧 In progress | 1 / 9 | Theme, dead code, fonts, typing |
 | M2 | Auth & session (make it real) | ⏳ Ready | 0 / 6 | OTP, session lifecycle, guards |
 | M3 | Family module completion | ⏳ Ready | 0 / 6 | i18n, invite lifecycle, guardrails |
 | M4 | Medicine & health | ⏳ Ready | 0 / 5 | First new domain module |
@@ -27,7 +27,7 @@ Every task is sized to be completed in one focused session and is executable wit
 | M6 | Money — expenses & UPI | ⏳ Ready | 0 / 6 | Spend tracking, payments |
 | M7 | Safety, wellness, style, events | ⏳ Ready | 0 / 5 | Remaining dashboard tiles |
 | M8 | Backend & AI integration | ❓ Needs decision | 0 / 6 | API, sync, model provider |
-| M9 | Quality & release | ⏳ Ready | 0 / 6 | Tests, a11y, CI, store builds |
+| M9 | Quality & release | 🚧 In progress | 1 / 8 | Tests, a11y, CI, store builds |
 
 Recommended order: **M1 → M2 → M3**, then pick domain modules (M4–M7) by product priority. M8 unblocks nothing in M1–M3 but should be decided before M4 grows real data. M9 runs continuously and gates any release.
 
@@ -53,7 +53,7 @@ Goal: remove the traps that will otherwise cost every future session. No new use
 
 | ID | Task | Acceptance criteria | Status |
 | --- | --- | --- | --- |
-| M1-T1 | Delete shadowed and unused code: `src/theme/`, `src/styles/onboarding.ts`, `src/shared/components/index.ts`, `src/features/family/index.ts` | Files removed; `tsc --noEmit`, `npm run lint`, `npm test` all pass; nothing imported them beforehand (verify with grep) | ⏳ |
+| M1-T1 | Delete shadowed and unused code: `src/theme/`, `src/styles/onboarding.ts`, `src/shared/components/index.ts`, `src/features/family/index.ts` | Files removed; `tsc --noEmit`, `npm run lint`, `npm test` all pass; nothing imported them beforehand (verify with grep) | ✅ 2026-07-30 |
 | M1-T2 | Route `saheli.lang` and `saheli.theme.palette` through `src/utils/storage.ts` instead of raw `AsyncStorage`, or document why they stay raw strings | One storage access path; `docs/ARCHITECTURE.md` §5 updated | ⏳ |
 | M1-T3 | Make theme switching work at runtime: theme Context or `useThemedStyles(fn)` hook; styles resolve per render | Changing palette restyles mounted screens with no restart; all screens migrated off module-scope `StyleSheet.create` reads of `colors` | ⏳ |
 | M1-T4 | Add a palette picker to the profile edit screen (Terracotta / Ocean / Midnight with swatches) | Selection persists, applies live, survives restart | 🔒 needs M1-T3 |
@@ -61,6 +61,7 @@ Goal: remove the traps that will otherwise cost every future session. No new use
 | M1-T6 | Unify navigation typing on `NativeStackScreenProps` from `@react-navigation/native-stack`; drop `@react-navigation/stack` if unused | Single nav package in `package.json` deps; `tsc` green | ⏳ |
 | M1-T7 | Give dashboard tiles and quick actions stable IDs; route on ID, not translated label | Family tile still navigates when the app is in Hindi; adding a route needs no string matching | ⏳ |
 | M1-T8 | Replace the `key={localeVersion}` remount pattern with a proper i18n hook/Context (`useTranslation()`) | Language switch re-renders without remounting subtrees; state is not lost on switch | ⏳ |
+| M1-T9 | Add a `textOnPrimary` role to `PaletteColors` and all three palettes; replace the three inline `{ color: '#FFF' }` in `language.tsx:83` and `profile.tsx:256,262` | No inline hex left in any screen; the active-card label stays legible in Midnight, where `surfaceElevated` is `#2A2440` and is *not* a valid substitute | ⏳ |
 
 ---
 
@@ -183,6 +184,8 @@ Runs alongside every other milestone; gates any store release.
 | M9-T4 | CI workflow: install, `tsc --noEmit`, lint, test on every push | Green pipeline required to merge | ⏳ |
 | M9-T5 | Accessibility pass: labels on icon-only buttons, contrast check across all three palettes, dynamic type sanity | Screen reader can navigate onboarding and dashboard | ⏳ |
 | M9-T6 | Release prep: app icons, splash, versioning, signed Android/iOS builds | Installable build produced | ⏳ |
+| M9-T7 | Repair the jest harness: install the missing `@react-native/jest-preset`, widen `transformIgnorePatterns` for the RN-ecosystem ESM packages, and mock gesture-handler / async-storage / safe-area-context | `npm test` runs and passes; documented in `ARCHITECTURE.md` §8 | ✅ 2026-07-30 |
+| M9-T8 | Silence the React `act()` warning in the smoke test — `language.tsx` bumps `localeVersion` from the async `loadSavedLanguage()` callback, outside `act` | `npm test` passes with no console warnings | ⏳ |
 
 ---
 

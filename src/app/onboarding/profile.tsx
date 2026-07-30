@@ -182,7 +182,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <Text style={styles.headerTitle}>{isEditing ? t('profile.header_title') : t('onboarding.profile_title')}</Text>
-        <View style={{ width: 40 }} />
+        <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.root}>
@@ -359,6 +359,10 @@ const styles = StyleSheet.create({
     backgroundColor: colors.background,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+  },
+  // Balances the back button so the header title stays centred.
+  headerSpacer: {
+    width: 40,
   },
   backBtn: {
     width: 40,

@@ -79,7 +79,7 @@ export function applyPalette(key) { Object.assign(colors, p.colors); }  // mutat
 
 **Why runtime switching does not actually work yet:** screens build their styles with `StyleSheet.create({...})` at *module load*, reading `colors.x` once. Mutating `colors` afterwards does not re-create those frozen style objects. So a palette change only takes effect on a fresh app start, and there is no UI to trigger one. Fixing this means either moving to a theme Context with styles built inside the render, or a `useThemedStyles(fn)` hook. Tracked as `M1-T3`.
 
-**Shadowed directory:** `src/theme/` (`colors.ts`, `typography.ts`, `index.ts`) contains an older, smaller token set. It is **dead code** — both Metro and TypeScript resolve `../theme` to the file `src/theme.ts` before the directory `src/theme/index.ts`. Never edit `src/theme/`; deletion is tracked as `M1-T1`.
+`src/theme.ts` is the only theme source. The older shadowed `src/theme/` directory was deleted in `M1-T1` (2026-07-30); all 12 `../theme` imports in the repo resolve to the file.
 
 **Fonts:** `theme.fonts` names `Fraunces_*` and `DMSans_*`, but no `.ttf` assets are bundled and there is no `react-native.config.js` asset link. All text currently renders in the platform default font. Tracked as `M1-T4`.
 
@@ -150,7 +150,7 @@ interface FamilyMember {
 }
 ```
 
-`src/features/family/index.ts` declares a *different, thinner* `FamilyMember` and an `inviteFamilyMember` stub. It is unused; the screen's definition is authoritative. Consolidation is `M3-T4`.
+The duplicate, thinner `FamilyMember` in `src/features/family/index.ts` was deleted in `M1-T1` (2026-07-30). The screen's definition above is the only one. `M3-T4` still applies: move it to `src/features/family/types.ts` and the storage access to `familyStore.ts`.
 
 ---
 
@@ -163,7 +163,7 @@ interface FamilyMember {
 | `SectionHeader` | `components/SectionHeader.tsx` | title + subtitle pair |
 | `BottomSheet` | `components/BottomSheet.tsx` | `Modal` + `Animated` + `PanResponder`; drag-to-dismiss (>120px or velocity >0.6), only when the inner scroll is at the top; `@react-native-community/blur` loaded through a `try/require` so a missing native module degrades gracefully instead of crashing |
 
-Screens still define most of their own `StyleSheet` blocks locally. Only `Card`, `SectionHeader` and `BottomSheet` are reused across screens. `src/shared/components/index.ts` is an unused re-export barrel (dead code, `M1-T1`).
+Screens still define most of their own `StyleSheet` blocks locally. Only `Card`, `SectionHeader` and `BottomSheet` are reused across screens. Import them from `src/components/` directly — the `src/shared/components/index.ts` re-export barrel was deleted in `M1-T1` (2026-07-30).
 
 ### Signature interaction: the dashboard scroll header
 
@@ -187,17 +187,30 @@ Ordered by how much they will hurt later. All are tracked in `docs/BACKLOG.md`.
 1. **Auth is theatre.** `otp.tsx`'s Verify button calls `navigation.navigate('Profile')` unconditionally — no code comparison, no attempt limit, no resend timer wiring. `useAuth`/`authService` are stubs returning `{ success: true }` and are imported by nothing. There is no auth guard, so the Dashboard is reachable by back/forward navigation without any credential. (`M2`)
 2. **No session lifecycle.** The idle timeout, absolute expiry, and re-auth banner described in earlier documentation were never implemented. (`M2-T3`)
 3. **Theme cannot change at runtime** (§3) and there is no palette picker UI. (`M1-T3`)
-4. **Dead code:** `src/theme/`, `src/styles/onboarding.ts`, `src/shared/components/index.ts`, `src/hooks/useAuth.ts`, `src/features/auth/auth.ts`, `src/features/family/index.ts`. Six paths that an agent can waste a session reading. (`M1-T1`)
+4. **Auth stubs are unused.** `src/hooks/useAuth.ts` and `src/features/auth/auth.ts` are imported by nothing (`useAuth` imports `authService`, and nothing imports `useAuth`). They are deliberately kept as the scaffolding `M2-T3`/`M2-T4` will build the real session model into. The other four dead paths were deleted in `M1-T1` (2026-07-30).
 5. **Family screen not localized** — breaks the 6-language promise on a shipped screen. (`M3-T1`)
 6. **Fonts not bundled** — the visual design in the palette definitions is not what renders. (`M1-T4`)
 7. **Two navigation typing sources** (`native-stack` navigator vs `stack` prop types). (`M1-T5`)
-8. **Test coverage is one smoke test** (`__tests__/App.test.tsx`). No component, storage, or i18n tests. (`M9-T1`)
+8. **Test coverage is one smoke test** (`__tests__/App.test.tsx`). No component, storage, or i18n tests. The harness itself was repaired in `M1-T1` (2026-07-30) — see §8. (`M9-T1`)
 9. **Dashboard numbers are hardcoded** (`₹12,450`, `2 Tasks`, `4 Bills`, `4 / 4 Modules Synced`). They must become derived values before the modules that own them land. (`M4`+)
-10. **Tile navigation is string-matched.** `handleTilePress` compares the translated title against `'Family'`, so it silently breaks for any tile whose label is translated differently. Tiles need stable IDs. (`M1-T7`)
+10. **Tile navigation is string-matched.** `dashboard.tsx:94` routes on `title === 'Family' || title === t('dashboard.tile_family')`. The `t()` arm means it does work in every locale today, but the match is by label rather than identity, so it breaks the moment a translation is reworded and every new route needs another string comparison. Tiles need stable IDs. (`M1-T7`)
 
 ---
 
-## 8. Conventions for new code
+## 8. Test harness
+
+**Files:** `jest.config.js` · `jest.setup.js` · `__tests__/`
+
+`npm test` runs jest on the `@react-native/jest-preset` preset. Two pieces of configuration are required for a test that renders `App` to run at all, both added in `M1-T1`:
+
+- **`transformIgnorePatterns`** — the preset only lets `react-native` and `@react-native*` through babel. Every other RN-ecosystem package in this app ships untranspiled ESM, so `@react-navigation`, `react-native-gesture-handler`, `react-native-safe-area-context`, `react-native-screens`, `react-native-image-picker` and `@react-native-async-storage` are added to the allowlist. **Adding a new RN dependency that ships ESM means adding it here too.**
+- **`jest.setup.js`** — swaps native modules for the mocks each package ships: `react-native-gesture-handler/jestSetup`, `@react-native-async-storage/async-storage/jest`, and `react-native-safe-area-context/jest/mock`. The safe-area mock is a default-exported object while consumers use named imports, so it is unwrapped with `.default`.
+
+The suite passes but prints a React `act()` warning: `language.tsx` bumps `localeVersion` from the async `loadSavedLanguage()` callback, outside `act`. Tracked as `M9-T7`.
+
+---
+
+## 9. Conventions for new code
 
 - **Screens** go in `src/app/` (app-level flow) or `src/features/<domain>/` (domain module). A feature folder owns its screen, its types, and its storage key.
 - **Register the route** in `RootStackParamList` and `_layout.tsx` in the same change.

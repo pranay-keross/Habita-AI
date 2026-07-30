@@ -3,7 +3,7 @@ import { View, Text, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Aler
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../_layout';
-import { colors, fonts, radius, shadow, spacing } from '../../theme';
+import { colors, fonts, radius, spacing } from '../../theme';
 import { getCurrentLanguage, t } from '../../i18n';
 import Button from '../../components/Button';
 import { setItem } from '../../utils/storage';

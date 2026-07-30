@@ -10,7 +10,7 @@ For milestones M4–M7, where a new module lands under `src/features/`. The Fami
 Build the {{MODULE_NAME}} module for Saheli — backlog task {{TASK_ID}}.
 
 Read docs/ARCHITECTURE.md first, especially §5 (storage contract), §6 (components) and
-§8 (conventions).
+§9 (conventions).
 
 ## Structure to create
 

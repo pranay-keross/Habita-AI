@@ -47,16 +47,18 @@ src/app/onboarding/              language · phone · otp · profile
 src/features/family/FamilyScreen.tsx   family members, roles, permissions, bottom sheet
 src/components/                  Button · Card · SectionHeader · BottomSheet
 src/i18n/index.ts + locales/     6 locales, LTR enforced, manual change listeners
-src/theme.ts                     ACTIVE design tokens — 3 palettes
+src/theme.ts                     design tokens — 3 palettes (the only theme source)
 src/utils/storage.ts             AsyncStorage JSON helpers
+jest.config.js · jest.setup.js   test harness — transform allowlist + native mocks
 ```
 
-**Dead code — do not read, do not edit, do not extend** (deletion tracked as `M1-T1`):
-`src/theme/` (shadowed by `src/theme.ts`), `src/styles/onboarding.ts`, `src/shared/components/index.ts`, `src/hooks/useAuth.ts`, `src/features/auth/auth.ts`, `src/features/family/index.ts`.
+**Unused, but deliberately kept:** `src/hooks/useAuth.ts` and `src/features/auth/auth.ts` are stubs imported by nothing. Do not extend them ad hoc — they are the scaffolding `M2-T3`/`M2-T4` will build the real session model into.
+
+`M1-T1` (2026-07-30) deleted the four genuinely dead paths — `src/theme/`, `src/styles/`, `src/shared/`, `src/features/family/index.ts`. If a doc still mentions them, that doc is stale.
 
 ## 5. Patterns you must follow
 
-**Theme.** Import `{ colors, fonts, radius, shadow, spacing }` from `src/theme` — the file, never the directory. `colors` is a mutable singleton mutated by `applyPalette()`. Because `StyleSheet.create` snapshots values at module load, palette changes do not restyle mounted screens; that is a known limitation (`docs/DECISIONS.md` D-004, fix tracked as `M1-T3`). Never hardcode hex in a screen.
+**Theme.** Import `{ colors, fonts, radius, shadow, spacing }` from `src/theme`. `colors` is a mutable singleton mutated by `applyPalette()`. Because `StyleSheet.create` snapshots values at module load, palette changes do not restyle mounted screens; that is a known limitation (`docs/DECISIONS.md` D-004, fix tracked as `M1-T3`). Never hardcode hex in a screen.
 
 **i18n.** Six locales: en, hi, bn, ta, es, ar. Every new user-facing string goes into **all six** files, namespaced by screen. `i18n-js` is not reactive, so screens call `subscribeToLanguageChanges()`, bump a `localeVersion` counter, and pass `key={localeVersion}` to their root view. Translated arrays are built inside the render body, not at module scope.
 

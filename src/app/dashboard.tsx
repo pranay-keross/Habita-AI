@@ -6,7 +6,7 @@ import type { RootStackParamList } from './_layout';
 import { colors, fonts, radius, shadow, spacing } from '../theme';
 import SectionHeader from '../components/SectionHeader';
 import Card from '../components/Card';
-import { getCurrentLanguage, subscribeToLanguageChanges, t } from '../i18n';
+import { subscribeToLanguageChanges, t } from '../i18n';
 import { getItem } from '../utils/storage';
 
 type Props = StackScreenProps<RootStackParamList, 'Dashboard'>;

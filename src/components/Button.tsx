@@ -1,5 +1,5 @@
 import React from 'react';
-import {Pressable, Text, ViewStyle, TextStyle, ActivityIndicator} from 'react-native';
+import {Pressable, Text, ViewStyle, TextStyle, ActivityIndicator, StyleSheet} from 'react-native';
 import {theme} from '../theme';
 
 interface ButtonProps {
@@ -38,10 +38,11 @@ export default function Button({
       ) : (
         <Text
           style={[
+            styles.label,
+            // Read at render, not module load, so a palette change is picked up.
             {
               color: theme.colors.surface,
               fontFamily: theme.fonts.sansMedium,
-              fontSize: 16,
             },
             textStyle,
           ]}
@@ -52,3 +53,9 @@ export default function Button({
     </Pressable>
   );
 }
+
+const styles = StyleSheet.create({
+  label: {
+    fontSize: 16,
+  },
+});
