@@ -2,7 +2,7 @@
 
 How AI agents work in this repository. Product context is in `AI_CONTEXT.md`; this file is about *process*.
 
-**Last updated:** 2026-07-30
+**Last updated:** 2026-08-05
 
 ---
 
@@ -53,12 +53,12 @@ These apply to every change. An agent should stop and ask rather than break one.
 
 1. **`npx tsc --noEmit` must pass** before a task is called done. Run `npm run lint` and `npm test` too, and report the real output.
 2. **Six locales or none.** Any new user-facing string is added to all of `en, hi, bn, ta, es, ar`, namespaced by screen. A partly localized screen is a defect.
-3. **Design tokens only.** Import from `src/theme.ts`, never inline hex in a screen.
+3. **Design tokens only.** Style blocks are factories called through `useThemedStyles`; screens import `ThemeTokens` as a type, never the token values, and never inline hex. See `docs/ARCHITECTURE.md` §3.
 4. **LTR everywhere.** Layout direction stays left-to-right in all languages including Arabic; the back arrow is a top-left `Pressable` on every screen. See `docs/DECISIONS.md` D-003.
 5. **Storage discipline.** `saheli.` prefix, access via `src/utils/storage.ts`, key documented in `docs/ARCHITECTURE.md` §5.
 6. **Routes are registered in pairs** — `RootStackParamList` and `_layout.tsx`, same change.
 7. **No new dependency without asking**, including what already-installed package was ruled out and why.
-8. **No backend or network calls in this phase** (`docs/DECISIONS.md` D-002). Needs remote data? Define the interface, stub it, add an M8 backlog row.
+8. **No backend or network calls, except auth/profile** (`docs/DECISIONS.md` D-002, narrowed by D-012). `src/features/auth/api.ts` and `src/features/auth/auth.ts` are the one place this is allowed — everything else (family, dashboard, documents, money, …) is still device-local only. Needs remote data outside auth/profile? Define the interface, stub it, add an M8 backlog row.
 9. **Never mark a doc claim done without pointing at the implementing code.**
 10. **One task per run.** If it turns out to be bigger than a session, stop, report, and propose a split into new backlog rows.
 
@@ -70,15 +70,15 @@ Full detail in `docs/BACKLOG.md`; this table is the summary.
 
 | Area | Status |
 | --- | --- |
-| Onboarding UI — language, phone, OTP input, profile | ✅ Built (UI only) |
+| Onboarding — language, phone, OTP, profile | ✅ Built, real backend auth (`M2-T1`/`M2-T4`/`M2-T6`, D-012) — resend timer, idle/absolute expiry, re-auth banner still missing |
 | Home dashboard with scroll-driven sticky header | ✅ Built (static data) |
 | Family groups — members, roles, permission toggles, bottom sheet | ✅ Built (English-only, local storage) |
-| Design system — 3 palettes, tokens, 4 shared components | ✅ Built (runtime switching does not work; fonts not bundled) |
+| Design system — 3 palettes, tokens, 4 shared components, `lucide-react-native` icons | ✅ Built (live switching + picker in Profile → Appearance; fonts still not bundled) |
 | Localization — 6 locales, live switching | ✅ Built (Family screen not covered) |
 | Documentation & prompt library | ✅ M0 complete, 2026-07-30 |
-| OTP verification, session lifecycle, auth guard | ❌ Not built — M2 |
+| Session lifecycle (idle/absolute expiry, resend timer, re-auth banner) | ❌ Not built — M2-T2, M2-T3's remaining half, M2-T5 |
 | Medicine, Documents, Money/UPI, Safety, Wellness, Style, Events, Vehicles | ❌ Not built — M4–M7 |
-| Backend, real invites, AI/OCR | ❌ Not built — M8, decisions open |
+| Backend beyond auth/profile, real invites, AI/OCR | ❌ Not built — M8, decisions open |
 
 ---
 

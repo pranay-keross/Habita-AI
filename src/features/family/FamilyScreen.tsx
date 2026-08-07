@@ -3,7 +3,8 @@ import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert } from 
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../app/_layout';
-import { colors, fonts, radius, shadow, spacing } from '../../theme';
+import type { ThemeTokens } from '../../theme';
+import useThemedStyles from '../../hooks/useThemedStyles';
 import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
 import { getItem, setItem } from '../../utils/storage';
@@ -59,6 +60,7 @@ const DEFAULT_MEMBERS: FamilyMember[] = [
 ];
 
 export default function FamilyScreen({ navigation }: Props) {
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const [members, setMembers] = useState<FamilyMember[]>(DEFAULT_MEMBERS);
   const [showInviteModal, setShowInviteModal] = useState(false);
@@ -274,7 +276,7 @@ export default function FamilyScreen({ navigation }: Props) {
           value={inviteName}
           onChangeText={setInviteName}
           placeholder="e.g. Rajesh Sharma"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={styles.placeholder.color}
         />
 
         <Text style={styles.label}>Mobile Number</Text>
@@ -284,7 +286,7 @@ export default function FamilyScreen({ navigation }: Props) {
           onChangeText={setInvitePhone}
           keyboardType="phone-pad"
           placeholder="e.g. +91 98765 43210"
-          placeholderTextColor={colors.textMuted}
+          placeholderTextColor={styles.placeholder.color}
         />
 
         <Text style={styles.label}>Relationship</Text>
@@ -348,7 +350,7 @@ export default function FamilyScreen({ navigation }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background,
@@ -390,7 +392,7 @@ const styles = StyleSheet.create({
   addBtnText: {
     fontFamily: fonts.sansBold,
     fontSize: 12,
-    color: '#FFF',
+    color: colors.textOnPrimary,
   },
   content: {
     paddingHorizontal: spacing.lg,
@@ -407,13 +409,13 @@ const styles = StyleSheet.create({
   heroTitle: {
     fontFamily: fonts.serif,
     fontSize: 26,
-    color: '#FFF',
+    color: colors.textOnPrimary,
     marginBottom: 6,
   },
   heroSubtitle: {
     fontFamily: fonts.sans,
     fontSize: 13,
-    color: '#F8ECE4',
+    color: colors.textOnPrimaryMuted,
     marginBottom: spacing.lg,
     lineHeight: 18,
   },
@@ -431,12 +433,12 @@ const styles = StyleSheet.create({
   statNum: {
     fontFamily: fonts.sansBold,
     fontSize: 20,
-    color: '#FFF',
+    color: colors.textOnPrimary,
   },
   statLabel: {
     fontFamily: fonts.sans,
     fontSize: 11,
-    color: '#F8ECE4',
+    color: colors.textOnPrimaryMuted,
     marginTop: 2,
   },
   sectionHeader: {
@@ -456,7 +458,7 @@ const styles = StyleSheet.create({
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: radius.xl,
     padding: spacing.md,
     marginBottom: spacing.md,
@@ -503,7 +505,7 @@ const styles = StyleSheet.create({
   roleText: {
     fontFamily: fonts.sansBold,
     fontSize: 9,
-    color: '#FFF',
+    color: colors.textOnPrimary,
   },
   memberSub: {
     fontFamily: fonts.sans,
@@ -638,7 +640,7 @@ const styles = StyleSheet.create({
     textTransform: 'uppercase',
   },
   input: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
@@ -648,13 +650,18 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: colors.textPrimary,
   },
+  // `placeholderTextColor` is a prop, not a style — the colour is kept here so
+  // the factory stays the single place this screen reads the palette.
+  placeholder: {
+    color: colors.textMuted,
+  },
   chipRow: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 8,
   },
   chip: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surfaceElevated,
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: radius.pill,
@@ -671,7 +678,7 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
   },
   chipTextActive: {
-    color: '#FFF',
+    color: colors.textOnPrimary,
   },
   permCheckGrid: {
     gap: 10,
@@ -680,7 +687,7 @@ const styles = StyleSheet.create({
   checkRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surfaceElevated,
     padding: 12,
     borderRadius: radius.md,
     borderWidth: 1,
@@ -701,12 +708,12 @@ const styles = StyleSheet.create({
   modalRemoveBtn: {
     marginTop: 14,
     marginBottom: 24,
-    backgroundColor: '#FDE8E8',
+    backgroundColor: colors.dangerSoft,
     paddingVertical: 12,
     borderRadius: radius.xl,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: '#F8B4B4',
+    borderColor: colors.dangerBorder,
   },
   modalRemoveText: {
     fontFamily: fonts.sansBold,

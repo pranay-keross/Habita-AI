@@ -16,10 +16,14 @@
     "phone_title": "Enter your mobile number",
     "phone_hint": "Saheli is sending a code to your phone",
     "phone_placeholder": "+91 98765 43210",
+    "phone_terms": "We'll send a 6-digit verification code to this number.",
+    "phone_invalid": "Please enter a valid phone number.",
+    "error_title": "Error",
+    "network_error": "Couldn't reach the server. Check your connection and try again.",
     "send_otp": "Send OTP",
     "otp_title": "Verify the code",
     "otp_hint": "Enter the 6-digit code we sent you",
-    "otp_demo": "Demo mode — code is 123456",
+    "otp_invalid": "That code isn't right. Try again.",
     "verify": "Verify",
     "change_number": "Change number",
     "resend_in": "Resend in {{sec}}s",
@@ -76,7 +80,11 @@
     "photo_change": "Change Photo",
     "name_label": "Display Name",
     "phone_label": "Mobile Number",
+    "email_label": "Email",
+    "email_placeholder": "you@example.com",
+    "save_error": "Couldn't save your profile. Try again.",
     "language_label": "App Language",
+    "theme_label": "Appearance",
     "role_label": "Selected Role",
     "location_label": "Location",
     "save_changes": "Save Changes",
@@ -89,5 +97,13 @@
     "delete_account_confirm_msg": "Are you sure you want to delete your account? All saved data will be removed.",
     "cancel": "Cancel",
     "confirm": "Confirm"
+  },
+  "theme": {
+    "terracotta": "Terracotta",
+    "terracotta_desc": "Warm earthy · default",
+    "ocean": "Ocean Breeze",
+    "ocean_desc": "Cool · calming blues",
+    "midnight": "Midnight",
+    "midnight_desc": "Dark · easy on the eyes"
   }
 }

@@ -3,13 +3,15 @@ import { View, Text, Pressable, FlatList, StyleSheet } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../_layout';
-import { colors, fonts, radius, shadow, spacing } from '../../theme';
+import type { ThemeTokens } from '../../theme';
+import useThemedStyles from '../../hooks/useThemedStyles';
 import { SUPPORTED_LANGS, getCurrentLanguage, loadSavedLanguage, setLanguage, subscribeToLanguageChanges, t } from '../../i18n';
 import Button from '../../components/Button';
 
 type Props = StackScreenProps<RootStackParamList, 'Language'>;
 
 const LanguageScreen = ({ navigation }: Props) => {
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState('en');
   const [localeVersion, setLocaleVersion] = useState(0);
@@ -80,8 +82,8 @@ const LanguageScreen = ({ navigation }: Props) => {
               onPress={() => pickLanguage(item.code)}
               android_ripple={{ color: 'rgba(255,255,255,0.16)' }}>
               <Text style={styles.flag}>{item.flag}</Text>
-              <Text style={[styles.native, selected === item.code && { color: '#FFF' }]}>{item.native}</Text>
-              <Text style={[styles.label, selected === item.code && { color: colors.blush }]}>{item.label}</Text>
+              <Text style={[styles.native, selected === item.code && styles.nativeActive]}>{item.native}</Text>
+              <Text style={[styles.label, selected === item.code && styles.labelActive]}>{item.label}</Text>
             </Pressable>
           )}
         />
@@ -92,7 +94,7 @@ const LanguageScreen = ({ navigation }: Props) => {
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: colors.background,
@@ -135,7 +137,7 @@ const styles = StyleSheet.create({
   },
   card: {
     flex: 1,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surfaceElevated,
     borderRadius: radius.xl,
     borderColor: colors.border,
     alignItems: 'center',
@@ -156,6 +158,9 @@ const styles = StyleSheet.create({
     color: colors.textPrimary,
     marginTop: 6,
   },
+  nativeActive: {
+    color: colors.textOnPrimary,
+  },
   label: {
     fontFamily: fonts.sansMedium,
     fontSize: 11,
@@ -163,6 +168,9 @@ const styles = StyleSheet.create({
     marginTop: 2,
     letterSpacing: 1,
     textTransform: 'uppercase',
+  },
+  labelActive: {
+    color: colors.textOnPrimaryMuted,
   },
   cta: {
     marginTop: 18,

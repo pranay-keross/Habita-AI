@@ -1,56 +1,64 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Pressable } from 'react-native';
+import { View, Text, KeyboardAvoidingView, Platform, StyleSheet, Pressable, Alert } from 'react-native';
+import { OtpInput, type OtpInputRef } from 'react-native-otp-entry';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../_layout';
-import { colors, fonts, radius, spacing } from '../../theme';
+import type { ThemeTokens } from '../../theme';
+import useThemedStyles from '../../hooks/useThemedStyles';
 import { t } from '../../i18n';
 import Button from '../../components/Button';
+import useAuth from '../../hooks/useAuth';
+import { parseAuthError } from '../../features/auth/api';
+import { getItem } from '../../utils/storage';
 
 type Props = StackScreenProps<RootStackParamList, 'Otp'>;
 
-const OtpScreen = ({ navigation }: Props) => {
+const OtpScreen = ({ navigation, route }: Props) => {
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
-  const [digits, setDigits] = useState(['', '', '', '', '', '']);
-  const inputRefs = useRef<Array<TextInput | null>>([]);
+  const { verify } = useAuth();
+  const [code, setCode] = useState('');
+  const [verifying, setVerifying] = useState(false);
+  const [error, setError] = useState('');
+  const otpRef = useRef<OtpInputRef>(null);
 
-  const handleChange = (index: number, value: string) => {
-    const clean = value.replace(/\D/g, '');
-
-    // Support 6-digit paste
-    if (clean.length >= 6) {
-      const pasteDigits = clean.slice(0, 6).split('');
-      setDigits(pasteDigits);
-      inputRefs.current[5]?.focus();
+  const handleVerify = async () => {
+    if (code.length < 6) {
       return;
     }
 
-    const singleDigit = clean.slice(-1);
-    const next = [...digits];
-    next[index] = singleDigit;
-    setDigits(next);
-
-    // Auto-advance to next input digit automatically
-    if (singleDigit && index < 5) {
-      inputRefs.current[index + 1]?.focus();
-    }
-  };
-
-  const handleKeyPress = (index: number, key: string) => {
-    if (key === 'Backspace') {
-      // Focus previous input on backspace if current is empty
-      if (!digits[index] && index > 0) {
-        inputRefs.current[index - 1]?.focus();
-        const next = [...digits];
-        next[index - 1] = '';
-        setDigits(next);
+    setError('');
+    setVerifying(true);
+    try {
+      const phone = await getItem('saheli.user_phone', '');
+      await verify(phone, code);
+      // A returning user (login succeeded directly, isNewUser: false) already has a
+      // profile — send them straight to the Dashboard instead of back through Profile
+      // setup. Defaults to Profile if this param is somehow missing, since that's the
+      // safe side: it only costs an extra screen, never strands anyone mid-setup.
+      const isNewUser = route.params?.isNewUser ?? true;
+      navigation.navigate(isNewUser ? 'Profile' : 'Dashboard');
+    } catch (err) {
+      const kind = parseAuthError(err);
+      console.warn('OTP verify failed:', kind, err);
+      if (kind === 'network') {
+        Alert.alert(t('onboarding.error_title'), t('onboarding.network_error'));
+      } else {
+        setError(t('onboarding.otp_invalid'));
+        // Clear and refocus rather than leaving 6 filled boxes the user has to manually
+        // delete one at a time to retry.
+        otpRef.current?.clear();
+        otpRef.current?.focus();
       }
+    } finally {
+      setVerifying(false);
     }
   };
 
   return (
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
-      <View style={[styles.root, { paddingTop: insets.top + 20 }]}> 
+      <View style={[styles.root, { paddingTop: insets.top + 20 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
@@ -61,28 +69,37 @@ const OtpScreen = ({ navigation }: Props) => {
           </View>
           <Text style={styles.title}>{t('onboarding.otp_title')}</Text>
           <Text style={styles.hint}>{t('onboarding.otp_hint')}</Text>
-          <Text style={styles.demo}>{t('onboarding.otp_demo')}</Text>
 
           <View style={styles.codeRow}>
-            {digits.map((digit, index) => (
-              <TextInput
-                key={index}
-                ref={(ref) => {
-                  inputRefs.current[index] = ref;
-                }}
-
-                style={styles.codeBox}
-                value={digit}
-                onChangeText={(value) => handleChange(index, value)}
-                onKeyPress={({ nativeEvent }) => handleKeyPress(index, nativeEvent.key)}
-                keyboardType="number-pad"
-                maxLength={6}
-                autoFocus={index === 0}
-              />
-            ))}
+            <OtpInput
+              ref={otpRef}
+              numberOfDigits={6}
+              autoFocus
+              type="numeric"
+              onTextChange={(value) => {
+                setError('');
+                setCode(value);
+              }}
+              theme={{
+                containerStyle: styles.codeContainer,
+                pinCodeContainerStyle: error ? styles.codeBoxError : styles.codeBox,
+                focusedPinCodeContainerStyle: styles.codeBoxFocused,
+                filledPinCodeContainerStyle: styles.codeBoxFilled,
+                pinCodeTextStyle: styles.codeText,
+                focusStickStyle: styles.codeStick,
+              }}
+            />
           </View>
 
-          <Button title={t('onboarding.verify')} onPress={() => navigation.navigate('Profile')} style={styles.cta} />
+          {!!error && <Text style={styles.errorText}>{error}</Text>}
+
+          <Button
+            title={t('onboarding.verify')}
+            onPress={handleVerify}
+            loading={verifying}
+            disabled={code.length < 6}
+            style={styles.cta}
+          />
         </View>
       </View>
     </KeyboardAvoidingView>
@@ -90,7 +107,7 @@ const OtpScreen = ({ navigation }: Props) => {
 };
 
 
-const styles = StyleSheet.create({
+const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) => StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: colors.background,
@@ -143,32 +160,59 @@ const styles = StyleSheet.create({
     textAlign: 'center',
     marginTop: 6,
   },
-  demo: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 12,
-    color: colors.turmeric,
-    marginTop: 20,
-    backgroundColor: '#FCE3C8',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-  },
   codeRow: {
-    flexDirection: 'row',
-    gap: 8,
+    width: '100%',
     marginTop: 30,
+  },
+  codeContainer: {
+    width: '100%',
+    justifyContent: 'space-between',
   },
   codeBox: {
     width: 44,
     height: 54,
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 2,
     borderColor: colors.border,
     borderRadius: radius.md,
-    textAlign: 'center',
+  },
+  codeBoxFocused: {
+    width: 44,
+    height: 54,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    borderRadius: radius.md,
+  },
+  codeBoxFilled: {
+    width: 44,
+    height: 54,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 2,
+    borderColor: colors.borderStrong,
+    borderRadius: radius.md,
+  },
+  codeBoxError: {
+    width: 44,
+    height: 54,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 2,
+    borderColor: colors.danger,
+    borderRadius: radius.md,
+  },
+  codeText: {
     fontFamily: fonts.serif,
     fontSize: 24,
     color: colors.textPrimary,
+  },
+  codeStick: {
+    backgroundColor: colors.primary,
+  },
+  errorText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.danger,
+    marginTop: 12,
   },
   cta: {
     marginTop: 28,

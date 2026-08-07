@@ -1,6 +1,7 @@
 import React from 'react';
 import {Pressable, Text, ViewStyle, TextStyle, ActivityIndicator, StyleSheet} from 'react-native';
-import {theme} from '../theme';
+import type {ThemeTokens} from '../theme';
+import useThemedStyles from '../hooks/useThemedStyles';
 
 interface ButtonProps {
   title: string;
@@ -19,43 +20,43 @@ export default function Button({
   style,
   textStyle,
 }: ButtonProps) {
+  const styles = useThemedStyles(makeStyles);
+
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled || loading}
-      style={({pressed}) => [{
-        backgroundColor: disabled ? theme.colors.border : theme.colors.primary,
-        paddingVertical: theme.spacing.md,
-        paddingHorizontal: theme.spacing.lg,
-        borderRadius: theme.radius.md,
-        opacity: pressed ? 0.85 : 1,
-        alignItems: 'center',
-        justifyContent: 'center',
-      }, style] as any}
+      style={({pressed}) => [
+        styles.base,
+        disabled && styles.baseDisabled,
+        {opacity: pressed ? 0.85 : 1},
+        style,
+      ] as any}
     >
       {loading ? (
-        <ActivityIndicator color={theme.colors.surface} />
+        <ActivityIndicator color={styles.label.color} />
       ) : (
-        <Text
-          style={[
-            styles.label,
-            // Read at render, not module load, so a palette change is picked up.
-            {
-              color: theme.colors.surface,
-              fontFamily: theme.fonts.sansMedium,
-            },
-            textStyle,
-          ]}
-        >
-          {title}
-        </Text>
+        <Text style={[styles.label, textStyle]}>{title}</Text>
       )}
     </Pressable>
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = ({colors, fonts, radius, spacing}: ThemeTokens) => StyleSheet.create({
+  base: {
+    backgroundColor: colors.primary,
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderRadius: radius.md,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  baseDisabled: {
+    backgroundColor: colors.border,
+  },
   label: {
     fontSize: 16,
+    color: colors.surface,
+    fontFamily: fonts.sansMedium,
   },
 });

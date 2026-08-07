@@ -16,10 +16,14 @@
     "phone_title": "أدخل رقم هاتفك المحمول",
     "phone_hint": "ترسل Saheli رمزًا إلى هاتفك",
     "phone_placeholder": "+966 50 123 4567",
+    "phone_terms": "سنرسل رمز تحقق مكونًا من 6 أرقام إلى هذا الرقم.",
+    "phone_invalid": "الرجاء إدخال رقم هاتف صالح.",
+    "error_title": "خطأ",
+    "network_error": "تعذر الوصول إلى الخادم. تحقق من اتصالك وحاول مرة أخرى.",
     "send_otp": "إرسال الرمز",
     "otp_title": "التحقق من الرمز",
     "otp_hint": "أدخل الرمز المكون من 6 أرقام المرسل إليك",
-    "otp_demo": "وضع العرض التوضيحي — الرمز هو 123456",
+    "otp_invalid": "هذا الرمز غير صحيح. حاول مرة أخرى.",
     "verify": "تحقق",
     "change_number": "تغيير الرقم",
     "resend_in": "إعادة الإرسال خلال {{sec}} ثانية",
@@ -76,7 +80,11 @@
     "photo_change": "تغيير الصورة",
     "name_label": "الاسم المعروض",
     "phone_label": "رقم الهاتف المحمول",
+    "email_label": "البريد الإلكتروني",
+    "email_placeholder": "you@example.com",
+    "save_error": "تعذر حفظ ملفك الشخصي. حاول مرة أخرى.",
     "language_label": "لغة التطبيق",
+    "theme_label": "مظهر التطبيق",
     "role_label": "الدور المحدد",
     "location_label": "الموقع",
     "save_changes": "حفظ التغييرات",
@@ -89,5 +97,13 @@
     "delete_account_confirm_msg": "هل أنت تأكد من أنك تريد حذف حسابك؟ سيتم إزالة جميع البيانات المحفوظة.",
     "cancel": "إلغاء",
     "confirm": "تأكيد"
+  },
+  "theme": {
+    "terracotta": "تيراكوتا",
+    "terracotta_desc": "دافئ وترابي · افتراضي",
+    "ocean": "نسيم المحيط",
+    "ocean_desc": "بارد · أزرق مهدئ",
+    "midnight": "منتصف الليل",
+    "midnight_desc": "داكن · مريح للعين"
   }
 }

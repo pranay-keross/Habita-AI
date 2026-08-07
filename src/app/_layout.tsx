@@ -1,4 +1,5 @@
 import React from 'react';
+import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -8,12 +9,15 @@ import OtpScreen from './onboarding/otp';
 import ProfileScreen from './onboarding/profile';
 import DashboardScreen from './dashboard';
 import FamilyScreen from '../features/family/FamilyScreen';
+import type { ThemeTokens } from '../theme';
+import useThemedStyles from '../hooks/useThemedStyles';
 import useTheme from '../hooks/useTheme';
+import useAuth from '../hooks/useAuth';
 
 export type RootStackParamList = {
   Language: undefined;
   Phone: undefined;
-  Otp: undefined;
+  Otp: { isNewUser: boolean } | undefined;
   Profile: { isEditing?: boolean } | undefined;
   Dashboard: undefined;
   Family: undefined;
@@ -23,12 +27,27 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 
 const AppLayout = () => {
   const { theme } = useTheme();
+  const { pending, signedIn } = useAuth();
+  const styles = useThemedStyles(makeStyles);
+
+  // `initialRouteName` is only read on the Navigator's first mount, so the Navigator
+  // itself must not render until the session restore check resolves — otherwise it
+  // locks in `Language` before `signedIn` is known.
+  if (pending) {
+    return (
+      <SafeAreaProvider>
+        <View style={styles.loading}>
+          <ActivityIndicator color={theme.colors.primary} />
+        </View>
+      </SafeAreaProvider>
+    );
+  }
 
   return (
     <SafeAreaProvider>
       <NavigationContainer>
         <Stack.Navigator
-          initialRouteName="Language"
+          initialRouteName={signedIn ? 'Dashboard' : 'Language'}
           screenOptions={{
             headerShown: false,
             contentStyle: { backgroundColor: theme.colors.background },
@@ -46,5 +65,13 @@ const AppLayout = () => {
   );
 };
 
+const makeStyles = ({ colors }: ThemeTokens) => StyleSheet.create({
+  loading: {
+    flex: 1,
+    backgroundColor: colors.background,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+});
 
 export default AppLayout;

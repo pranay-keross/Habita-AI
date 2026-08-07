@@ -3,10 +3,13 @@ import { View, Text, TextInput, KeyboardAvoidingView, Platform, StyleSheet, Aler
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../_layout';
-import { colors, fonts, radius, spacing } from '../../theme';
+import type { ThemeTokens } from '../../theme';
+import useThemedStyles from '../../hooks/useThemedStyles';
 import { getCurrentLanguage, t } from '../../i18n';
 import Button from '../../components/Button';
 import { setItem } from '../../utils/storage';
+import useAuth from '../../hooks/useAuth';
+import { parseAuthError } from '../../features/auth/api';
 
 type Props = StackScreenProps<RootStackParamList, 'Phone'>;
 
@@ -22,17 +25,34 @@ const getCountryCodeForLang = (lang: string) => {
 };
 
 const PhoneScreen = ({ navigation }: Props) => {
+  const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { login } = useAuth();
   const [phone, setPhone] = useState(() => getCountryCodeForLang(getCurrentLanguage()));
+  const [submitting, setSubmitting] = useState(false);
 
   const submit = async () => {
     const cleaned = phone.replace(/[^\d+]/g, '');
     if (cleaned.length < 7) {
-      Alert.alert(t('common.error') || 'Error', 'Please enter a valid phone number');
+      Alert.alert(t('onboarding.error_title'), t('onboarding.phone_invalid'));
       return;
     }
-    await setItem('saheli.user_phone', phone.trim());
-    navigation.navigate('Otp');
+
+    setSubmitting(true);
+    try {
+      const { isNewUser } = await login(cleaned);
+      await setItem('saheli.user_phone', phone.trim());
+      navigation.navigate('Otp', { isNewUser });
+    } catch (err) {
+      const kind = parseAuthError(err);
+      console.warn('Phone submit failed:', kind, err);
+      Alert.alert(
+        t('onboarding.error_title'),
+        kind === 'network' ? t('onboarding.network_error') : t('onboarding.phone_invalid'),
+      );
+    } finally {
+      setSubmitting(false);
+    }
   };
 
 
@@ -60,20 +80,25 @@ const PhoneScreen = ({ navigation }: Props) => {
             onChangeText={setPhone}
             keyboardType="phone-pad"
             placeholder={t('onboarding.phone_placeholder')}
-            placeholderTextColor={colors.textMuted}
+            placeholderTextColor={styles.placeholder.color}
             autoFocus
           />
 
-          <Button title={`${t('onboarding.continue')} →`} onPress={submit} style={styles.cta} />
+          <Button
+            title={`${t('onboarding.continue')} →`}
+            onPress={submit}
+            loading={submitting}
+            style={styles.cta}
+          />
 
-          <Text style={styles.terms}>We will send a 6-digit verification code. Use 123456 in demo mode.</Text>
+          <Text style={styles.terms}>{t('onboarding.phone_terms')}</Text>
         </View>
       </View>
     </KeyboardAvoidingView>
   );
 };
 
-const styles = StyleSheet.create({
+const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) => StyleSheet.create({
   flex: {
     flex: 1,
     backgroundColor: colors.background,
@@ -141,7 +166,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
   },
   input: {
-    backgroundColor: '#FFF',
+    backgroundColor: colors.surfaceElevated,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: radius.md,
@@ -151,6 +176,11 @@ const styles = StyleSheet.create({
     fontSize: 18,
     letterSpacing: 0.5,
     color: colors.textPrimary,
+  },
+  // `placeholderTextColor` is a prop, not a style — the colour is kept here so
+  // the factory stays the single place this screen reads the palette.
+  placeholder: {
+    color: colors.textMuted,
   },
   cta: {
     marginTop: 20,

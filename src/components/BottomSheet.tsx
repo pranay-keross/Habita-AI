@@ -12,7 +12,8 @@ import {
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
-import { colors, fonts, shadow, spacing } from '../theme';
+import type { ThemeTokens } from '../theme';
+import useThemedStyles from '../hooks/useThemedStyles';
 
 interface BottomSheetProps {
   visible: boolean;
@@ -40,6 +41,7 @@ export default function BottomSheet({
   children,
   maxHeightPercent = 0.85,
 }: BottomSheetProps) {
+  const styles = useThemedStyles(makeStyles);
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const [scrollOffset, setScrollOffset] = useState(0);
@@ -181,7 +183,7 @@ export default function BottomSheet({
   );
 }
 
-const styles = StyleSheet.create({
+const makeStyles = ({ colors, fonts, shadow, spacing }: ThemeTokens) => StyleSheet.create({
   container: {
     flex: 1,
     justifyContent: 'flex-end',

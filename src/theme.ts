@@ -9,14 +9,23 @@ export interface PaletteColors {
   surface: string;
   surfaceElevated: string;
   turmeric: string;
+  turmericSoft: string;
   blush: string;
   forest: string;
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
+  // Text sitting on a `primary`-filled surface — hero cards, filled chips, role
+  // badges. Not white by definition: Midnight's primary is a light lavender, so
+  // white-on-primary there is unreadable and the role resolves to a dark ink.
+  textOnPrimary: string;
+  textOnPrimaryMuted: string;
+  textOnPrimaryAccent: string;
   border: string;
   borderStrong: string;
   danger: string;
+  dangerSoft: string;
+  dangerBorder: string;
 }
 
 export interface Palette {
@@ -45,14 +54,20 @@ export const palettes: Palette[] = [
       surface: '#F8EFE8',
       surfaceElevated: '#FFFDF9',
       turmeric: '#D9A24C',
+      turmericSoft: '#FCE3C8',
       blush: '#F4DCD3',
       forest: '#5B7B5C',
       textPrimary: '#4A2F2B',
       textSecondary: '#6A514C',
       textMuted: '#8C726D',
+      textOnPrimary: '#FFFFFF',
+      textOnPrimaryMuted: '#F8ECE4',
+      textOnPrimaryAccent: '#FFE8A3',
       border: 'rgba(201, 107, 93, 0.16)',
       borderStrong: 'rgba(201, 107, 93, 0.34)',
       danger: '#C95A4C',
+      dangerSoft: '#FDE8E8',
+      dangerBorder: '#F8B4B4',
     },
   },
   {
@@ -70,14 +85,20 @@ export const palettes: Palette[] = [
       surface: '#E6F1F4',
       surfaceElevated: '#FFFFFF',
       turmeric: '#F2A65A',
+      turmericSoft: '#FDE7CE',
       blush: '#C5E8EF',
       forest: '#1A8F73',
       textPrimary: '#0C2A34',
       textSecondary: '#2B4852',
       textMuted: '#6A8490',
+      textOnPrimary: '#FFFFFF',
+      textOnPrimaryMuted: '#D6EDF4',
+      textOnPrimaryAccent: '#FFD9A8',
       border: 'rgba(10, 110, 140, 0.15)',
       borderStrong: 'rgba(10, 110, 140, 0.35)',
       danger: '#C0392B',
+      dangerSoft: '#FBE4E1',
+      dangerBorder: '#F0B3AC',
     },
   },
   {
@@ -95,14 +116,21 @@ export const palettes: Palette[] = [
       surface: '#1F1B2E',
       surfaceElevated: '#2A2440',
       turmeric: '#F5B840',
+      turmericSoft: '#3A2E17',
       blush: '#3A2F52',
       forest: '#4ADE80',
       textPrimary: '#F3F0FF',
       textSecondary: '#D0C8E8',
       textMuted: '#9187A8',
+      // Midnight's primary is a light lavender, so on-primary text goes dark.
+      textOnPrimary: '#1B1430',
+      textOnPrimaryMuted: '#3E2F63',
+      textOnPrimaryAccent: '#4A2F00',
       border: 'rgba(167, 139, 250, 0.20)',
       borderStrong: 'rgba(167, 139, 250, 0.45)',
       danger: '#F87171',
+      dangerSoft: '#3A1F24',
+      dangerBorder: '#7F3B44',
     },
   },
 ];

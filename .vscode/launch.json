@@ -1,0 +1,37 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "Debug Android",
+      "cwd": "${workspaceFolder}",
+      "type": "reactnative",
+      "request": "launch",
+      "platform": "android",
+      "useHermesEngine": true,
+      "port": 8081
+    },
+    {
+      "name": "Attach to Hermes Application",
+      "cwd": "${workspaceFolder}",
+      "type": "reactnativedirect",
+      "request": "attach",
+      "platform": "android",
+      "port": 8081
+    },
+    {
+      "name": "Debug Android Hermes (Launch)",
+      "cwd": "${workspaceFolder}",
+      "type": "reactnativedirect",
+      "request": "launch",
+      "platform": "android",
+      "port": 8081
+    },
+    {
+      "name": "Attach to Metro Packager",
+      "cwd": "${workspaceFolder}",
+      "type": "reactnative",
+      "request": "attach",
+      "port": 8081
+    }
+  ]
+}

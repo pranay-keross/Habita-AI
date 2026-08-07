@@ -1,12 +1,36 @@
-import React, { useEffect, useRef, useState } from 'react';
-import { View, Text, ScrollView, Pressable, StyleSheet, Animated } from 'react-native';
+import React, { useEffect, useState } from 'react';
+import { View, Text, Pressable, StyleSheet } from 'react-native';
+import Animated, {
+  FadeInDown,
+  useAnimatedScrollHandler,
+  useAnimatedStyle,
+  useSharedValue,
+  interpolate,
+  Extrapolation,
+} from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
+import type { LucideIcon } from 'lucide-react-native';
+import ScanLine from 'lucide-react-native/icons/scan-line';
+import IndianRupee from 'lucide-react-native/icons/indian-rupee';
+import Pill from 'lucide-react-native/icons/pill';
+import Receipt from 'lucide-react-native/icons/receipt';
+import Fuel from 'lucide-react-native/icons/fuel';
+import Crown from 'lucide-react-native/icons/crown';
+import ScanSearch from 'lucide-react-native/icons/scan-search';
+import CreditCard from 'lucide-react-native/icons/credit-card';
+import Users from 'lucide-react-native/icons/users';
+import TrendingUp from 'lucide-react-native/icons/trending-up';
+import FolderOpen from 'lucide-react-native/icons/folder-open';
+import ShieldCheck from 'lucide-react-native/icons/shield-check';
+import HeartPulse from 'lucide-react-native/icons/heart-pulse';
+import Shirt from 'lucide-react-native/icons/shirt';
+import CalendarDays from 'lucide-react-native/icons/calendar-days';
+import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import type { RootStackParamList } from './_layout';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
 import SectionHeader from '../components/SectionHeader';
-import Card from '../components/Card';
 import { subscribeToLanguageChanges, t } from '../i18n';
 import { getItem } from '../utils/storage';
 
@@ -17,30 +41,30 @@ const PROFILE_STORAGE_KEY = 'saheli.user_profile';
 export default function DashboardScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
-  const scrollY = useRef(new Animated.Value(0)).current;
+  const scrollY = useSharedValue(0);
   const [avatar, setAvatar] = useState('👩‍💼');
   const [localeVersion, setLocaleVersion] = useState(0);
 
   // Dynamic translated arrays evaluated on render
-  const quickActions = [
-    { label: t('dashboard.action_scan'), shortcut: '📄' },
-    { label: t('dashboard.action_pay'), shortcut: '💸' },
-    { label: t('dashboard.action_meds'), shortcut: '💊' },
-    { label: t('dashboard.action_expense'), shortcut: '🧾' },
-    { label: t('dashboard.action_fuel'), shortcut: '⛽' },
-    { label: t('dashboard.action_premium'), shortcut: '⭐' },
+  const quickActions: { label: string; Icon: LucideIcon }[] = [
+    { label: t('dashboard.action_scan'), Icon: ScanLine },
+    { label: t('dashboard.action_pay'), Icon: IndianRupee },
+    { label: t('dashboard.action_meds'), Icon: Pill },
+    { label: t('dashboard.action_expense'), Icon: Receipt },
+    { label: t('dashboard.action_fuel'), Icon: Fuel },
+    { label: t('dashboard.action_premium'), Icon: Crown },
   ];
 
-  const tiles = [
-    { title: t('dashboard.tile_scan'), icon: '🔍' },
-    { title: t('dashboard.tile_pay'), icon: '💳' },
-    { title: t('dashboard.tile_family'), icon: '👪' },
-    { title: t('dashboard.tile_money'), icon: '📈' },
-    { title: t('dashboard.tile_docs'), icon: '📁' },
-    { title: t('dashboard.tile_safety'), icon: '🛡️' },
-    { title: t('dashboard.tile_wellness'), icon: '🏃‍♀️' },
-    { title: t('dashboard.tile_style'), icon: '💃' },
-    { title: t('dashboard.tile_events'), icon: '🎉' },
+  const tiles: { title: string; Icon: LucideIcon }[] = [
+    { title: t('dashboard.tile_scan'), Icon: ScanSearch },
+    { title: t('dashboard.tile_pay'), Icon: CreditCard },
+    { title: t('dashboard.tile_family'), Icon: Users },
+    { title: t('dashboard.tile_money'), Icon: TrendingUp },
+    { title: t('dashboard.tile_docs'), Icon: FolderOpen },
+    { title: t('dashboard.tile_safety'), Icon: ShieldCheck },
+    { title: t('dashboard.tile_wellness'), Icon: HeartPulse },
+    { title: t('dashboard.tile_style'), Icon: Shirt },
+    { title: t('dashboard.tile_events'), Icon: CalendarDays },
   ];
 
   useEffect(() => {
@@ -61,36 +85,22 @@ export default function DashboardScreen({ navigation }: Props) {
     };
   }, [navigation]);
 
-  // Interpolations for scroll animation
-  const appbarBgOpacity = scrollY.interpolate({
-    inputRange: [0, 80],
-    outputRange: [0, 0.98],
-    extrapolate: 'clamp',
+  // Scroll handler runs entirely on the UI thread, so the app bar fade-in
+  // stays glitch-free even on a busy JS thread.
+  const scrollHandler = useAnimatedScrollHandler((event) => {
+    scrollY.value = event.contentOffset.y;
   });
 
-  const appbarPillOpacity = scrollY.interpolate({
-    inputRange: [30, 90],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
+  const appBarBgStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [0, 60], [0, 0.98], Extrapolation.CLAMP),
+  }));
 
-  const appbarPillTranslateY = scrollY.interpolate({
-    inputRange: [30, 90],
-    outputRange: [12, 0],
-    extrapolate: 'clamp',
-  });
-
-  const heroCardScale = scrollY.interpolate({
-    inputRange: [-50, 0, 100],
-    outputRange: [1.05, 1, 0.94],
-    extrapolate: 'clamp',
-  });
-
-  const heroCardOpacity = scrollY.interpolate({
-    inputRange: [0, 70],
-    outputRange: [1, 0.2],
-    extrapolate: 'clamp',
-  });
+  const appBarPillStyle = useAnimatedStyle(() => ({
+    opacity: interpolate(scrollY.value, [10, 60], [0, 1], Extrapolation.CLAMP),
+    transform: [
+      { translateY: interpolate(scrollY.value, [10, 60], [10, 0], Extrapolation.CLAMP) },
+    ],
+  }));
 
   const handleTilePress = (title: string) => {
     if (title === 'Family' || title === t('dashboard.tile_family')) {
@@ -102,25 +112,15 @@ export default function DashboardScreen({ navigation }: Props) {
     <View key={localeVersion} style={styles.flex}>
       {/* Sticky AppBar */}
       <View pointerEvents="box-none" style={[styles.appBarContainer, { paddingTop: insets.top }]}>
-        <Animated.View style={[styles.appBarBg, { opacity: appbarBgOpacity }]} />
+        <Animated.View style={[styles.appBarBg, appBarBgStyle]} />
         <View style={styles.appBarContent}>
           <View style={styles.appBarLeft}>
             <Text style={styles.appBarBrand}>Saheli</Text>
 
-            <Animated.View
-              style={[
-                styles.compactPillRow,
-                {
-                  opacity: appbarPillOpacity,
-                  transform: [{ translateY: appbarPillTranslateY }],
-                },
-              ]}>
-              <View style={styles.compactPillPending}>
-                <Text style={styles.compactPillPendingText}>2 {t('dashboard.pending')}</Text>
-              </View>
-              <View style={styles.compactPillDue}>
-                <Text style={styles.compactPillDueText}>4 {t('dashboard.due')}</Text>
-              </View>
+            <Animated.View style={[styles.compactPill, appBarPillStyle]}>
+              <Text style={styles.compactPillText}>
+                2 {t('dashboard.pending')} · 4 {t('dashboard.due')}
+              </Text>
             </Animated.View>
           </View>
 
@@ -132,75 +132,82 @@ export default function DashboardScreen({ navigation }: Props) {
         </View>
       </View>
 
-      <ScrollView
+      <Animated.ScrollView
         contentContainerStyle={[styles.root, { paddingTop: insets.top + 64 }]}
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
-        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], {
-          useNativeDriver: false,
-        })}>
-        {/* Transformable Hero Card */}
+        onScroll={scrollHandler}>
+        {/* Greeting */}
         <Animated.View
-          style={[
-            styles.heroCardContainer,
-            {
-              transform: [{ scale: heroCardScale }],
-              opacity: heroCardOpacity,
-            },
-          ]}>
-          <Text style={styles.heroTitle}>{t('dashboard.greeting')}</Text>
-          <Text style={styles.heroSubtitle}>{t('dashboard.subheading')}</Text>
-
-          <View style={styles.badgeRow}>
-            <View style={styles.badgeItem}>
-              <Text style={styles.badgeLabel}>{t('dashboard.hero_pending')}</Text>
-              <Text style={styles.badgeValue}>2 Tasks</Text>
-            </View>
-            <View style={styles.badgeItem}>
-              <Text style={[styles.badgeLabel, styles.badgeLabelAccent]}>{t('dashboard.hero_due')}</Text>
-              <Text style={styles.badgeValue}>4 Bills</Text>
-            </View>
-          </View>
-
-          <View style={styles.statsRow}>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsTitle}>{t('dashboard.stats_spend_title')}</Text>
-              <Text style={styles.statsAmount}>₹12,450</Text>
-              <Text style={styles.statsNote}>{t('dashboard.stats_spend_sub')}</Text>
-            </View>
-            <View style={styles.statsCard}>
-              <Text style={styles.statsTitle}>{t('dashboard.stats_meds_title')}</Text>
-              <Text style={styles.statsAmount}>3 Active</Text>
-              <Text style={styles.statsNote}>{t('dashboard.stats_meds_sub')}</Text>
-            </View>
+          entering={FadeInDown.duration(420).springify().damping(18)}
+          style={styles.greetingBlock}>
+          <Text style={styles.greetingTitle}>{t('dashboard.greeting')}</Text>
+          <Text style={styles.greetingSubtitle}>{t('dashboard.subheading')}</Text>
+          <View style={styles.statusRow}>
+            <View style={styles.statusDot} />
+            <Text style={styles.statusText}>
+              2 {t('dashboard.hero_pending')} · 4 {t('dashboard.hero_due')}
+            </Text>
           </View>
         </Animated.View>
 
-        {/* Horizontal Quick Actions */}
+        {/* Stat cards */}
+        <Animated.View
+          entering={FadeInDown.delay(80).duration(420).springify().damping(18)}
+          style={styles.statsRow}>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>{t('dashboard.stats_spend_title')}</Text>
+            <Text style={styles.statValue}>₹12,450</Text>
+            <Text style={styles.statNote}>{t('dashboard.stats_spend_sub')}</Text>
+          </View>
+          <View style={styles.statCard}>
+            <Text style={styles.statLabel}>{t('dashboard.stats_meds_title')}</Text>
+            <Text style={styles.statValue}>3 Active</Text>
+            <Text style={styles.statNote}>{t('dashboard.stats_meds_sub')}</Text>
+          </View>
+        </Animated.View>
+
+        {/* Quick actions */}
         <View style={styles.sectionMargin}>
           <Text style={styles.sectionTitle}>{t('dashboard.quick_actions')}</Text>
           <Text style={styles.sectionSubtitle}>{t('dashboard.quick_actions_sub')}</Text>
 
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.horizontalScroll}>
+          <View style={styles.actionsRow}>
             {quickActions.map((action, idx) => (
-              <Card key={idx} style={styles.actionCard} onPress={() => {}}>
-                <Text style={styles.actionShortcut}>{action.shortcut}</Text>
-                <Text style={styles.actionLabel}>{action.label}</Text>
-              </Card>
+              <Animated.View
+                key={idx}
+                style={styles.actionItem}
+                entering={FadeInDown.delay(120 + idx * 40).duration(360).springify().damping(20)}>
+                <Pressable style={styles.actionPressable} onPress={() => {}}>
+                  <View style={styles.actionIconCircle}>
+                    <action.Icon size={22} color={styles.actionIconColor.color} strokeWidth={1.75} />
+                  </View>
+                  <Text style={styles.actionLabel} numberOfLines={1}>
+                    {action.label}
+                  </Text>
+                </Pressable>
+              </Animated.View>
             ))}
-          </ScrollView>
+          </View>
         </View>
 
-        {/* Feature Grid */}
+        {/* Module list */}
         <SectionHeader title={t('dashboard.quick_tiles')} subtitle={t('dashboard.quick_tiles_sub')} style={styles.gridHeader} />
-        <View style={styles.tilesGrid}>
+        <View style={styles.moduleList}>
           {tiles.map((tile, idx) => (
-            <Card key={idx} style={styles.tileCard} onPress={() => handleTilePress(tile.title)}>
-              <View style={styles.tileIconCircle}>
-                <Text style={styles.tileIcon}>{tile.icon}</Text>
-              </View>
-              <Text style={styles.tileTitle}>{tile.title}</Text>
-            </Card>
+            <Animated.View
+              key={idx}
+              entering={FadeInDown.delay(220 + idx * 30).duration(360).springify().damping(20)}>
+              <Pressable
+                style={[styles.moduleRow, idx === tiles.length - 1 && styles.moduleRowLast]}
+                onPress={() => handleTilePress(tile.title)}>
+                <View style={styles.moduleIconCircle}>
+                  <tile.Icon size={20} color={styles.moduleIconColor.color} strokeWidth={1.75} />
+                </View>
+                <Text style={styles.moduleTitle}>{tile.title}</Text>
+                <ChevronRight size={18} color={styles.moduleChevronColor.color} strokeWidth={1.75} />
+              </Pressable>
+            </Animated.View>
           ))}
         </View>
 
@@ -209,7 +216,7 @@ export default function DashboardScreen({ navigation }: Props) {
           <Text style={styles.footerBrand}>Saheli · Smart Household AI</Text>
           <Text style={styles.footerText}>{t('dashboard.footer_note')}</Text>
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
     </View>
   );
 }
@@ -254,31 +261,17 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     color: colors.primary,
     marginRight: 12,
   },
-  compactPillRow: {
-    flexDirection: 'row',
-    gap: 6,
-  },
-  compactPillPending: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 3,
+  compactPill: {
+    borderWidth: 1,
+    borderColor: colors.border,
     borderRadius: radius.pill,
-  },
-  compactPillPendingText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 11,
-    color: '#FFF',
-  },
-  compactPillDue: {
-    backgroundColor: colors.turmeric,
-    paddingHorizontal: 8,
+    paddingHorizontal: 10,
     paddingVertical: 3,
-    borderRadius: radius.pill,
   },
-  compactPillDueText: {
-    fontFamily: fonts.sansBold,
+  compactPillText: {
+    fontFamily: fonts.sansMedium,
     fontSize: 11,
-    color: colors.textPrimary,
+    color: colors.textSecondary,
   },
   profileBtn: {
     width: 40,
@@ -298,77 +291,68 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
   },
-  heroCardContainer: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.xxl,
-    padding: spacing.xl,
-    marginBottom: spacing.xl,
-    ...shadow.medium,
+  greetingBlock: {
+    marginBottom: spacing.lg,
   },
-  heroTitle: {
+  greetingTitle: {
     fontFamily: fonts.serif,
-    fontSize: 28,
-    color: '#FFF',
+    fontSize: 26,
+    color: colors.textPrimary,
     marginBottom: 4,
   },
-  heroSubtitle: {
+  greetingSubtitle: {
     fontFamily: fonts.sans,
     fontSize: 14,
-    color: '#F8ECE4',
-    marginBottom: spacing.lg,
+    color: colors.textSecondary,
   },
-  badgeRow: {
+  statusRow: {
     flexDirection: 'row',
-    gap: 12,
-    marginBottom: spacing.lg,
+    alignItems: 'center',
+    gap: 6,
+    marginTop: spacing.sm,
   },
-  badgeItem: {
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.md,
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+    backgroundColor: colors.turmeric,
   },
-  badgeLabel: {
+  statusText: {
     fontFamily: fonts.sansMedium,
-    fontSize: 11,
-    color: '#FFF',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  badgeLabelAccent: {
-    color: '#FFE8A3',
-  },
-  badgeValue: {
-    fontFamily: fonts.sansBold,
-    fontSize: 15,
-    color: '#FFF',
-    marginTop: 2,
+    fontSize: 12,
+    color: colors.textSecondary,
   },
   statsRow: {
     flexDirection: 'row',
     gap: 12,
+    marginBottom: spacing.xl,
   },
-  statsCard: {
+  statCard: {
     flex: 1,
-    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    backgroundColor: colors.surface,
     borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
     padding: spacing.md,
+    ...shadow.soft,
   },
-  statsTitle: {
+  statLabel: {
     fontFamily: fonts.sansMedium,
     fontSize: 11,
-    color: '#F8ECE4',
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
-  statsAmount: {
+  statValue: {
     fontFamily: fonts.serif,
-    fontSize: 18,
-    color: '#FFF',
+    fontSize: 20,
+    color: colors.textPrimary,
     marginVertical: 4,
   },
-  statsNote: {
+  statNote: {
     fontFamily: fonts.sans,
-    fontSize: 10,
-    color: '#F8ECE4',
+    fontSize: 11,
+    color: colors.textMuted,
   },
   sectionMargin: {
     marginBottom: spacing.xl,
@@ -385,56 +369,78 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     marginTop: 2,
     marginBottom: spacing.md,
   },
-  horizontalScroll: {
-    gap: 12,
+  actionsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    rowGap: spacing.md,
   },
-  actionCard: {
-    width: 110,
-    padding: spacing.md,
+  actionItem: {
+    width: '33.33%',
+  },
+  actionPressable: {
     alignItems: 'center',
   },
-  actionShortcut: {
-    fontSize: 26,
+  actionIconCircle: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: colors.blush,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: 8,
+  },
+  actionIconColor: {
+    color: colors.primary,
   },
   actionLabel: {
     fontFamily: fonts.sansMedium,
     fontSize: 12,
     color: colors.textPrimary,
     textAlign: 'center',
+    paddingHorizontal: 4,
   },
   gridHeader: {
     marginBottom: spacing.md,
   },
-  tilesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 12,
-  },
-  tileCard: {
-    width: '30%',
-    aspectRatio: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: spacing.sm,
-  },
-  tileIconCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
+  moduleList: {
     backgroundColor: colors.surface,
+    borderRadius: radius.lg,
+    borderWidth: 1,
+    borderColor: colors.border,
+    overflow: 'hidden',
+    ...shadow.soft,
+  },
+  moduleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  moduleRowLast: {
+    borderBottomWidth: 0,
+  },
+  moduleIconCircle: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: colors.blush,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: 6,
+    marginRight: spacing.md,
   },
-  tileIcon: {
-    fontSize: 22,
+  moduleIconColor: {
+    color: colors.primary,
   },
-  tileTitle: {
+  moduleTitle: {
+    flex: 1,
     fontFamily: fonts.sansMedium,
-    fontSize: 12,
+    fontSize: 14,
     color: colors.textPrimary,
-    textAlign: 'center',
+  },
+  moduleChevronColor: {
+    color: colors.textMuted,
   },
   footer: {
     alignItems: 'center',

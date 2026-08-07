@@ -34,7 +34,7 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string></string>
+	<string>Saheli uses your location to pre-fill your city on your profile. You can still edit it manually.</string>
 
 	<key>NSCameraUsageDescription</key>
 	<string>Saheli requires camera access to take profile photos and scan documents.</string>

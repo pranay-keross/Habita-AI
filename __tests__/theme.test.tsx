@@ -8,7 +8,11 @@ import ReactTestRenderer from 'react-test-renderer';
 import {
   ThemeTokens,
   applyPalette,
+  colors as activeColors,
+  currentPaletteMeta,
+  loadSavedTheme,
   palettes,
+  saveTheme,
   shadow,
   subscribeToThemeChanges,
 } from '../src/theme';
@@ -71,6 +75,21 @@ describe('runtime palette switching', () => {
     unsubscribe();
     applyPalette('midnight');
     expect(listener).toHaveBeenCalledTimes(1);
+  });
+
+  // M1-T4: the picker calls saveTheme; these are its two other criteria.
+  it('persists the selection and restores it on the next launch', async () => {
+    const ocean = palettes.find((p) => p.key === 'ocean')!;
+
+    await saveTheme('ocean');
+    expect(currentPaletteMeta.key).toBe('ocean');
+
+    // Cold start: in-memory palette is back at the default, storage is not.
+    applyPalette('terracotta');
+    expect(await loadSavedTheme()).toBe('ocean');
+    expect(activeColors.background).toBe(ocean.colors.background);
+
+    await saveTheme('terracotta');
   });
 
   it('moves shadow colour with the palette', () => {

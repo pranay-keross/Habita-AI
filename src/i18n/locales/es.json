@@ -16,10 +16,14 @@
     "phone_title": "Ingresa tu número de móvil",
     "phone_hint": "Saheli te enviará un código",
     "phone_placeholder": "+34 612 345 678",
+    "phone_terms": "Enviaremos un código de verificación de 6 dígitos a este número.",
+    "phone_invalid": "Introduce un número de teléfono válido.",
+    "error_title": "Error",
+    "network_error": "No se pudo conectar con el servidor. Comprueba tu conexión e inténtalo de nuevo.",
     "send_otp": "Enviar código",
     "otp_title": "Verificar el código",
     "otp_hint": "Ingresa el código de 6 dígitos enviado",
-    "otp_demo": "Modo de demostración — el código es 123456",
+    "otp_invalid": "Ese código no es correcto. Inténtalo de nuevo.",
     "verify": "Verificar",
     "change_number": "Cambiar número",
     "resend_in": "Reenviar en {{sec}}s",
@@ -76,7 +80,11 @@
     "photo_change": "Cambiar Foto",
     "name_label": "Nombre para mostrar",
     "phone_label": "Número de móvil",
+    "email_label": "Correo electrónico",
+    "email_placeholder": "tucorreo@ejemplo.com",
+    "save_error": "No se pudo guardar tu perfil. Inténtalo de nuevo.",
     "language_label": "Idioma de la aplicación",
+    "theme_label": "Apariencia",
     "role_label": "Rol seleccionado",
     "location_label": "Ubicación",
     "save_changes": "Guardar cambios",
@@ -89,5 +97,13 @@
     "delete_account_confirm_msg": "¿Estás seguro de que deseas eliminar tu cuenta? Todos los datos guardados serán eliminados.",
     "cancel": "Cancelar",
     "confirm": "Confirmar"
+  },
+  "theme": {
+    "terracotta": "Terracota",
+    "terracotta_desc": "Cálido y terroso · predeterminado",
+    "ocean": "Brisa oceánica",
+    "ocean_desc": "Fresco · azules relajantes",
+    "midnight": "Medianoche",
+    "midnight_desc": "Oscuro · cómodo para la vista"
   }
 }
