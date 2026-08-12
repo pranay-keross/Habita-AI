@@ -40,7 +40,7 @@ what does.
 ## Step 4 — Consistency check
 - Feature status agrees across README.md, AI_CONTEXT.md and docs/BACKLOG.md
 - File maps match the real tree
-- Storage keys in docs/ARCHITECTURE.md §5 match a grep for `saheli.` in src/
+- Storage keys in docs/ARCHITECTURE.md §5 match a grep for `habita.` in src/
 - Task IDs referenced anywhere exist in docs/BACKLOG.md
 
 ## Step 5 — Report

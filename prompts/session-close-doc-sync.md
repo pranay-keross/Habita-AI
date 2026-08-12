@@ -44,7 +44,7 @@ Run `npx tsc --noEmit`, `npm run lint` and `npm test` and record the real result
 Confirm these do not contradict each other:
 - Feature status in README.md vs docs/BACKLOG.md vs AI_CONTEXT.md
 - The file/directory map in README.md vs AI_CONTEXT.md vs the real tree
-- The storage key table in docs/ARCHITECTURE.md vs every `saheli.` key in the source
+- The storage key table in docs/ARCHITECTURE.md vs every `habita.` key in the source
   (grep for it)
 - Task IDs referenced in prompts and docs actually exist in docs/BACKLOG.md
 

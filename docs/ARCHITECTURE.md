@@ -1,13 +1,17 @@
-# Saheli — Architecture
+# Habita AI — Architecture
 
-**Status:** reflects the codebase as of 2026-08-07, branch `initial-static`, after `M2-T1`/`M2-T4`/`M2-T6`–`M2-T8` (`docs/DECISIONS.md` D-013–D-018) — profile creation confirmed working end-to-end against a real backend, with onboarding's returning-user routing, OTP input, role prompt, and location prefill all fixed from direct device testing.
+**Status:** reflects the codebase as of 2026-08-11, branch `initial-static`, after `M2-T1`–`M2-T2` (`docs/DECISIONS.md` D-012–D-018), the Saheli → Habita AI rebrand (D-019, D-020), **M4-T1/T2/T3/T5 (Medical Chest)** (D-021), **real Family & Managed Members backend integration** (D-023, superseding M3's local model), a **Postman-collection reconciliation pass** (D-024, adding the `invites/history` endpoint), and three live-tested session/storage fixes — **silent token refresh** (D-027), **account-scoped local data no longer leaking across sign-in/sign-out** (D-028), and a **validated boot guard plus correct phone/photo/language sourcing on Profile edit and Dashboard** (D-029) — profile creation confirmed working end-to-end against a real backend, and Family is now a second domain talking to it, alongside auth/profile.
 This document describes what exists, not what is planned. Planned work lives in `docs/BACKLOG.md`.
+
+### Target platform vision (not this document's subject)
+
+`Habita AI Software Requirements Specification.md` (repo root) specifies a full enterprise backend — Spring Boot 3.3/Java 21/PostgreSQL 16, dual-LLM (OpenAI + Gemini) intelligence layer, 16 feature modules across identity, health, household ledger, and global finance. **None of that backend exists in this repo.** Everything below this line describes only what is actually built in this React Native client, per this document's stated job (`agent.md` §3) — the SRS is cross-referenced, never duplicated, and its scope should not be read as current state. See `docs/BACKLOG.md` M8 for the integration path once that backend exists, and `NEXT_STEPS.md` for what to build in this client in the meantime.
 
 ---
 
 ## 1. Shape of the system
 
-Saheli is a **React Native client that is mostly still backend-free, with one exception**: onboarding (`M2-T1`, 2026-08-05, `docs/DECISIONS.md` D-012) now calls a real backend for auth and profile creation — see §6. Everything else — theming, i18n, family, dashboard — still reads and writes `AsyncStorage` directly from the screen component, no server involved.
+Habita AI is a **React Native client that is mostly still backend-free, with a few exceptions**: onboarding (`M2-T1`, 2026-08-05, `docs/DECISIONS.md` D-012) calls a real backend for auth and profile creation — see §6 — and Family/Managed Members (`docs/DECISIONS.md` D-023, 2026-08-10) calls the same backend for family sharing — see §7. `dashboard.tsx` also calls the profile-details endpoint, but narrowly: since `docs/DECISIONS.md` D-029 (2026-08-11) it fetches `GET /profile/details` on every focus to keep the header photo and active language in sync with the signed-in account (§6, §8) — it does not otherwise talk to a server, and still reads/writes `AsyncStorage` directly for everything else on the screen (medicine adherence, cached avatar fallback). Everything else — theming, i18n, medicine's own CRUD — still reads and writes `AsyncStorage` directly from the screen component, no server involved.
 
 ```
 ┌──────────────────────────────────────────────────────┐
@@ -20,17 +24,18 @@ Saheli is a **React Native client that is mostly still backend-free, with one ex
 │                       Profile → Dashboard → Family   │
 └──────────────────────────────────────────────────────┘
           │                    │                  │                │
-   ┌──────▼──────┐     ┌───────▼──────┐   ┌───────▼──────┐  ┌──────▼───────┐
-   │ Screens     │     │ Components   │   │ Cross-cutting│  │ Backend      │
-   │ app/*       │     │ Button, Card │   │ theme.ts     │  │ (auth only)  │
-   │ features/*  │     │ SectionHeader│   │ i18n/        │  │ features/    │
-   │             │     │ BottomSheet  │   │ utils/storage│  │  auth/api.ts │
-   └──────┬──────┘     └──────────────┘   └───────┬──────┘  └──────┬───────┘
-          └────────────── AsyncStorage ───────────┘                │
+   ┌──────▼──────┐     ┌───────▼──────┐   ┌───────▼──────┐  ┌──────▼──────────┐
+   │ Screens     │     │ Components   │   │ Cross-cutting│  │ Backend         │
+   │ app/*       │     │ Button, Card │   │ theme.ts     │  │ (auth, profile, │
+   │ features/*  │     │ SectionHeader│   │ i18n/        │  │  family)        │
+   │             │     │ BottomSheet  │   │ utils/storage│  │ features/       │
+   └──────┬──────┘     └──────────────┘   └───────┬──────┘  │  auth/api.ts    │
+          └────────────── AsyncStorage ───────────┘         │  family/api.ts  │
+                                                              └─────────────────┘
                                                           src/config.ts (API_BASE_URL)
 ```
 
-There is still no state container (no Redux/Zustand/Context store) and no general API/service layer — `src/features/auth/api.ts` is scoped to auth+profile, not a repository pattern for the whole app. Screen-local `useState` plus `AsyncStorage` remains the state model everywhere else. This was a deliberate choice for the static-design phase (`docs/DECISIONS.md` D-002); D-012 narrows that decision's scope rather than replacing it — D-002 itself is unchanged and still governs every other domain (family, dashboard, documents, money, …) until each gets its own such exception.
+There is still no state container (no Redux/Zustand/Context store) and no general API/service layer — `src/features/auth/api.ts` and `src/features/family/api.ts` are each scoped to their own domain, not a repository pattern for the whole app. Screen-local `useState` plus `AsyncStorage` remains the state model everywhere else. This was a deliberate choice for the static-design phase (`docs/DECISIONS.md` D-002); D-012 and D-023 each narrow that decision's scope rather than replacing it — D-002 itself is unchanged and still governs every other domain (dashboard, documents, money, medicine's own data, …) until each gets its own such exception.
 
 ---
 
@@ -47,10 +52,11 @@ There is still no state container (no Redux/Zustand/Context store) and no genera
 export type RootStackParamList = {
   Language: undefined;
   Phone: undefined;
-  Otp: undefined;
+  Otp: { isNewUser: boolean } | undefined;
   Profile: { isEditing?: boolean } | undefined;
   Dashboard: undefined;
   Family: undefined;
+  Medicine: undefined;   // M4-T1
 };
 ```
 
@@ -79,7 +85,7 @@ export const colors: PaletteColors = { ...palettes[0].colors };  // mutable sing
 export function applyPalette(key) { Object.assign(colors, p.colors); }  // mutates in place
 ```
 
-`applyPalette` mutates the exported `colors` object rather than replacing it, so every module holding a reference sees the new values. The selected key persists to `saheli.theme.palette`; `loadSavedTheme()` restores it, `saveTheme()` writes it. `src/hooks/useTheme.ts` wraps both and is consumed once, in `_layout.tsx`, to set the stack's `contentStyle.backgroundColor`.
+`applyPalette` mutates the exported `colors` object rather than replacing it, so every module holding a reference sees the new values. The selected key persists to `habita.theme.palette`; `loadSavedTheme()` restores it, `saveTheme()` writes it. `src/hooks/useTheme.ts` wraps both and is consumed once, in `_layout.tsx`, to set the stack's `contentStyle.backgroundColor`.
 
 **Runtime switching — how it works since `M1-T3a` (2026-07-30).** The blocker was that screens build styles with `StyleSheet.create({...})` at *module load*, reading `colors.x` once; mutating `colors` afterwards cannot re-create those frozen style objects, and remounting does not help because module scope is evaluated once per module load, not per mount. Styles therefore have to be built in the render path.
 
@@ -126,7 +132,7 @@ Two things a style block cannot express, and where they went:
 
 - Built on `i18n-js` with `enableFallback = true` and `defaultLocale = 'en'`.
 - `SUPPORTED_LANGS` carries code, English label, native label, and flag for the picker.
-- The current code persists to `saheli.lang`; `loadSavedLanguage()` restores it on the Language screen.
+- The current code persists to `habita.lang`; `loadSavedLanguage()` restores it on the Language screen.
 - **Layout direction is deliberately pinned to LTR.** `applyLanguage()` calls `I18nManager.allowRTL(false)` and `forceRTL(false)` on every switch, including Arabic, so back buttons and flex rows stay left-aligned and the app does not need a native restart to change language. `RTL_LANGS` is declared but not acted on. See `docs/DECISIONS.md` (D-003).
 
 **Re-render mechanism.** `i18n-js` is not reactive, so the app uses a hand-rolled observer:
@@ -149,14 +155,17 @@ Since `M1-T2` (2026-07-30) this is the **only** path to storage — `src/utils/s
 
 | Key | Written by | Shape | Notes |
 | --- | --- | --- | --- |
-| `saheli.lang` | `i18n/index.ts` | JSON string (`"hi"`) | validated against `SUPPORTED_LANGS` on read; falls back to `en` |
-| `saheli.theme.palette` | `theme.ts` | JSON string (`"ocean"`) | validated against `palettes` on read; falls back to `terracotta` |
-| `saheli.user_phone` | `onboarding/phone.tsx` | JSON string | pre-fills the profile step |
-| `saheli.user_profile` | `onboarding/profile.tsx` | `UserProfile` JSON | read by dashboard (avatar) and profile edit |
-| `saheli.family_members` | `features/family/FamilyScreen.tsx` | `FamilyMember[]` JSON | seeded with 3 demo members on first read |
-| `saheli.session` | `hooks/useAuth.ts` | `{accessToken, refreshToken, expiresIn, userId, issuedAt, phone}` JSON | added `M2-T1`/`M2-T4` (`docs/DECISIONS.md` D-012); presence of this key is what `signedIn` means — see §6 |
+| `habita.lang` | `i18n/index.ts` | JSON string (`"hi"`) | validated against `SUPPORTED_LANGS` on read; falls back to `en` |
+| `habita.theme.palette` | `theme.ts` | JSON string (`"ocean"`) | validated against `palettes` on read; falls back to `terracotta` |
+| `habita.user_phone` | `onboarding/phone.tsx` | JSON string | pre-fills the profile step |
+| `habita.user_profile` | `onboarding/profile.tsx` | `UserProfile` JSON | read by dashboard (avatar) and profile edit |
+| `habita.session` | `hooks/useAuth.ts` | `{accessToken, refreshToken, expiresIn, userId, issuedAt, phone}` JSON | added `M2-T1`/`M2-T4` (`docs/DECISIONS.md` D-012); presence of this key is what `signedIn` means — see §6 |
+| `habita.medicines` | `features/medicine/medicineStore.ts` | `Medicine[]` JSON | added `M4-T2`; empty until the user adds a first medicine |
+| `habita.medicine_intake_log` | `features/medicine/medicineStore.ts` | `IntakeLogEntry[]` JSON | added `M4-T3`; append-only, one entry per marked-taken dose; read by `calculateAdherence()` |
 
-`clearAll()` (Delete Account) wipes **all** of the above, including language, palette, and the session — so Delete Account also signs the device out. `handleSignOut` in `profile.tsx` clears just `saheli.session` via `useAuth().logout()`, added `M2-T6` (previously it only reset navigation and left the token behind).
+`clearAll()` (Delete Account) wipes **all** of the above, including language, palette, and the session — so Delete Account also signs the device out. `handleSignOut` in `profile.tsx` calls `useAuth().logout()`, which since `M2-T6` clears `habita.session` and, since `docs/DECISIONS.md` D-028 (2026-08-11), also clears the account-scoped keys below via `clearAccountData()` — `habita.user_profile`, `habita.medicines`, `habita.medicine_intake_log` — so a second phone number signing in on the same device no longer inherits the first account's cached name/photo/medicines. Device preferences (`habita.lang`, `habita.theme.palette`) are deliberately left alone, and `habita.user_phone` is left alone too (the very next onboarding screen always overwrites it). The same clearing also runs pre-emptively inside `verify()` if the cached profile's phone doesn't match the number just verified, as a safety net for sessions that went stale without an explicit sign-out.
+
+**Family has no local storage key at all** (`docs/DECISIONS.md` D-023, 2026-08-10) — same pattern as `UserProfile`'s `GET`/`PUT` split, not the local-first pattern the rest of this table follows. `FamilyScreen.tsx` always reads live from `GET /families`/`GET /families/invites`; nothing is cached to `AsyncStorage`, so there is no `habita.family_members` key to list here or to wipe on Delete Account. The old key is gone, not renamed — a device with pre-D-023 local data simply stops reading it, the same fallback-safe shape D-007 already established for other removed/renamed keys.
 
 ### Data models
 
@@ -172,34 +181,63 @@ interface UserProfile {
   photoUri: string | null;  // device file URI from image picker
 }
 
-// src/features/family/FamilyScreen.tsx  (authoritative)
+// src/features/family/types.ts — real backend shapes, not a local model (D-023). No
+// AsyncStorage key: always fetched live from GET /families / GET /families/invites.
+type FamilyRole = 'OWNER' | 'ADMIN' | 'MEMBER';   // OWNER permanent, never reassignable
+
 interface FamilyMember {
-  id: string;            // Date.now().toString()
+  id: string;
   name: string;
-  phone: string;
-  relation: string;      // 'Self' | 'Spouse' | 'Parent' | 'Child' | 'Staff'
-  role: 'owner' | 'editor' | 'viewer';
-  avatar: string;        // emoji derived from relation
-  permissions: {
-    medicines: boolean;
-    expenses: boolean;
-    documents: boolean;
-    safety: boolean;
-  };
+  role: FamilyRole;
+  managed: boolean;              // true for a dependent (ManagedMember-backed, no login)
+  managedMemberId: string | null;
+}
+
+interface Family {
+  id: string;
+  name: string;
+  ownerUserId: string;
+  members: FamilyMember[];
+}
+
+interface FamilyInvite {
+  id: string;
+  familyId: string;
+  familyName: string;
+  invitedByName: string;
+  role: FamilyRole;
+  status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED';
+  createdAt: string;
+}
+
+// src/features/medicine/types.ts  (M4-T1)
+interface Medicine {
+  id: string;
+  name: string;
+  dosage: string;
+  schedule: ('morning' | 'afternoon' | 'evening' | 'night')[];
+  stock: number;
+}
+
+interface IntakeLogEntry {
+  id: string;
+  medicineId: string;
+  slot: 'morning' | 'afternoon' | 'evening' | 'night';
+  takenAt: number;        // epoch ms
 }
 ```
 
-The duplicate, thinner `FamilyMember` in `src/features/family/index.ts` was deleted in `M1-T1` (2026-07-30). The screen's definition above is the only one. `M3-T4` still applies: move it to `src/features/family/types.ts` and the storage access to `familyStore.ts`.
+`FamilyMember`/`Family`/`FamilyInvite` are defined exactly once, in `src/features/family/types.ts`, matching the real `/api/families/**` response shapes — see §7. `FamilyScreen.tsx` re-exports `FamilyMember` rather than redefining it. This replaced an earlier local-only model (`relation: 'self' | 'spouse' | 'parent' | 'child' | 'staff'`, a `permissions` matrix, `familyStore.ts` backed by `habita.family_members`) that D-023 deleted outright, not deprecated — see `docs/DECISIONS.md` D-023 for why (the real backend has no permission matrix and no `relation` concept at all).
 
 ---
 
 ## 6. Authentication
 
-**Status:** real, as of `M2-T1`/`M2-T4`/`M2-T6` (2026-08-05), **contract verified against `Saheli-Backend.postman_collection.json`'s saved examples** as of a follow-up pass the same day — see `docs/DECISIONS.md` D-012/D-013 for why this domain now makes network calls when D-002 otherwise forbids it. This is the one place in the app that talks to a server.
+**Status:** real, as of `M2-T1`/`M2-T4`/`M2-T6` (2026-08-05), **contract verified against `Saheli Backend — Auth, Profile & Family.postman_collection.json`'s saved examples** as of a follow-up pass the same day — see `docs/DECISIONS.md` D-012/D-013 for why this domain now makes network calls when D-002 otherwise forbids it. This is the one place in the app that talks to a server. For continuing the backend itself (a separate Spring Boot project, not in this repo) — confirmed-live behavior, known backend-side bugs, and the target API surface beyond auth/profile — see `docs/BACKEND_CONTEXT.md`, not this section.
 
 **Files:** `src/config.ts` (`API_BASE_URL`) · `src/features/auth/api.ts` (`apiFetch`, `postMultipart`, `ApiError`, `parseAuthError`) · `src/features/auth/auth.ts` (`authService`: `register`, `login`, `loginOrRegister`, `verifyOtp`, `refresh`) · `src/hooks/useAuth.ts`. `otp.tsx`'s input widget is `react-native-otp-entry` (`M2-T7`, `docs/DECISIONS.md` D-017) — pure JS, no native rebuild.
 
-**Backend contract.** `Saheli-Backend.postman_collection.json` (repo root) is the only source for this — there is no OpenAPI spec, but this version of the collection ships full saved request/response examples for every endpoint (2xx and every documented error), unlike the collection `M2-T1` originally shipped against. Endpoints used:
+**Backend contract.** `Saheli Backend — Auth, Profile & Family.postman_collection.json` (repo root) is the only source for this — there is no OpenAPI spec, but this version of the collection ships full saved request/response examples for every endpoint (2xx and every documented error), unlike the collection `M2-T1` originally shipped against. Endpoints used:
 
 - `POST /auth/register {phone}` and `POST /auth/login {phone}` — both **phone-only**, both just send an OTP. Neither returns tokens. Both responses include a `devOtp` when the backend's `OTP_DEMO_MODE=true`, but the client doesn't read it — `register`/`login` return `Promise<void>` (`docs/DECISIONS.md` D-017, reversing an earlier prefill feature the user explicitly didn't want).
 - `POST /auth/verify-otp {phone, code}` → `{accessToken, refreshToken, expiresIn, userId}`. `expiresIn` is milliseconds from issuance (e.g. `3600000` = 1 hour) — captured into the session (below) but not yet enforced anywhere (`M2-T3`).
@@ -211,7 +249,7 @@ The duplicate, thinner `FamilyMember` in `src/features/family/index.ts` was dele
 
 **Phone format.** The backend validates a **bare 10-digit Indian mobile number** — no country code, no `+`, no spaces (`register`/`login`/`verify-otp` all 400 with `"phone: must be a valid 10-digit Indian mobile number"` otherwise). Screens still work with the display-formatted string (`"+91 98765 43210"`, `getCountryCodeForLang` also offers `+34`/`+966` for the es/ar locales); `auth.ts`'s private `toBackendPhone()` strips to the trailing 10 digits before every request. This is the one place that conversion happens — a non-Indian number will still fail the backend's validator (a real backend limitation, not something the client papers over), surfaced to the user as the generic `invalid_phone` error.
 
-**Flow.** `phone.tsx` calls `authService.loginOrRegister(phone)` — tries `login`, and on a `not_registered` result falls back to `register`; the result (`{isNewUser}`) is forwarded via `navigation.navigate('Otp', {isNewUser})`. `otp.tsx` calls `useAuth().verify(phone, code)`, which calls `verifyOtp` and, on success, persists `{accessToken, refreshToken, expiresIn, userId, issuedAt, phone}` to `saheli.session` (§5) via the existing `storage.ts` helpers — no new storage path, no `react-native-keychain`. It then navigates to `'Profile'` if `isNewUser` (first-time setup still needed) or straight to `'Dashboard'` if not (`M2-T7`, `docs/DECISIONS.md` D-017 — a returning user previously landed on Profile setup every time, since this distinction didn't exist). `profile.tsx`: on first-time setup, posts to `create`; in edit mode, loads via `GET /profile/details` (local `AsyncStorage` is the immediate/offline fallback while that resolves) and saves via `PUT /profile/details`, plus a separate `PUT /profile/profilePhoto` call only when the photo is a fresh local file (detected by `!photoUri.startsWith('http')` — an S3 URL just loaded from `GET` needs no re-upload).
+**Flow.** `phone.tsx` calls `authService.loginOrRegister(phone)` — tries `login`, and on a `not_registered` result falls back to `register`; the result (`{isNewUser}`) is forwarded via `navigation.navigate('Otp', {isNewUser})`. `otp.tsx` calls `useAuth().verify(phone, code)`, which calls `verifyOtp` and, on success, persists `{accessToken, refreshToken, expiresIn, userId, issuedAt, phone}` to `habita.session` (§5) via the existing `storage.ts` helpers — no new storage path, no `react-native-keychain`. It then navigates to `'Profile'` if `isNewUser` (first-time setup still needed) or straight to `'Dashboard'` if not (`M2-T7`, `docs/DECISIONS.md` D-017 — a returning user previously landed on Profile setup every time, since this distinction didn't exist). `profile.tsx`: on first-time setup, posts to `create`; in edit mode, loads via `GET /profile/details` (local `AsyncStorage` is the immediate/offline fallback while that resolves) and saves via `PUT /profile/details`, plus a separate `PUT /profile/profilePhoto` call only when the photo is a fresh local file (detected by `!photoUri.startsWith('http')` — an S3 URL just loaded from `GET` needs no re-upload).
 
 **The multipart JSON part problem — resolved, confirmed live (`M2-T1`, 2026-08-07 — `docs/DECISIONS.md` D-013/D-014/D-015).** `profileRequest` needs `Content-Type: application/json` on that specific part for Spring's `@RequestPart` to pick a message converter. Two client-side approaches were live-tested against a real backend, with real server logs both times:
 
@@ -222,21 +260,59 @@ The duplicate, thinner `FamilyMember` in `src/features/family/index.ts` was dele
 
 **`parseAuthError`** (`src/features/auth/api.ts`) interprets a failed request into `'not_registered' | 'already_registered' | 'invalid_phone' | 'invalid_code' | 'network' | 'unknown'`. Every 4xx in the collection's examples is a 400 or 401 with a structured `{message, ...}` body — status code alone can't distinguish "phone not registered" (login) from "phone already registered" (register) from a validation failure, since they're all 400 — so this matches on the `message` string, not just the status. Every screen branches on this enum, never on a raw status or body, so a wrong mapping is a one-function fix.
 
-**`useAuth()` is a plain hook, not a Context.** Each caller gets its own local `session`/`pending` state, backed by the same `saheli.session` key — deliberate, not an oversight. Nothing today needs `signedIn` to update reactively *across* components mid-session, since navigation only ever moves forward through explicit `navigate()` calls (Phone → Otp → Profile → Dashboard); `_layout.tsx` reads it exactly once, at boot.
+**`useAuth()` is a plain hook, not a Context.** Each caller gets its own local `session`/`pending` state, backed by the same `habita.session` key — deliberate, not an oversight. Nothing today needs `signedIn` to update reactively *across* components mid-session, since navigation only ever moves forward through explicit `navigate()` calls (Phone → Otp → Profile → Dashboard); `_layout.tsx` reads it exactly once, at boot.
 
-**Auth guard.** `_layout.tsx` calls `useAuth()` and renders a themed loading `View` (`styles.loading`, via the same `useThemedStyles` factory pattern every screen uses) while `pending`, then mounts `Stack.Navigator` with `initialRouteName={signedIn ? 'Dashboard' : 'Language'}`. This only guards **cold start** — `initialRouteName` is read once by React Navigation and never revisited, so this is not a per-screen guard against, say, manually navigating to `Dashboard` mid-session with an expired token. That is unchanged from before this work and is still `docs/ARCHITECTURE.md` §8's known gap #1.
+**Auth guard.** `_layout.tsx` calls `useAuth()` and renders a themed loading `View` (`styles.loading`, via the same `useThemedStyles` factory pattern every screen uses) while `pending`, then mounts `Stack.Navigator` with `initialRouteName={signedIn ? 'Dashboard' : 'Language'}`. Since `docs/DECISIONS.md` D-029 (2026-08-11), the boot check that sets `pending: false` actually validates the stored session through the same `getValidSession()` refresh-or-clear logic every screen's `getAccessToken()` uses (`D-027`), rather than just checking that a session object exists — a long-idle reopen whose token has genuinely died now correctly boots to `Language` instead of stranding the user on Dashboard with a token that fails every request. This still only guards **cold start** — `initialRouteName` is read once by React Navigation and never revisited, so this is not a per-screen guard against a session that dies *while the app is already open* on `Dashboard`. That gap is unchanged and is still `docs/ARCHITECTURE.md` §9's known gap #1.
 
-**What this explicitly does not do yet** (tracked as separate `docs/BACKLOG.md` M2 rows, not silently dropped): no resend-OTP countdown (`M2-T2`), no idle/absolute session expiry or silent token refresh on 401 (`M2-T3`'s remaining half — `refresh()` exists in `auth.ts`, `expiresIn` is now captured, but nothing acts on either yet), no "session expired" re-auth banner (`M2-T5`).
+**Resend and change-number** (`M2-T2`, `otp.tsx`): a 30-second self-rescheduling `setTimeout` countdown (`RESEND_COOLDOWN_SECONDS`) gates a "Resend" link — while it's running, `onboarding.resend_in` shows the remaining seconds; at zero, tapping "Resend" calls the same `useAuth().login()` (i.e. `loginOrRegister`) the Phone screen calls, clears the entered code, refocuses the input, and restarts the countdown. A separate "Change number" link (`onboarding.change_number`) calls `navigation.goBack()` — the same action as the top-left back arrow, just labeled for discoverability. Neither adds a new backend call; both reuse what `M2-T1` already wired.
 
-**Location permission** (`profile.tsx`, first-time setup only): `@react-native-community/geolocation` gets the device's current coordinates, then `reverseGeocode()` (same file) turns them into a real place name — `"City, State"`, falling back to just the city or Nominatim's full `display_name` if the address is sparse, and to raw `"lat, lng"` only if the lookup itself fails — and stays editable either way. Requires `ACCESS_COARSE_LOCATION`/`ACCESS_FINE_LOCATION` (`android/app/src/main/AndroidManifest.xml`) and `NSLocationWhenInUseUsageDescription` (`ios/SaheliCLI/Info.plist`) — same native-rebuild caveat as `react-native-svg` in `M1-T13`: `pod install` and a fresh build are required, a Metro reload alone won't pick up the new native module. Jest has no way to reach the real module either, so `jest.setup.js` mocks it (the package ships no jest mock of its own, unlike gesture-handler/async-storage/safe-area-context — see §9).
+**Silent token refresh** (`M2-T3`, `docs/DECISIONS.md` D-027, 2026-08-11): `useAuth()`'s `getAccessToken()`/`getUserId()` now check the stored session's `issuedAt + expiresIn` before returning it, and transparently call `authService.refresh()` first if it's expired or about to be (a 30-second skew) — confirmed live: a genuinely expired token was getting a bare `403` from the backend on `PUT /profile/details` before this, now gets a real, authenticated response. A module-level in-flight-refresh guard (not per-hook-instance) coalesces concurrent callers, since every screen holds its own `session` state (`useAuth()` is a plain hook, see below) and refresh tokens are typically single-use. If the refresh token itself has also expired, the session is cleared outright rather than kept around failing forever.
+
+**Account-scoped local data no longer leaks across sign-in/sign-out** (`docs/DECISIONS.md` D-028, 2026-08-11). `verify()` now compares the *cached profile's* phone against the phone just verified before persisting the new session — a mismatch means this device holds another account's data, and `clearAccountData()` (`habita.user_profile`, `habita.medicines`, `habita.medicine_intake_log`) runs first. `logout()` calls the same function. See §5's storage table note for the full key list this does and doesn't touch.
+
+**Profile edit reads phone from the session, and applies the account's saved language — and so does Dashboard, on every focus** (`docs/DECISIONS.md` D-029, 2026-08-11). `useAuth()` gained `getPhone()` (mirrors `getUserId()`/`getAccessToken()`) — `profile.tsx`'s edit-mode load calls it directly rather than reading `habita.user_profile`'s cached `phone`, which only ever had a value after at least one save on that device and was rendering empty for a freshly signed-in account. That screen's live `GET /profile/details` handler now also calls `setLanguage(details.preferredLanguage)` (validated against `SUPPORTED_LANGS`) on success — previously fetched and silently discarded, so the picker (and the whole app, since `i18n`'s current locale is shared, not screen-local) kept showing the device's last language instead of the signed-in account's own saved choice. `dashboard.tsx`'s own `focus` listener (§8) now makes the same `GET /profile/details` call, applying `avatarUrl` to the header photo and `preferredLanguage` the same way — so the correct photo and language show up the moment a returning user lands on Dashboard, not only once they happen to open Profile edit. A `liveProfileLoaded` guard (same shape as `profile.tsx`'s own) keeps the local-cache read from re-clobbering a fresher live photo if it resolves second.
+
+**What this still does not do** (tracked as separate `docs/BACKLOG.md` M2 rows, not silently dropped): no *proactive* idle/absolute expiry detection — today's refresh only fires reactively, the next time something calls `getAccessToken()`, not on a timer — and no "session expired" re-auth banner for the case where the refresh token itself has died (`M2-T5`).
+
+**Location permission** (`profile.tsx`, first-time setup only): `@react-native-community/geolocation` gets the device's current coordinates, then `reverseGeocode()` (same file) turns them into a real place name — `"City, State"`, falling back to just the city or Nominatim's full `display_name` if the address is sparse, and to raw `"lat, lng"` only if the lookup itself fails — and stays editable either way. Requires `ACCESS_COARSE_LOCATION`/`ACCESS_FINE_LOCATION` (`android/app/src/main/AndroidManifest.xml`) and `NSLocationWhenInUseUsageDescription` (`ios/SaheliCLI/Info.plist`) — same native-rebuild caveat as `react-native-svg` in `M1-T13`: `pod install` and a fresh build are required, a Metro reload alone won't pick up the new native module. Jest has no way to reach the real module either, so `jest.setup.js` mocks it (the package ships no jest mock of its own, unlike gesture-handler/async-storage/safe-area-context — see §10).
 
 **Reverse geocoding** (`M2-T8`, `docs/DECISIONS.md` D-018 — resolves what D-012 deliberately deferred): OpenStreetMap's Nominatim, plain `fetch`, no API key and no new dependency. Its usage policy asks for a descriptive `User-Agent` (set) and caps free usage around 1 request/second — fine for one lookup per profile setup, not something to scale up without revisiting (a paid provider or self-hosted Nominatim instance).
 
-**Role is asked only in Profile edit mode, not first-time setup** (`M2-T8`) — it has no backend field at all (confirmed by `ProfileDetailsResponse`'s shape above), so asking for it during onboarding was friction for a purely local, changeable-later concept. `handleSaveProfile` still writes whatever `role` currently holds (default `'household_ceo'`) to `saheli.user_profile` on every save, onboarding included — only the picker UI is conditional on `isEditing`.
+**Role is asked only in Profile edit mode, not first-time setup** (`M2-T8`) — it has no backend field at all (confirmed by `ProfileDetailsResponse`'s shape above), so asking for it during onboarding was friction for a purely local, changeable-later concept. `handleSaveProfile` still writes whatever `role` currently holds (default `'household_ceo'`) to `habita.user_profile` on every save, onboarding included — only the picker UI is conditional on `isEditing`.
 
 ---
 
-## 7. UI component system
+## 7. Family & Sharing
+
+**Status:** real, as of `docs/DECISIONS.md` D-023 (2026-08-10), with the collection's `invites/history` endpoint added 2026-08-11 (D-024) — superseded a local-only model built in `M3` (2026-08-08). Every endpoint in the collection's Family folder is now implemented client-side. Only matched against `Saheli Backend — Auth, Profile & Family.postman_collection.json`'s saved examples so far, **not run against a live server in this session** — unlike auth/profile (§6), nothing here carries a "confirmed live" claim yet. See `docs/BACKEND_CONTEXT.md` for the full contract table and known gaps.
+
+**Files:** `src/features/family/api.ts` (`createFamily`, `listMyFamilies`, `getFamily`, `inviteMember`, `listMyPendingInvites`, `acceptInvite`, `declineInvite`, `listFamilyPendingInvites`, `cancelInvite`, `listFamilyInviteHistory`, `updateMemberRole`, `removeMember`, `addManagedMember`, `removeManagedMember`, plus `getMyPrimaryFamily`/`resolveMyMembership`/`getMyProfileName` helpers and `parseFamilyError`) · `src/features/family/types.ts` (`Family`, `FamilyMember`, `FamilyInvite`, `FamilyRole`) · `src/features/family/FamilyScreen.tsx`. Reuses `apiFetch`/`ApiError` from `src/features/auth/api.ts` — the fetch wrapper is domain-agnostic, so Family did not need its own.
+
+**Invite history** (`D-024`, 2026-08-11): an admin-only, collapsed-by-default "Invite history" section beneath the pending-invites panel — `GET /families/{id}/invites/history` is fetched lazily on first expand (not on every screen load, since it's admin-only and rarely needed), and lists every invite ever sent for the family with a status-colored badge (`family.status_pending/accepted/declined/cancelled`, all six locales). Unlike `listFamilyPendingInvites`, the backend does not filter this by status.
+
+**The screen's initial load no longer alerts on failure** (`D-025`, 2026-08-11). `reload()` takes an optional `{silent}` flag: the mount effect calls `reload({silent: true})`, and on failure sets a `loadError` state instead of calling `showError`'s `Alert.alert` — rendered as an inline "Couldn't load your family" card (same visual language as the create-family empty state) with a "Try Again" button that re-runs the silent reload. The most common trigger in practice is simply no backend being reachable, and greeting the user with a modal alert the instant they open the screen read as a bug, not a status. Every other call site (create/invite/accept/decline/cancel/save-role/remove/leave) still calls `reload()` without `silent` and still alerts on failure — those are direct responses to something the user just tapped, where a modal is the right amount of interruption.
+
+**Invite vs. Add Dependent is explained inline, not just separated** (`D-026`, 2026-08-11). Both bottom sheets carry a `sheetInfoBox` callout above their fields — the Invite sheet's explains a phone-identified request goes to the invitee's own account for them to accept; the Add Dependent sheet's explains the opposite (no account, no request, attached immediately). The Add Dependent sheet's submit button was also relabeled from the shared `family.send_invitation` string (which it had been reusing, contradicting its own callout) to a dedicated `family.add_dependent_btn`.
+
+**No local storage key.** Unlike every other domain module in this app, Family has nothing in the §5 table — it is always read live from `GET /families` and `GET /families/invites`, the same "network is the source of truth" shape §6 already established for Profile, not the local-first-with-a-storage-key shape everything else in §5 follows.
+
+**Roles are `OWNER` / `ADMIN` / `MEMBER`, not the local model's `owner`/`editor`/`viewer` + a permission matrix.** `OWNER` is assigned once at family creation and is permanent — no endpoint can reassign it. `ADMIN` can invite, remove members, change non-owner roles, and manage dependents; `MEMBER` cannot. **There is no per-module permission matrix on this backend at all** — `docs/DECISIONS.md` D-023 records the decision to drop the client's old `permissions: {medicines, expenses, documents, safety}` concept entirely rather than fake it locally, and gate purely by role instead.
+
+**Invite flow is real cross-account consent, not a same-device toggle.** `POST /families/{id}/members {phone, role}` creates a `PENDING` `FamilyInvite` for an **already-registered** user — it does not attach them as a member. That person must accept or decline it themselves, from their own session (`POST/GET .../invites`, `.../accept`, `.../decline`) — `FamilyScreen.tsx` fetches `GET /families/invites` on every load to show invites addressed to the current user, independent of whether they have a family of their own yet. The inviter never gets to set the invitee's name — it comes from the invitee's own account once they accept.
+
+**A user can belong to zero or many families** (`GET /families` returns a list) — the client only supports one at a time (`getMyPrimaryFamily()` takes `families[0]`), with a create-family empty state (`family.no_family_title`, `POST /families`) when the list is empty. No family switcher exists; picking a second family isn't reachable from the UI at all.
+
+**Identity resolution is a real, working, but honestly fragile heuristic.** `FamilyMemberResponse` carries no `userId` for a non-owner row — the only unambiguous match is `Family.ownerUserId === useAuth().getUserId()`. For a non-owner, `resolveMyMembership()` (`src/features/family/api.ts`) falls back to matching the caller's own cached `habita.user_profile` name against the member list; if that doesn't resolve, it defaults to the least-privileged `MEMBER` read rather than guessing upward. This is what both `FamilyScreen.tsx` (to decide which admin actions to render) and `MedicineScreen.tsx`'s `M4-T5` permission gate (`canEdit = membership.isAdmin`, or `true` if the user has no family at all) depend on. Documented as a real backend contract gap in `docs/BACKEND_CONTEXT.md` — a `userId` per member, or a dedicated "my membership" endpoint, would remove the guesswork.
+
+**No self-service "leave family" endpoint exists.** `DELETE /families/{id}/members/{id}` (Remove Member) requires admin access on the *caller*, not just ownership of the row being removed — so a plain `MEMBER` has no way to remove themselves at all via this API. `FamilyScreen.tsx` only renders "Leave Family" for a resolved `ADMIN` member, calling Remove Member on their own row; a plain `MEMBER` doesn't see the action, rather than showing one that would 401.
+
+**Managed Members** (dependents — children, elderly parents, anyone without their own login) are real (`POST/DELETE .../managed-members`), closing what was tracked as `M2-T9`. `relationship` is a free-text string on the backend (`"Mother"`, `"Grandfather"`, …), not an enum — the client's `label_relationship`/`placeholder_relationship` fields reflect that; there is no fixed relation picker the way the old local model had. Removing a managed member (`removeManagedMember`) is distinct from removing a regular member (`removeMember`): it takes `managedMemberId`, not `familyMemberId`, and also deactivates the underlying dependent record, not just the family link.
+
+**Errors.** `parseFamilyError()` (`src/features/family/api.ts`) mirrors `parseAuthError`'s message-matching shape (§6) — every 4xx here is also a 400 or 401 with a structured `{message, ...}` body, so status code alone can't distinguish "not found" from "no permission" from "already a member." Buckets into `not_found | no_permission | phone_not_registered | already_member | family_full | network | unknown`, each mapped to a localized `family.error_*` string.
+
+---
+
+## 8. UI component system
 
 | Component | File | Notes |
 | --- | --- | --- |
@@ -262,26 +338,35 @@ Screens still define most of their own `StyleSheet` blocks locally. Only `Card`,
 
 **`M1-T14` (2026-08-05) removed the scaling/fading hero card** that used to own this section — see `docs/DECISIONS.md` D-011. The greeting is now plain text directly on `colors.background`, and there is nothing left that needs a scroll-driven scale/opacity transform, so `heroCardScale`/`heroCardOpacity` (and the ranges tuned for them in `M1-T12`) no longer exist. The AppBar's fade-in ranges were tightened (`80`→`60`, `30–90`→`10–60`) to match — the trigger content is shorter now (a text block, not a tall filled card), so the transition needed to start and finish sooner to still feel tied to what's scrolling past it.
 
+**Entrance animation cut back to one fade, not a cascade (2026-08-11, D-025).** Every mount previously fired 18 separate staggered `FadeInDown.springify()` entrances — the greeting, the stat-cards row, each of the 6 quick actions (40ms apart), and each of the 10 module rows (30ms apart) — direct user feedback called this "too much animation." Only one `Animated.View` remains, wrapping the greeting + stat cards together in a single 280ms fade with no spring/bounce and no per-item delay; quick actions and module rows render as plain `View`/`Pressable` with no entrance animation at all. The scroll-driven AppBar fade above is unchanged — it is functional (it's what makes the sticky header appear), not decorative, and wasn't part of the complaint.
+
 ---
 
-## 8. Known gaps and technical debt
+## 9. Known gaps and technical debt
 
 Ordered by how much they will hurt later. All are tracked in `docs/BACKLOG.md`.
 
-1. **Auth is real but partial.** `M2-T1`/`M2-T4`/`M2-T6` (§6) wired register/login/verify-otp against a real backend and added a cold-start auth guard. Still missing: resend-OTP countdown, idle/absolute session expiry, silent refresh on an expired token (`refresh()` exists but nothing calls it), and a "session expired" re-auth banner. Also still missing: a *mid-session* guard — the cold-start check only runs once at boot, so nothing stops in-app navigation to `Dashboard` if a token has since expired. (`M2-T2`, `M2-T3`, `M2-T5`)
-2. **No session expiry.** No idle timeout or absolute expiry is enforced — a persisted token is trusted until the backend itself rejects it. (`M2-T3`)
+1. **Auth is real but partial.** `M2-T1`/`M2-T4`/`M2-T6` (§6) wired register/login/verify-otp against a real backend and added a cold-start auth guard; `M2-T2` added the resend-OTP countdown and change-number link; `M2-T3`'s silent refresh landed 2026-08-11 (D-027). Still missing: *proactive* idle/absolute expiry detection (refresh today is reactive, not timer-driven) and a "session expired" re-auth banner for a refresh token that's itself died. Also still missing: a *mid-session* guard — the cold-start check only runs once at boot, so nothing stops in-app navigation to `Dashboard` if a token has since expired. (`M2-T3`, `M2-T5`)
+2. **No proactive session expiry.** A persisted access token now silently refreshes itself on next use if expired (`M2-T3`, D-027) rather than being trusted forever, but nothing checks on a timer — an idle app doesn't detect expiry until something calls `getAccessToken()` again. (`M2-T3`)
 3. **Theming is complete for the screens that exist** (`M1-T3b`, `M1-T4`, `M1-T9`, `M1-T11`). What is left is a product question, not a gap: Midnight is manual-only and does not follow the OS appearance setting (`docs/BACKLOG.md` → Open question 6). (§3)
-4. **Most of auth's backend contract is still matched against saved examples, not confirmed live.** `Saheli-Backend.postman_collection.json` ships full request/response examples for every endpoint, and `parseAuthError` (§6) is written to match them exactly. Profile creation specifically *is* now confirmed working end-to-end against a live backend, including the photo upload (`docs/DECISIONS.md` D-015) — that live test also surfaced a backend-side bug, not fixed here (D-016): re-creating a profile for a user that already has one 500s instead of updating or returning a clean conflict. `register`/`login`/`verify-otp`/`refresh` and the profile-edit path (`PUT /profile/details`, `PUT /profile/profilePhoto`) still haven't been run live.
-5. **Family screen not localized** — breaks the 6-language promise on a shipped screen. (`M3-T1`)
-6. **Fonts not bundled** — the visual design in the palette definitions is not what renders. (`M1-T4`)
-7. **Two navigation typing sources** (`native-stack` navigator vs `stack` prop types). (`M1-T5`)
-8. **Test coverage is theming plus one smoke test** — `__tests__/App.test.tsx`, `theme.test.tsx`, `themedScreens.test.tsx` (29 tests). No storage, i18n, or interaction tests, and no React Native Testing Library. The harness itself was repaired in `M1-T1` (2026-07-30) — see §9. (`M9-T1`)
-9. **Dashboard numbers are hardcoded** — `₹12,450` and `3 Active` in the dashboard stat cards, `2`/`4` in the greeting's `Pending`/`Due` status line, and (on `FamilyScreen.tsx`, not the dashboard) `Modules Synced`. They must become derived values before the modules that own them land. (`M4`+)
-10. **Tile navigation is string-matched.** `dashboard.tsx`'s `handleTilePress` routes on `title === 'Family' || title === t('dashboard.tile_family')`. The `t()` arm means it does work in every locale today, but the match is by label rather than identity, so it breaks the moment a translation is reworded and every new route needs another string comparison. Tiles need stable IDs. (`M1-T7`)
+4. **Most of auth's backend contract is still matched against saved examples, not confirmed live.** `Saheli Backend — Auth, Profile & Family.postman_collection.json` ships full request/response examples for every endpoint, and `parseAuthError` (§6) is written to match them exactly. Profile creation specifically *is* now confirmed working end-to-end against a live backend, including the photo upload (`docs/DECISIONS.md` D-015) — that live test also surfaced a backend-side bug, not fixed here (D-016): re-creating a profile for a user that already has one 500s instead of updating or returning a clean conflict. `register`/`login`/`verify-otp`/`refresh` and the profile-edit path (`PUT /profile/details`, `PUT /profile/profilePhoto`) still haven't been run live.
+5. **Fonts not bundled** — the visual design in the palette definitions is not what renders. (`M1-T4`)
+6. **Two navigation typing sources** (`native-stack` navigator vs `stack` prop types). (`M1-T5`)
+7. **Test coverage is theming plus one smoke test** — `__tests__/App.test.tsx`, `theme.test.tsx`, `themedScreens.test.tsx` (34 tests). No storage, i18n, or interaction tests, and no React Native Testing Library. The harness itself was repaired in `M1-T1` (2026-07-30) — see §10. (`M9-T1`)
+8. **One dashboard number is still hardcoded** — `₹12,450` (30-day spend) in the dashboard stat card. `2`/`4` in the greeting's `Pending`/`Due` status line are also still placeholders, pending `M5-T11`'s Events module and `M6-T3`'s spend rollup. Medicine adherence (the card next to it) went live in `M4-T3`.
+9. **Family's "which member is me" is a name-match heuristic, not a real identity lookup** (§7, `docs/DECISIONS.md` D-023). `FamilyMemberResponse` has no `userId` for a non-owner row, so `resolveMyMembership()` falls back to matching the caller's own cached profile name — wrong if two members share a display name, or if the caller renamed since joining (falls back to the safe `MEMBER` read in that case, not a crash, but still not a correct answer). Fixing this needs a backend change (a `userId` per member, or a "my membership" endpoint) — see `docs/BACKEND_CONTEXT.md`.
+10. **No self-service "leave family" for a plain `MEMBER`.** The backend's Remove Member endpoint requires admin access on the *caller*, not just ownership of the row — so `FamilyScreen.tsx` only offers "Leave Family" to a resolved `ADMIN`. A plain member who wants to leave currently has no in-app way to do it. (§7)
+11. **No multi-family switcher.** The backend supports a user belonging to several families; the client only ever shows `families[0]` (`getMyPrimaryFamily()`). Joining a second family (by accepting an invite) works, but there is no UI to switch to it afterward. (§7)
+
+Resolved this pass, kept here as a record rather than silently deleted:
+
+- ~~Family screen not localized~~ — done, `M3-T1`, then rebuilt against the real backend in `M8-T3`/D-023 with a fresh localization pass.
+- ~~Tile navigation is string-matched~~ — done, `M1-T7`: `dashboard.tsx`'s `tiles`/`quickActions` now carry a stable `id`, and `handleTilePress`/`handleActionPress` route on it instead of `tile.title`.
+- ~~Family's "Modules Synced" stat was a fake local registry~~ — moot as of D-023: the stat (and the whole permission-matrix concept it measured) was removed, not fixed, since the real backend has no permission matrix to synchronize.
 
 ---
 
-## 9. Test harness
+## 10. Test harness
 
 **Files:** `jest.config.js` · `jest.setup.js` · `__tests__/`
 
@@ -295,19 +380,19 @@ Ordered by how much they will hurt later. All are tracked in `docs/BACKLOG.md`.
 
 `theme.test.tsx` also covers `M1-T4`'s persistence criterion: `saveTheme` → reset in-memory palette → `loadSavedTheme` returns the saved key, which is what a cold start does.
 
-`__tests__/themedScreens.test.tsx` (added in `M1-T3b`) does the same for the real files — `Card`, `Button`, `SectionHeader` and `otp.tsx` — and adds a source-scan guard: every file under `src/` is asserted not to contain a top-level `const styles = StyleSheet.create(`. That is the one form the type checker and eslint both accept and that silently breaks theming, so it is checked by reading the source rather than by rendering. `otp.tsx` is still the screen chosen to mount because it has no *mount-time* effects — `M2-T1` gave it an async storage read and a network call, but both only run from the Verify button's `onPress`, which this test never triggers; the "no effects" property that made it a safe, undemanding mount target is unchanged.
+`__tests__/themedScreens.test.tsx` (added in `M1-T3b`) does the same for the real files — `Card`, `Button`, `SectionHeader` and `otp.tsx` — and adds a source-scan guard: every file under `src/` is asserted not to contain a top-level `const styles = StyleSheet.create(`. That is the one form the type checker and eslint both accept and that silently breaks theming, so it is checked by reading the source rather than by rendering. `otp.tsx` is still the screen chosen to mount, though it's no longer effect-free: `M2-T2` added a self-rescheduling `setTimeout` countdown (the resend timer) that starts on mount. It's still a safe mount target because the test unmounts inside `act()` (line ~99), which runs the effect's cleanup (`clearTimeout`) before the suite moves on — no leaked timer, no new open-handle warning. `M2-T1`'s async storage read and network call still only run from the Verify button's `onPress`, which this test never triggers.
 
-Current run (2026-08-05): 3 suites, 29 tests, all passing. Jest still reports `A worker process has failed to exit gracefully` — `@react-navigation/native`'s `useLinking` timer stays pending because the smoke test never unmounts (`M9-T8b`). The React `act()` warning previously recorded here **did not reproduce**, on this tree or on a stashed-clean one; treat it as timing-dependent rather than fixed (`M9-T8a`). `M2-T1` added a second candidate for this warning — `_layout.tsx`'s `useAuth()` boot check resolves its `getItem` promise asynchronously, same shape as the language-loading pattern already tolerated here — but it did not reproduce either on this run.
+Current run (2026-08-10): 3 suites, 34 tests, all passing — up from 29 because `themedScreens.test.tsx`'s source-scan guard (`it.each(sourceFiles(SRC)...)`, above) generates one test per `.tsx?` file under `src/`; `M3-T4`/`M4-T1` originally added five (`family/types.ts`, `family/familyStore.ts`, `medicine/types.ts`, `medicine/medicineStore.ts`, `medicine/MedicineScreen.tsx`), and D-023's Family backend integration swapped `family/familyStore.ts` for `family/api.ts` — net file count unchanged, so the total is still 34. Jest still reports `A worker process has failed to exit gracefully` — `@react-navigation/native`'s `useLinking` timer stays pending because the smoke test never unmounts (`M9-T8b`). The React `act()` warning previously recorded here **did not reproduce**, on this tree or on a stashed-clean one; treat it as timing-dependent rather than fixed (`M9-T8a`). `M2-T1` added a second candidate for this warning — `_layout.tsx`'s `useAuth()` boot check resolves its `getItem` promise asynchronously, same shape as the language-loading pattern already tolerated here — but it did not reproduce either on this run.
 
 ---
 
-## 10. Conventions for new code
+## 11. Conventions for new code
 
 - **Screens** go in `src/app/` (app-level flow) or `src/features/<domain>/` (domain module). A feature folder owns its screen, its types, and its storage key.
 - **Register the route** in `RootStackParamList` and `_layout.tsx` in the same change.
 - **Styling:** write the style block as `const makeStyles = ({ colors, … }: ThemeTokens) => StyleSheet.create({…})` and call `useThemedStyles(makeStyles)` in the component. Import `ThemeTokens` as a type from `src/theme`; do not import the token values into a screen. Never inline hex. A module-scope `const styles = StyleSheet.create(...)` is a defect — `__tests__/themedScreens.test.tsx` fails the build if one appears.
 - **Strings:** add to `src/i18n/locales/en.json` first, then all five other locale files in the same commit. Namespace by screen (`dashboard.*`, `profile.*`, `family.*`) — or by domain when the strings are not screen-specific (`theme.*`).
 - **Reactivity to language:** subscribe via `subscribeToLanguageChanges` and key the root view on a `localeVersion` counter.
-- **Storage:** always through `src/utils/storage.ts`, always with a `saheli.` key prefix, and document the key in §5 of this file.
+- **Storage:** always through `src/utils/storage.ts`, always with a `habita.` key prefix, and document the key in §5 of this file.
 - **Safe area:** screens handle their own insets; the navigator has no header.
 - **Before finishing:** `npx tsc --noEmit` must pass.

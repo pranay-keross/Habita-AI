@@ -1,0 +1,4086 @@
+{
+  "info": {
+    "_postman_id": "53029024-7099-4133-90dd-0e094bfeca63",
+    "name": "Saheli Backend — Auth, Profile & Family",
+    "description": "Authentication (phone + OTP) and Profile CRUD for the Saheli Spring Boot backend.\n\n**Flow to run in order (Auth folder):**\n1. Register User — creates an unverified User row and issues an OTP\n2. Verify OTP (Register) — verifies the OTP, marks the user verified, returns access + refresh JWT\n3. Login User — for an already-verified phone, issues a fresh OTP\n4. Verify OTP (Login) — same endpoint as verify, returns fresh tokens\n5. Refresh Token — exchanges a refresh token for a new access + refresh pair\n\nAll tokens/ids are captured automatically into collection variables by each request's Tests script, so requests can be run top-to-bottom with the Collection Runner.\n\n**Profile folder** requires `accessToken` to be set (run the Auth flow first). Auth is inherited at the collection level as a Bearer token using `{{accessToken}}`; the four Auth requests explicitly opt out of it since `/api/auth/**` is public.\n\nOTP demo mode is on by default in local dev (`OTP_DEMO_MODE=true`) — every OTP is `123456` and is echoed back in the response as `devOtp`, which the Register/Login requests capture into `{{otp}}` automatically.\n\n**Family folder** requires `accessToken` to be set (run the Auth flow first) and covers create/list/get, invite-consent membership, role updates, and member/managed-member removal (`/api/families/**`). Some requests (List My Pending Invites, Accept Invite, Decline Invite) must run as the *invited* user rather than the inviter — they override auth with the `invitedUserAccessToken` collection variable; run the Auth flow a second time for `invitedPhone` to populate it.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "_exporter_id": "51164236",
+    "_collection_link": "https://go.postman.co/collection/51164236-53029024-7099-4133-90dd-0e094bfeca63?source=collection_link"
+  },
+  "item": [
+    {
+      "name": "Authentication",
+      "item": [
+        {
+          "name": "Register User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test(\"Response has message\", function () {",
+                  "        pm.expect(json.message).to.be.a('string');",
+                  "    });",
+                  "    if (json.devOtp) {",
+                  "        pm.collectionVariables.set(\"otp\", json.devOtp);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone\": \"{{phone}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/register",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Creates a new (unverified) User row for `phone` if one doesn't already exist, then issues an OTP with purpose REGISTER. Fails if the phone is already a **verified** user. Public endpoint — no token required."
+          },
+          "response": [
+            {
+              "name": "200 OK — OTP issued",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876543210\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "register"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"message\": \"OTP sent to 9876543210\",\n    \"devOtp\": \"123456\"\n}"
+            },
+            {
+              "name": "400 Bad Request — phone already registered (verified)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876543210\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "register"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Phone number is already registered\",\n    \"path\": \"/api/auth/register\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — invalid phone format",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"12345\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/register",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "register"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Validation failed\",\n    \"path\": \"/api/auth/register\",\n    \"details\": [\n        \"phone: must be a valid 10-digit Indian mobile number\"\n    ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Login User",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    if (json.devOtp) {",
+                  "        pm.collectionVariables.set(\"otp\", json.devOtp);",
+                  "    }",
+                  "    pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                  "     pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
+                  "",
+                  "}"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone\": \"{{phone}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/login",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Issues an OTP with purpose LOGIN for an already-**verified** phone. Fails if the phone has never completed registration. Public endpoint — no token required."
+          },
+          "response": [
+            {
+              "name": "200 OK — OTP issued",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876543210\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"message\": \"OTP sent to 9876543210\",\n    \"devOtp\": \"123456\"\n}"
+            },
+            {
+              "name": "400 Bad Request — phone not registered",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9000000000\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Phone number is not registered\",\n    \"path\": \"/api/auth/login\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — invalid phone format",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"12345\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/login",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "login"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Validation failed\",\n    \"path\": \"/api/auth/login\",\n    \"details\": [\n        \"phone: must be a valid 10-digit Indian mobile number\"\n    ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Verify OTP",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test(\"Response has tokens\", function () {",
+                  "        pm.expect(json.accessToken).to.be.a('string');",
+                  "        pm.expect(json.refreshToken).to.be.a('string');",
+                  "    });",
+                  "    pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
+                  "    pm.collectionVariables.set(\"userId\", json.userId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone\": \"{{phone}}\",\n    \"code\": \"{{otp}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/verify-otp",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "verify-otp"
+              ]
+            },
+            "description": "Verifies the most recent unconsumed OTP for `phone` (works for both REGISTER and LOGIN purposes). On success, marks the user verified (if this was a REGISTER OTP), updates `lastLoginAt`, and returns a fresh access + refresh JWT pair. Public endpoint — no token required.\n\nRun **Register User** or **Login User** first so `{{otp}}` is populated (auto-captured from `devOtp` in demo mode)."
+          },
+          "response": [
+            {
+              "name": "200 OK — tokens issued",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876543210\",\n    \"code\": \"123456\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/verify-otp",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "verify-otp"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"accessToken\": \"{{supabase_service_role_api_key_0lxd}}.eyJzdWIiOiIzZmE4NWY2NC01NzE3LTQ1NjItYjNmYy0yYzk2M2Y2NmFmYTYiLCJwaG9uZSI6Ijk4NzY1NDMyMTAiLCJ0eXBlIjoiVVNFUiIsImlhdCI6MTc1NDQ3NjM2MSwiZXhwIjoxNzU0NDc5OTYxfQ.9f1c1a1b2c3d4e5f6a7b8c9d0e1f2a3b4c5d6e7f8a9b0c1d2e3f4a5b6c7d8e9f\",\n    \"refreshToken\": \"{{supabase_service_role_api_key_0lxd}}.eyJzdWIiOiIzZmE4NWY2NC01NzE3LTQ1NjItYjNmYy0yYzk2M2Y2NmFmYTYiLCJwaG9uZSI6Ijk4NzY1NDMyMTAiLCJ0eXBlIjoiVVNFUiIsImlhdCI6MTc1NDQ3NjM2MSwiZXhwIjoxNzU3MDY4MzYxfQ.1a2b3c4d5e6f7a8b9c0d1e2f3a4b5c6d7e8f9a0b1c2d3e4f5a6b7c8d9e0f1a2b\",\n    \"expiresIn\": 3600000,\n    \"userId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\"\n}"
+            },
+            {
+              "name": "400 Bad Request — no pending OTP",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876543210\",\n    \"code\": \"123456\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/verify-otp",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "verify-otp"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"No pending OTP for this phone\",\n    \"path\": \"/api/auth/verify-otp\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — OTP expired",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876543210\",\n    \"code\": \"123456\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/verify-otp",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "verify-otp"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"OTP has expired, please request a new one\",\n    \"path\": \"/api/auth/verify-otp\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — incorrect OTP",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876543210\",\n    \"code\": \"000000\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/verify-otp",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "verify-otp"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Incorrect OTP\",\n    \"path\": \"/api/auth/verify-otp\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — max attempts exceeded",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876543210\",\n    \"code\": \"000000\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/verify-otp",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "verify-otp"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Maximum OTP attempts exceeded, please request a new one\",\n    \"path\": \"/api/auth/verify-otp\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Refresh Token",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set(\"accessToken\", json.accessToken);",
+                  "    pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
+                  "    pm.collectionVariables.set(\"userId\", json.userId);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "noauth"
+            },
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/auth/refresh",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Exchanges a valid, non-expired `USER`-typed refresh token for a brand new access + refresh pair. Public endpoint — no token required (the refresh token itself is the credential). There is no revocation list, so an old refresh token stays valid after this call until it naturally expires."
+          },
+          "response": [
+            {
+              "name": "200 OK — new tokens issued",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"refreshToken\": \"{{supabase_service_role_api_key_0lxd}}...\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/refresh",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "refresh"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"accessToken\": \"{{json_web_token_1cpx}}\",\n    \"refreshToken\": \"{{json_web_token_02fj}}\",\n    \"expiresIn\": 3600000,\n    \"userId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\"\n}"
+            },
+            {
+              "name": "401 Unauthorized — invalid or expired refresh token",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"refreshToken\": \"not-a-real-token\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/refresh",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "refresh"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"Invalid or expired refresh token\",\n    \"path\": \"/api/auth/refresh\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "401 Unauthorized — wrong token type (access token used as refresh)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"refreshToken\": \"{{accessToken}}\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/auth/refresh",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "auth",
+                    "refresh"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"Invalid refresh token\",\n    \"path\": \"/api/auth/refresh\",\n    \"details\": []\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Phone + OTP authentication. All endpoints under `/api/auth/**` are public (no Bearer token required — see `SecurityConfig.PUBLIC_PATHS`)."
+    },
+    {
+      "name": "Profile",
+      "item": [
+        {
+          "name": "Create Profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "profileRequest",
+                  "value": "{\n    \"name\": \"Aarti Sharma\",\n    \"email\": \"aarti.sharma@example.com\",\n    \"city\": \"Pune\",\n    \"preferredLanguage\": \"en\"\n}",
+                  "contentType": "application/json",
+                  "type": "text",
+                  "description": "JSON body for ProfileRequestDto — must be sent as a part named 'profileRequest' with Content-Type application/json."
+                },
+                {
+                  "key": "profilePhoto",
+                  "type": "file",
+                  "description": "The profile photo file (uploaded to S3; only the object key is stored).",
+                  "value": null
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/profile/create",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "create"
+              ]
+            },
+            "description": "One-time onboarding: creates the `UserProfile` row for the authenticated user (updates `name`/`email` on `User`, uploads `profilePhoto` to S3 if provided, sets `isCompleted=true`). Requires a `USER`-typed Bearer access token. Success response is the plain string `Profile Saved Successfully` (no longer echoes the user id, as of commit `5d863d5`).\n\nMultipart request — `profileRequest` must be attached as a **text part with Content-Type: application/json** (not a query param, not top-level JSON body), and `profilePhoto` as a **file part**. In Postman, select a file for the `profilePhoto` key before sending.\n\n**`preferredLanguage` note (known gap, not yet fixed in code):** `ProfileRequestDto.preferredLanguage` was annotated `@NotBlank` in commit `5d863d5`, but the controller's `@RequestPart(\"profileRequest\") ProfileRequestDto profileRequest` parameter has no `@Valid`/`@Validated` — Spring does not run bean validation on a `@RequestPart` without it, so this constraint is currently a no-op. Omitting `preferredLanguage` does **not** return a clean 400; it either fails as a 500 (null hits the `preferred_language VARCHAR(10) NOT NULL` column) or silently persists an empty string, depending on whether the JSON key is missing vs. sent as `\"\"`. See the two error examples below."
+          },
+          "response": [
+            {
+              "name": "200 OK — profile created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "profileRequest",
+                      "value": "{\"name\":\"Aarti Sharma\",\"email\":\"aarti.sharma@example.com\",\"city\":\"Pune\",\"preferredLanguage\":\"en\"}",
+                      "contentType": "application/json",
+                      "type": "text"
+                    },
+                    {
+                      "key": "profilePhoto",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/create",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "create"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain;charset=UTF-8"
+                }
+              ],
+              "cookie": [],
+              "body": "Profile Saved Successfully"
+            },
+            {
+              "name": "403 Forbidden — missing or invalid access token",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "profileRequest",
+                      "value": "{\"name\":\"Aarti Sharma\",\"email\":\"aarti.sharma@example.com\",\"city\":\"Pune\",\"preferredLanguage\":\"en\"}",
+                      "contentType": "application/json",
+                      "type": "text"
+                    },
+                    {
+                      "key": "profilePhoto",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/create",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "create"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "cookie": [],
+              "body": ""
+            },
+            {
+              "name": "500 Internal Server Error — unexpected failure (e.g. S3 upload)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "profileRequest",
+                      "value": "{\"name\":\"Aarti Sharma\",\"email\":\"aarti.sharma@example.com\",\"city\":\"Pune\",\"preferredLanguage\":\"en\"}",
+                      "contentType": "application/json",
+                      "type": "text"
+                    },
+                    {
+                      "key": "profilePhoto",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/create",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "create"
+                  ]
+                }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/profile/create\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "500 Internal Server Error — preferredLanguage omitted (known gap, see request description)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "profileRequest",
+                      "value": "{\"name\":\"Aarti Sharma\",\"email\":\"aarti.sharma@example.com\",\"city\":\"Pune\"}",
+                      "contentType": "application/json",
+                      "type": "text"
+                    },
+                    {
+                      "key": "profilePhoto",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/create",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "create"
+                  ]
+                }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/profile/create\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Profile Details",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/profile/details",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "details"
+              ]
+            },
+            "description": "Returns the authenticated user's profile. `avatarUrl` is a freshly generated S3 pre-signed URL (10-minute expiry), not the raw stored object key — `null` if no photo was ever uploaded. Requires a `USER`-typed Bearer access token."
+          },
+          "response": [
+            {
+              "name": "200 OK — profile details",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/details",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "details"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"phone\": \"9876543210\",\n    \"name\": \"Aarti Sharma\",\n    \"email\": \"aarti.sharma@example.com\",\n    \"preferredLanguage\": \"en\",\n    \"active\": true,\n    \"isVerified\": true,\n    \"avatarUrl\": \"https://saheli-v1-bucket.s3.ap-south-1.amazonaws.com/9f8e7d6c-5b4a-3c2d-1e0f-a9b8c7d6e5f4-photo.jpg?X-Amz-Algorithm=AWS4-HMAC-SHA256&X-Amz-Credential=EXAMPLEKEYID1234ABCD%2F20260806%2Fap-south-1%2Fs3%2Faws4_request&X-Amz-Date=20260806T091241Z&X-Amz-Expires=600&X-Amz-SignedHeaders=host&X-Amz-Signature=abcdef1234567890\",\n    \"city\": \"Pune\"\n}"
+            },
+            {
+              "name": "403 Forbidden — missing or invalid access token",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/details",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "details"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "cookie": [],
+              "body": ""
+            },
+            {
+              "name": "500 Internal Server Error — profile not created yet",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/details",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "details"
+                  ]
+                }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/profile/details\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Profile Photo",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "profilePhoto",
+                  "type": "file",
+                  "description": "New photo file. Uploaded to S3 first; DB is updated; the previous S3 object is deleted only after a successful DB update.",
+                  "value": null
+                }
+              ]
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/profile/profilePhoto",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "profilePhoto"
+              ]
+            },
+            "description": "Replaces the authenticated user's profile photo. Requires an existing `UserProfile` (run Create Profile first) and a `USER`-typed Bearer access token."
+          },
+          "response": [
+            {
+              "name": "200 OK — photo updated",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "profilePhoto",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/profilePhoto",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "profilePhoto"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain;charset=UTF-8"
+                }
+              ],
+              "cookie": [],
+              "body": "Profile Photo Updated Successfully"
+            },
+            {
+              "name": "400 Bad Request — no photo provided",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "profilePhoto",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/profilePhoto",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "profilePhoto"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Profile photo is required\",\n    \"path\": \"/api/profile/profilePhoto\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "404 Not Found — profile does not exist yet",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "profilePhoto",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/profilePhoto",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "profilePhoto"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"User profile not found\",\n    \"path\": \"/api/profile/profilePhoto\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "403 Forbidden — missing or invalid access token",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "profilePhoto",
+                      "type": "file",
+                      "src": []
+                    }
+                  ]
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/profilePhoto",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "profilePhoto"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "cookie": [],
+              "body": ""
+            }
+          ]
+        },
+        {
+          "name": "Update Profile Details",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"email\": \"aarti.new@example.com\",\n    \"preferredLanguage\": \"hi\",\n    \"city\": \"Mumbai\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/profile/details",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "profile",
+                "details"
+              ]
+            },
+            "description": "Partially updates `email` (on `User`) and `city`/`preferredLanguage` (on `UserProfile`) for the authenticated user. `email: null` leaves the existing email unchanged; `city`/`preferredLanguage` are overwritten with whatever is sent (including `null`). Requires an existing `UserProfile` and a `USER`-typed Bearer access token."
+          },
+          "response": [
+            {
+              "name": "200 OK — details updated",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"email\": \"aarti.new@example.com\",\n    \"preferredLanguage\": \"hi\",\n    \"city\": \"Mumbai\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/details",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "details"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "text",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain;charset=UTF-8"
+                }
+              ],
+              "cookie": [],
+              "body": "Profile Updated Successfully"
+            },
+            {
+              "name": "404 Not Found — profile does not exist yet",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"email\": \"aarti.new@example.com\",\n    \"preferredLanguage\": \"hi\",\n    \"city\": \"Mumbai\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/details",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "details"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"User profile not found\",\n    \"path\": \"/api/profile/details\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "403 Forbidden — missing or invalid access token",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"email\": \"aarti.new@example.com\",\n    \"preferredLanguage\": \"hi\",\n    \"city\": \"Mumbai\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/profile/details",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "profile",
+                    "details"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "cookie": [],
+              "body": ""
+            }
+          ]
+        }
+      ],
+      "description": "Post-registration onboarding CRUD. All endpoints require a `USER`-typed Bearer access token (`authenticated()` in `SecurityConfig`, resolved via `@CurrentUser`)."
+    },
+    {
+      "name": "Family",
+      "item": [
+        {
+          "name": "Create Family",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set(\"familyId\", json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"{{familyName}}\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/families",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families"
+              ]
+            },
+            "description": "Creates a Family owned by the caller and attaches them as its sole OWNER FamilyMember in the same transaction. Requires a USER-typed Bearer access token."
+          },
+          "response": [
+            {
+              "name": "200 OK — family created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Sharma Family\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        }\n    ]\n}"
+            },
+            {
+              "name": "400 Bad Request — blank name",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Validation failed\",\n    \"path\": \"/api/families\",\n    \"details\": [\n        \"name: must not be blank\"\n    ]\n}"
+            },
+            {
+              "name": "403 Forbidden — missing or invalid access token",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Sharma Family\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "cookie": [],
+              "body": ""
+            }
+          ]
+        },
+        {
+          "name": "List My Families",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/families",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families"
+              ]
+            },
+            "description": "Lists every Family the caller belongs to (as a User-backed FamilyMember, any role)."
+          },
+          "response": [
+            {
+              "name": "200 OK — families list",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"name\": \"Sharma Family\",\n        \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n        \"members\": [\n            {\n                \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n                \"name\": \"Aarti Sharma\",\n                \"role\": \"OWNER\",\n                \"managed\": false,\n                \"managedMemberId\": null\n            }\n        ]\n    }\n]"
+            },
+            {
+              "name": "403 Forbidden - No accesstoken provided List My Families",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "0"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 04:51:27 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "Get Family",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/families/{{familyId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "{{familyId}}"
+              ]
+            },
+            "description": "Returns one Family with its full member list. Caller must be a member of the family (any role) — FamilyAccessService.requireRole."
+          },
+          "response": [
+            {
+              "name": "200 OK — family details",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        }\n    ]\n}"
+            },
+            {
+              "name": "401 Unauthorized — caller is not a member of this family",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "404 Not Found — family does not exist",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family not found\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Invite Member",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status code is 200\", function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test(\"Invite is PENDING\", function () {",
+                  "        pm.expect(json.status).to.eql(\"PENDING\");",
+                  "    });",
+                  "    pm.collectionVariables.set(\"inviteId\", json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"phone\": \"{{invitedPhone}}\",\n    \"role\": \"MEMBER\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "{{familyId}}",
+                "members"
+              ]
+            },
+            "description": "Creates a PENDING FamilyInvite for an already-registered user by phone — does not attach them as a member yet (superseded the old immediate-attach behavior, see docs/DECISIONS.md D-012). The target accepts/declines via the Accept/Decline Invite requests below, run as that user. Requires OWNER/ADMIN on the family (requireAdminAccess). role cannot be OWNER.\n\n{{invitedPhone}} must already be a verified registered user — run the Auth folder's Register to Verify OTP flow for that phone first (in a second Postman run, or temporarily swap {{phone}})."
+          },
+          "response": [
+            {
+              "name": "200 OK — invite created",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n    \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"familyName\": \"Sharma Family\",\n    \"invitedByName\": \"Aarti Sharma\",\n    \"role\": \"MEMBER\",\n    \"status\": \"PENDING\",\n    \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n}"
+            },
+            {
+              "name": "400 Bad Request — no registered user with that phone",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9000000001\",\n    \"role\": \"MEMBER\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"No registered user with phone 9000000001\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — already a member",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"User is already a member of this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — already has a pending invite",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"User already has a pending invite to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — role OWNER is not assignable",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"OWNER\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Ownership cannot be assigned this way\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "List My Pending Invites",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{invitedUserAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/families/invites",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "invites"
+              ]
+            },
+            "description": "Pending invites addressed to the caller, across every family. Run as the invited user, not the inviter — this request overrides the collection's default Bearer auth with {{invitedUserAccessToken}}. Run the Auth folder's flow for {{invitedPhone}} first and paste the resulting accessToken into that collection variable."
+          },
+          "response": [
+            {
+              "name": "200 OK — pending invites",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/invites",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "invites"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n        \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"familyName\": \"Sharma Family\",\n        \"invitedByName\": \"Aarti Sharma\",\n        \"role\": \"MEMBER\",\n        \"status\": \"PENDING\",\n        \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n    }\n]"
+            },
+            {
+              "name": "403 Forbidden - No accessToken provided for the invited member List My Pending Invites",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/invites",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "invites"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "0"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 04:48:41 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "Accept Invite",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    const nonManaged = json.members.filter(m => !m.managed);",
+                  "    if (nonManaged.length > 0) {",
+                  "        pm.collectionVariables.set(\"familyMemberId\", nonManaged[nonManaged.length - 1].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{invitedUserAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "invites",
+                "{{inviteId}}",
+                "accept"
+              ]
+            },
+            "description": "Accepts a PENDING invite addressed to the caller: creates the FamilyMember with the invite's role, marks the invite ACCEPTED. Run as the invited user ({{invitedUserAccessToken}}, see List My Pending Invites). Capacity is re-checked here, not just at invite time."
+          },
+          "response": [
+            {
+              "name": "200 OK — invite accepted, now a member",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "invites",
+                    "{{inviteId}}",
+                    "accept"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        },\n        {\n            \"id\": \"d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n            \"name\": \"Rahul Sharma\",\n            \"role\": \"MEMBER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        }\n    ]\n}"
+            },
+            {
+              "name": "400 Bad Request — invite no longer pending",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "invites",
+                    "{{inviteId}}",
+                    "accept"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Invite is no longer pending\",\n    \"path\": \"/api/families/invites/c3d4e5f6-a7b8-4901-c234-56789abcdef0/accept\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — family is full",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "invites",
+                    "{{inviteId}}",
+                    "accept"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Family already has the maximum of 5 members\",\n    \"path\": \"/api/families/invites/c3d4e5f6-a7b8-4901-c234-56789abcdef0/accept\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "404 Not Found — invite does not exist or belongs to someone else",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "invites",
+                    "{{inviteId}}",
+                    "accept"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Invite not found\",\n    \"path\": \"/api/families/invites/c3d4e5f6-a7b8-4901-c234-56789abcdef0/accept\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Decline Invite",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{invitedUserAccessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/decline",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "invites",
+                "{{inviteId}}",
+                "decline"
+              ]
+            },
+            "description": "Declines a PENDING invite addressed to the caller — marks it DECLINED, no FamilyMember is created. Run as the invited user. Mutually exclusive with Accept Invite for the same invite (only run one)."
+          },
+          "response": [
+            {
+              "name": "204 No Content — invite declined",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/decline",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "invites",
+                    "{{inviteId}}",
+                    "decline"
+                  ]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "cookie": [],
+              "body": ""
+            },
+            {
+              "name": "400 Bad Request — invite no longer pending",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/decline",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "invites",
+                    "{{inviteId}}",
+                    "decline"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Invite is no longer pending\",\n    \"path\": \"/api/families/invites/c3d4e5f6-a7b8-4901-c234-56789abcdef0/decline\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Family Pending Invites (admin)",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/families/{{familyId}}/invites",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "{{familyId}}",
+                "invites"
+              ]
+            },
+            "description": "Every PENDING invite outstanding for this family. Requires OWNER/ADMIN (requireAdminAccess) — run with the inviter's token."
+          },
+          "response": [
+            {
+              "name": "200 OK — pending invites for this family",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/invites",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "invites"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n        \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"familyName\": \"Sharma Family\",\n        \"invitedByName\": \"Aarti Sharma\",\n        \"role\": \"MEMBER\",\n        \"status\": \"PENDING\",\n        \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n    }\n]"
+            },
+            {
+              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/invites",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "invites"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/invites\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Cancel Invite (admin)",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/families/{{familyId}}/invites/{{inviteId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "{{familyId}}",
+                "invites",
+                "{{inviteId}}"
+              ]
+            },
+            "description": "Cancels a still-PENDING invite before the target responds to it. Requires OWNER/ADMIN. Run this only if you did not already Accept/Decline the same {{inviteId}} above."
+          },
+          "response": [
+            {
+              "name": "204 No Content — invite cancelled",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/invites/{{inviteId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "invites",
+                    "{{inviteId}}"
+                  ]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "cookie": [],
+              "body": ""
+            },
+            {
+              "name": "400 Bad Request — invite no longer pending",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/invites/{{inviteId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "invites",
+                    "{{inviteId}}"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Invite is no longer pending\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/invites/c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "404 Not Found — invite does not exist for this family",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/invites/{{inviteId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "invites",
+                    "{{inviteId}}"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Invite not found\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/invites/c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update Member Role",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"role\": \"ADMIN\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "{{familyId}}",
+                "members",
+                "{{familyMemberId}}",
+                "role"
+              ]
+            },
+            "description": "Changes a member's role. Requires OWNER/ADMIN (requireAdminAccess). role cannot be OWNER, and a member whose current role is OWNER cannot be changed at all — ownership is permanent and non-transferable through this endpoint (see docs/DECISIONS.md D-013)."
+          },
+          "response": [
+            {
+              "name": "200 OK — role updated",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members",
+                    "{{familyMemberId}}",
+                    "role"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        },\n        {\n            \"id\": \"d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n            \"name\": \"Rahul Sharma\",\n            \"role\": \"ADMIN\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        }\n    ]\n}"
+            },
+            {
+              "name": "400 Bad Request — cannot change the owner's role",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"role\": \"MEMBER\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members",
+                    "{{familyMemberId}}",
+                    "role"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Cannot change the family owner's role\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/b2c3d4e5-f6a7-4890-b123-456789abcdef/role\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "400 Bad Request — role OWNER is not assignable",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"role\": \"OWNER\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members",
+                    "{{familyMemberId}}",
+                    "role"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Ownership cannot be assigned this way\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01/role\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "404 Not Found — family member does not exist",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members",
+                    "{{familyMemberId}}",
+                    "role"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family member not found\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01/role\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
+              "originalRequest": {
+                "method": "PATCH",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members",
+                    "{{familyMemberId}}",
+                    "role"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01/role\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Remove Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "{{familyId}}",
+                "members",
+                "{{familyMemberId}}"
+              ]
+            },
+            "description": "Removes a member (unlinks the FamilyMember row; works for either a User-backed or ManagedMember-backed row, but does not touch the underlying ManagedMember record — see Remove Managed Member for that). Requires OWNER/ADMIN. The OWNER can never be removed."
+          },
+          "response": [
+            {
+              "name": "204 No Content — member removed",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members",
+                    "{{familyMemberId}}"
+                  ]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "cookie": [],
+              "body": ""
+            },
+            {
+              "name": "400 Bad Request — cannot remove the family owner",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members",
+                    "{{familyMemberId}}"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Cannot remove the family owner\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "404 Not Found — family member does not exist",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "members",
+                    "{{familyMemberId}}"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family member not found\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Add Managed Member",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    const managed = json.members.filter(m => m.managedMemberId);",
+                  "    if (managed.length > 0) {",
+                  "        const last = managed[managed.length - 1];",
+                  "        pm.collectionVariables.set(\"managedMemberId\", last.managedMemberId);",
+                  "        pm.collectionVariables.set(\"familyMemberId\", last.id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n    \"name\": \"Grandma Sharma\",\n    \"relationship\": \"Mother\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "{{familyId}}",
+                "managed-members"
+              ]
+            },
+            "description": "Creates a ManagedMember (a dependent with no login of their own — e.g. an elderly parent or child) owned by the caller, and attaches them to the family with role MEMBER immediately (no invite/consent step — a ManagedMember cannot consent for themselves). Requires OWNER/ADMIN."
+          },
+          "response": [
+            {
+              "name": "200 OK — managed member added",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Grandma Sharma\",\n    \"relationship\": \"Mother\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "managed-members"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        },\n        {\n            \"id\": \"e5f6a7b8-c9d0-4123-e456-789abcdef012\",\n            \"name\": \"Grandma Sharma\",\n            \"role\": \"MEMBER\",\n            \"managed\": true,\n            \"managedMemberId\": \"f6a7b8c9-d0e1-4234-f567-89abcdef0123\"\n        }\n    ]\n}"
+            },
+            {
+              "name": "400 Bad Request — family is full",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Grandma Sharma\",\n    \"relationship\": \"Mother\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "managed-members"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Family already has the maximum of 5 members\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
+              "originalRequest": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n    \"name\": \"Grandma Sharma\",\n    \"relationship\": \"Mother\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "managed-members"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Remove Managed Member",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members/{{managedMemberId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "families",
+                "{{familyId}}",
+                "managed-members",
+                "{{managedMemberId}}"
+              ]
+            },
+            "description": "Fully retires a dependent: deletes the FamilyMember link and sets ManagedMember.active = false. Takes the managedMemberId (from FamilyMemberResponse.managedMemberId), not the familyMemberId — distinct from Remove Member, which only unlinks. Requires OWNER/ADMIN."
+          },
+          "response": [
+            {
+              "name": "204 No Content — managed member removed",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members/{{managedMemberId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "managed-members",
+                    "{{managedMemberId}}"
+                  ]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": "text",
+              "header": [],
+              "cookie": [],
+              "body": ""
+            },
+            {
+              "name": "404 Not Found — managed member not found in this family",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members/{{managedMemberId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "managed-members",
+                    "{{managedMemberId}}"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Managed member not found in this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members/f6a7b8c9-d0e1-4234-f567-89abcdef0123\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members/{{managedMemberId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "managed-members",
+                    "{{managedMemberId}}"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members/f6a7b8c9-d0e1-4234-f567-89abcdef0123\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "ListInvitesHistory",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": [
+            {
+              "name": "200-OK-ListInvitesHistory",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/6de0d911-f3e7-412e-9f25-5fde52bed8fd/invites/history",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "6de0d911-f3e7-412e-9f25-5fde52bed8fd",
+                    "invites",
+                    "history"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 10 Aug 2026 10:20:45 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"2534dfb5-5baa-4f0c-910f-b33ad4c5e9b0\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"ACCEPTED\",\n        \"createdAt\": \"2026-08-10T08:20:41.973081Z\"\n    },\n    {\n        \"id\": \"273b83a7-551c-4de1-bd58-4c53311c9591\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"ACCEPTED\",\n        \"createdAt\": \"2026-08-10T10:18:00.657295Z\"\n    },\n    {\n        \"id\": \"2d3fe2b9-7c6d-4de0-b6dd-3b2f94639283\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"CANCELLED\",\n        \"createdAt\": \"2026-08-10T10:18:50.807555Z\"\n    },\n    {\n        \"id\": \"766557b0-e493-4164-acf5-f7ca89f65897\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"DECLINED\",\n        \"createdAt\": \"2026-08-10T10:18:26.296505Z\"\n    },\n    {\n        \"id\": \"92257e86-67ff-4668-8d3f-812737aafe80\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"DECLINED\",\n        \"createdAt\": \"2026-08-10T10:18:32.920140Z\"\n    }\n]"
+            },
+            {
+              "name": "401-ERROR-LIstFamilyHistroyWith wrongFamilyId",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/families/6d0d911-f3e7-412e-9f25-5fde52bed8fd/invites/history",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "families",
+                    "6d0d911-f3e7-412e-9f25-5fde52bed8fd",
+                    "invites",
+                    "history"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 10 Aug 2026 10:21:38 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-10T10:21:37.740762900Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/6d0d911-f3e7-412e-9f25-5fde52bed8fd/invites/history\",\n    \"details\": []\n}"
+            }
+          ]
+        }
+      ],
+      "description": "Family multi-tenancy: create/list/get, invite-consent membership (invite then accept/decline/cancel), role updates, and member/managed-member removal. All endpoints require a USER-typed Bearer access token; every write goes through FamilyAccessService (requireAdminAccess for membership changes, requireRole for reads). Accept/Decline/List-My-Invites requests run as the invited user via {{invitedUserAccessToken}}, overriding the collection default — see each request's description."
+    },
+    {
+      "name": "Medchest",
+      "item": [
+        {
+          "name": "Create profile",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"name\": \"Rahul\",\r\n  \"category\": \"CHILD\",\r\n  \"dateOfBirth\": \"2026-08-11\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{family}}/{{familyId}}/profiles",
+              "host": [
+                "{{family}}"
+              ],
+              "path": [
+                "{{familyId}}",
+                "profiles"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK-Create profile",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"name\": \"Rahul\",\r\n  \"category\": \"KID\",\r\n  \"dateOfBirth\": \"2026-08-11\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/profiles",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 04:18:36 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"6898cde9-f06b-42a1-b100-10bd94370238\",\n    \"name\": \"Rahul\",\n    \"category\": \"KID\",\n    \"dateOfBirth\": \"2026-08-11\"\n}"
+            },
+            {
+              "name": "500 Error-Create profile",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"name\": \"Rahul\",\r\n  \"category\": \"CHILD\",\r\n  \"dateOfBirth\": \"2026-08-11\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/profiles",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 04:19:10 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T04:19:10.295562200Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/families/6de0d911-f3e7-412e-9f25-5fde52bed8fd/profiles\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Profile details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const resp=pm.response.json();\r",
+                  "pm.collectionVariables.set(\"familyProfileId\", resp[0].id);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{family}}/{{familyId}}/profiles",
+              "host": [
+                "{{family}}"
+              ],
+              "path": [
+                "{{familyId}}",
+                "profiles"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK-Get Profile details",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/profiles",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 04:24:35 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"6898cde9-f06b-42a1-b100-10bd94370238\",\n        \"name\": \"Rahul\",\n        \"category\": \"KID\",\n        \"dateOfBirth\": \"2026-08-11\"\n    }\n]"
+            },
+            {
+              "name": "401 Unauthorized-Get Profile details",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/profiles",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 04:26:15 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T04:26:15.502438400Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/6de0d911-f3e7-412e-9f2-5fde52bed8fd/profiles\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "New Request",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "requests": {},
+        "exec": [
+          ""
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080"
+    },
+    {
+      "key": "phone",
+      "value": "9876543210"
+    },
+    {
+      "key": "otp",
+      "value": "123456"
+    },
+    {
+      "key": "accessToken",
+      "secret": true
+    },
+    {
+      "key": "refreshToken",
+      "secret": true
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "familyName",
+      "value": "Sharma Family"
+    },
+    {
+      "key": "familyId",
+      "value": ""
+    },
+    {
+      "key": "familyMemberId",
+      "value": ""
+    },
+    {
+      "key": "managedMemberId",
+      "value": ""
+    },
+    {
+      "key": "inviteId",
+      "value": ""
+    },
+    {
+      "key": "invitedPhone",
+      "value": "9876500000"
+    },
+    {
+      "key": "invitedUserAccessToken",
+      "value": ""
+    },
+    {
+      "key": "json_web_token_02fj",
+      "secret": true
+    },
+    {
+      "key": "json_web_token_1cpx",
+      "secret": true
+    },
+    {
+      "key": "supabase_service_role_api_key_0lxd",
+      "secret": true
+    },
+    {
+      "key": "json_web_token_0zbl",
+      "secret": true
+    },
+    {
+      "key": "json_web_token_13vq",
+      "secret": true
+    },
+    {
+      "key": "auth",
+      "value": ""
+    },
+    {
+      "key": "family",
+      "value": ""
+    },
+    {
+      "key": "medicine",
+      "value": ""
+    },
+    {
+      "key": "profile",
+      "value": ""
+    },
+    {
+      "key": "familyProfileId",
+      "value": ""
+    }
+  ]
+}

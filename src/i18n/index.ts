@@ -27,7 +27,7 @@ i18n.defaultLocale = 'en';
 i18n.enableFallback = true;
 i18n.locale = 'en';
 
-const LANG_KEY = 'saheli.lang';
+const LANG_KEY = 'habita.lang';
 
 export const t = (key: string, options?: Record<string, any>) => i18n.t(key, options);
 
@@ -53,6 +53,7 @@ export async function setLanguage(code: string) {
 }
 
 function applyLanguage(code: string) {
+  const changed = code !== currentLocale;
   currentLocale = code;
   i18n.locale = code;
   try {
@@ -60,6 +61,14 @@ function applyLanguage(code: string) {
     I18nManager.allowRTL(false);
     I18nManager.forceRTL(false);
   } catch {}
-  listeners.forEach((listener) => listener());
+  // Screens that key off `subscribeToLanguageChanges` (dashboard.tsx, FamilyScreen.tsx)
+  // remount their whole tree via a `key={localeVersion}` bump on every notification.
+  // Background callers re-apply `preferredLanguage` from a profile fetch on every
+  // screen focus, which is usually already the active language — without this guard
+  // that fired a full remount (a visible blink) after every silent fetch even though
+  // nothing changed.
+  if (changed) {
+    listeners.forEach((listener) => listener());
+  }
 }
 

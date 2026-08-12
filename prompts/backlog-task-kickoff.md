@@ -23,12 +23,12 @@ working around it.
 Give me a short implementation plan (5–10 bullets). Wait for my go-ahead before editing.
 
 ## Step 3 — Implement
-Follow the conventions in docs/ARCHITECTURE.md §9:
+Follow the conventions in docs/ARCHITECTURE.md §11:
 - Styling from src/theme.ts tokens only — never src/theme/, never inline hex
 - New user-facing strings go into all six locale files under src/i18n/locales/,
   namespaced by screen
 - New screens: register in RootStackParamList and src/app/_layout.tsx in the same change
-- New storage keys: prefix `saheli.`, access through src/utils/storage.ts, and document
+- New storage keys: prefix `habita.`, access through src/utils/storage.ts, and document
   the key in docs/ARCHITECTURE.md §5
 - Screens own their safe-area insets; the navigator has no header
 - Keep the back arrow top-left in every language

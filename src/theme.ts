@@ -158,7 +158,7 @@ export function applyPalette(paletteKey: string) {
   themeListeners.forEach((listener) => listener());
 }
 
-const THEME_KEY = 'saheli.theme.palette';
+const THEME_KEY = 'habita.theme.palette';
 
 export async function loadSavedTheme(): Promise<string> {
   const saved = await getItem<string>(THEME_KEY, 'terracotta');

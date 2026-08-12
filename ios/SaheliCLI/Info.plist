@@ -7,7 +7,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>SaheliCLI</string>
+	<string>Habita AI</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -34,12 +34,12 @@
 		<true/>
 	</dict>
 	<key>NSLocationWhenInUseUsageDescription</key>
-	<string>Saheli uses your location to pre-fill your city on your profile. You can still edit it manually.</string>
+	<string>Habita AI uses your location to pre-fill your city on your profile. You can still edit it manually.</string>
 
 	<key>NSCameraUsageDescription</key>
-	<string>Saheli requires camera access to take profile photos and scan documents.</string>
+	<string>Habita AI requires camera access to take profile photos and scan documents.</string>
 	<key>NSPhotoLibraryUsageDescription</key>
-	<string>Saheli requires photo library access to select your profile picture.</string>
+	<string>Habita AI requires photo library access to select your profile picture.</string>
 
 	<key>RCTNewArchEnabled</key>
 	<true/>

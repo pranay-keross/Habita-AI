@@ -20,7 +20,7 @@ function safeJsonParse(text: string): unknown {
 }
 
 interface ApiFetchOptions {
-  method: 'GET' | 'POST' | 'PUT' | 'DELETE';
+  method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   token?: string | null;
 }

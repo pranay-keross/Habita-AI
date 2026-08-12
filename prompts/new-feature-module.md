@@ -7,7 +7,7 @@ For milestones M4–M7, where a new module lands under `src/features/`. The Fami
 ## Prompt
 
 ```
-Build the {{MODULE_NAME}} module for Saheli — backlog task {{TASK_ID}}.
+Build the {{MODULE_NAME}} module for Habita AI — backlog task {{TASK_ID}}.
 
 Read docs/ARCHITECTURE.md first, especially §5 (storage contract), §6 (components) and
 §9 (conventions).
@@ -27,7 +27,7 @@ Do NOT repeat these mistakes from the Family module:
 ## Requirements
 
 1. Types and storage: define the domain interface in types.ts; put every read/write in
-   {{module}}Store.ts behind named functions; use one `saheli.{{module}}` storage key and
+   {{module}}Store.ts behind named functions; use one `habita.{{module}}` storage key and
    add it to the table in docs/ARCHITECTURE.md §5.
 
 2. Routing: add the route to RootStackParamList and src/app/_layout.tsx. Wire the matching

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import Animated, {
   FadeInDown,
   useAnimatedScrollHandler,
@@ -31,47 +31,108 @@ import type { RootStackParamList } from './_layout';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
 import SectionHeader from '../components/SectionHeader';
-import { subscribeToLanguageChanges, t } from '../i18n';
+import { subscribeToLanguageChanges, setLanguage, SUPPORTED_LANGS, t } from '../i18n';
 import { getItem } from '../utils/storage';
+import { calculateAdherence, loadIntakeLog, loadMedicines } from '../features/medicine/medicineStore';
+import useAuth from '../hooks/useAuth';
+import { apiFetch } from '../features/auth/api';
 
 type Props = StackScreenProps<RootStackParamList, 'Dashboard'>;
 
-const PROFILE_STORAGE_KEY = 'saheli.user_profile';
+const PROFILE_STORAGE_KEY = 'habita.user_profile';
+
+// Matches `onboarding/profile.tsx`'s `ProfileDetailsResponse` — GET /profile/details's
+// shape. Duplicated rather than imported, same pattern already used for
+// `PROFILE_STORAGE_KEY` above (docs/DECISIONS.md D-019).
+interface ProfileDetailsResponse {
+  phone: string;
+  name: string;
+  email: string;
+  preferredLanguage: string;
+  active: boolean;
+  isVerified: boolean;
+  avatarUrl: string | null;
+  city: string;
+}
+
+// Stable IDs a translation reword can't break — `handleTilePress`/quick actions
+// route on these, never on the (locale-dependent) label text. See `M1-T7`.
+type TileId = 'scan' | 'pay' | 'family' | 'money' | 'docs' | 'safety' | 'wellness' | 'style' | 'events' | 'medicine';
+type ActionId = 'scan' | 'pay' | 'meds' | 'expense' | 'fuel' | 'premium';
 
 export default function DashboardScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { getAccessToken } = useAuth();
   const scrollY = useSharedValue(0);
   const [avatar, setAvatar] = useState('👩‍💼');
+  const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [localeVersion, setLocaleVersion] = useState(0);
+  const [adherence, setAdherence] = useState<number | null>(null);
 
   // Dynamic translated arrays evaluated on render
-  const quickActions: { label: string; Icon: LucideIcon }[] = [
-    { label: t('dashboard.action_scan'), Icon: ScanLine },
-    { label: t('dashboard.action_pay'), Icon: IndianRupee },
-    { label: t('dashboard.action_meds'), Icon: Pill },
-    { label: t('dashboard.action_expense'), Icon: Receipt },
-    { label: t('dashboard.action_fuel'), Icon: Fuel },
-    { label: t('dashboard.action_premium'), Icon: Crown },
+  const quickActions: { id: ActionId; label: string; Icon: LucideIcon }[] = [
+    { id: 'scan', label: t('dashboard.action_scan'), Icon: ScanLine },
+    { id: 'pay', label: t('dashboard.action_pay'), Icon: IndianRupee },
+    { id: 'meds', label: t('dashboard.action_meds'), Icon: Pill },
+    { id: 'expense', label: t('dashboard.action_expense'), Icon: Receipt },
+    { id: 'fuel', label: t('dashboard.action_fuel'), Icon: Fuel },
+    { id: 'premium', label: t('dashboard.action_premium'), Icon: Crown },
   ];
 
-  const tiles: { title: string; Icon: LucideIcon }[] = [
-    { title: t('dashboard.tile_scan'), Icon: ScanSearch },
-    { title: t('dashboard.tile_pay'), Icon: CreditCard },
-    { title: t('dashboard.tile_family'), Icon: Users },
-    { title: t('dashboard.tile_money'), Icon: TrendingUp },
-    { title: t('dashboard.tile_docs'), Icon: FolderOpen },
-    { title: t('dashboard.tile_safety'), Icon: ShieldCheck },
-    { title: t('dashboard.tile_wellness'), Icon: HeartPulse },
-    { title: t('dashboard.tile_style'), Icon: Shirt },
-    { title: t('dashboard.tile_events'), Icon: CalendarDays },
+  const tiles: { id: TileId; title: string; Icon: LucideIcon }[] = [
+    { id: 'scan', title: t('dashboard.tile_scan'), Icon: ScanSearch },
+    { id: 'pay', title: t('dashboard.tile_pay'), Icon: CreditCard },
+    { id: 'family', title: t('dashboard.tile_family'), Icon: Users },
+    { id: 'medicine', title: t('dashboard.tile_medicine'), Icon: Pill },
+    { id: 'money', title: t('dashboard.tile_money'), Icon: TrendingUp },
+    { id: 'docs', title: t('dashboard.tile_docs'), Icon: FolderOpen },
+    { id: 'safety', title: t('dashboard.tile_safety'), Icon: ShieldCheck },
+    { id: 'wellness', title: t('dashboard.tile_wellness'), Icon: HeartPulse },
+    { id: 'style', title: t('dashboard.tile_style'), Icon: Shirt },
+    { id: 'events', title: t('dashboard.tile_events'), Icon: CalendarDays },
   ];
 
   useEffect(() => {
     const unsubFocus = navigation.addListener('focus', () => {
       setLocaleVersion((v) => v + 1);
-      getItem(PROFILE_STORAGE_KEY, { avatar: '👩‍💼' }).then((data) => {
+
+      // Set once the live fetch below succeeds — guards the local-cache callback so a
+      // slow AsyncStorage read can't resolve after a successful fetch and silently
+      // reapply a stale cached photo over a fresh one. Same pattern, same reason, as
+      // `onboarding/profile.tsx`'s edit-mode load (docs/DECISIONS.md D-028).
+      let liveProfileLoaded = false;
+
+      getItem(PROFILE_STORAGE_KEY, { avatar: '👩‍💼', photoUri: null }).then((data) => {
         if (data && data.avatar) setAvatar(data.avatar);
+        if (!liveProfileLoaded) {
+          setPhotoUri(data?.photoUri ?? null);
+        }
+      });
+
+      // Previously only Profile edit ever fetched this, so the dashboard kept showing
+      // whatever photo/language happened to be cached locally until the user went
+      // looking for it — confirmed live as a real gap (docs/DECISIONS.md D-029) and
+      // fixed the same way profile.tsx's own load already was.
+      (async () => {
+        try {
+          const token = await getAccessToken();
+          const details = await apiFetch<ProfileDetailsResponse>('/profile/details', { method: 'GET', token });
+          liveProfileLoaded = true;
+          if (details.avatarUrl) {
+            setPhotoUri(details.avatarUrl);
+          }
+          if (details.preferredLanguage && SUPPORTED_LANGS.some((l) => l.code === details.preferredLanguage)) {
+            await setLanguage(details.preferredLanguage);
+          }
+        } catch {
+          // Offline, or profile not created yet — local cache above already covers
+          // the screen.
+        }
+      })();
+
+      Promise.all([loadMedicines(), loadIntakeLog()]).then(([medicines, log]) => {
+        setAdherence(calculateAdherence(medicines, log));
       });
     });
 
@@ -83,7 +144,7 @@ export default function DashboardScreen({ navigation }: Props) {
       unsubFocus();
       unsubLang();
     };
-  }, [navigation]);
+  }, [navigation, getAccessToken]);
 
   // Scroll handler runs entirely on the UI thread, so the app bar fade-in
   // stays glitch-free even on a busy JS thread.
@@ -102,10 +163,20 @@ export default function DashboardScreen({ navigation }: Props) {
     ],
   }));
 
-  const handleTilePress = (title: string) => {
-    if (title === 'Family' || title === t('dashboard.tile_family')) {
+  const handleTilePress = (id: TileId) => {
+    if (id === 'family') {
       navigation.navigate('Family');
+    } else if (id === 'medicine') {
+      navigation.navigate('Medicine');
     }
+    // Other tiles have no screen yet — see docs/BACKLOG.md M5-M7.
+  };
+
+  const handleActionPress = (id: ActionId) => {
+    if (id === 'meds') {
+      navigation.navigate('Medicine');
+    }
+    // Other quick actions have no screen yet — see docs/BACKLOG.md M5-M7.
   };
 
   return (
@@ -115,7 +186,7 @@ export default function DashboardScreen({ navigation }: Props) {
         <Animated.View style={[styles.appBarBg, appBarBgStyle]} />
         <View style={styles.appBarContent}>
           <View style={styles.appBarLeft}>
-            <Text style={styles.appBarBrand}>Saheli</Text>
+            <Text style={styles.appBarBrand}>Habita AI</Text>
 
             <Animated.View style={[styles.compactPill, appBarPillStyle]}>
               <Text style={styles.compactPillText}>
@@ -127,7 +198,11 @@ export default function DashboardScreen({ navigation }: Props) {
           <Pressable
             style={styles.profileBtn}
             onPress={() => navigation.navigate('Profile', { isEditing: true })}>
-            <Text style={styles.profileBtnAvatar}>{avatar}</Text>
+            {photoUri ? (
+              <Image source={{ uri: photoUri }} style={styles.profileBtnImage} />
+            ) : (
+              <Text style={styles.profileBtnAvatar}>{avatar}</Text>
+            )}
           </Pressable>
         </View>
       </View>
@@ -137,48 +212,46 @@ export default function DashboardScreen({ navigation }: Props) {
         showsVerticalScrollIndicator={false}
         scrollEventThrottle={16}
         onScroll={scrollHandler}>
-        {/* Greeting */}
-        <Animated.View
-          entering={FadeInDown.duration(420).springify().damping(18)}
-          style={styles.greetingBlock}>
-          <Text style={styles.greetingTitle}>{t('dashboard.greeting')}</Text>
-          <Text style={styles.greetingSubtitle}>{t('dashboard.subheading')}</Text>
-          <View style={styles.statusRow}>
-            <View style={styles.statusDot} />
-            <Text style={styles.statusText}>
-              2 {t('dashboard.hero_pending')} · 4 {t('dashboard.hero_due')}
-            </Text>
+        {/* Greeting + stat cards — one restrained fade for the whole header block
+            instead of separate staggered entrances for the greeting and the cards. */}
+        <Animated.View entering={FadeInDown.duration(280)}>
+          <View style={styles.greetingBlock}>
+            <Text style={styles.greetingTitle}>{t('dashboard.greeting')}</Text>
+            <Text style={styles.greetingSubtitle}>{t('dashboard.subheading')}</Text>
+            <View style={styles.statusRow}>
+              <View style={styles.statusDot} />
+              <Text style={styles.statusText}>
+                2 {t('dashboard.hero_pending')} · 4 {t('dashboard.hero_due')}
+              </Text>
+            </View>
+          </View>
+
+          <View style={styles.statsRow}>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>{t('dashboard.stats_spend_title')}</Text>
+              <Text style={styles.statValue}>₹12,450</Text>
+              <Text style={styles.statNote}>{t('dashboard.stats_spend_sub')}</Text>
+            </View>
+            <View style={styles.statCard}>
+              <Text style={styles.statLabel}>{t('dashboard.stats_meds_title')}</Text>
+              <Text style={styles.statValue}>
+                {adherence === null ? '—' : `${adherence}%`}
+              </Text>
+              <Text style={styles.statNote}>{t('dashboard.stats_meds_sub')}</Text>
+            </View>
           </View>
         </Animated.View>
 
-        {/* Stat cards */}
-        <Animated.View
-          entering={FadeInDown.delay(80).duration(420).springify().damping(18)}
-          style={styles.statsRow}>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>{t('dashboard.stats_spend_title')}</Text>
-            <Text style={styles.statValue}>₹12,450</Text>
-            <Text style={styles.statNote}>{t('dashboard.stats_spend_sub')}</Text>
-          </View>
-          <View style={styles.statCard}>
-            <Text style={styles.statLabel}>{t('dashboard.stats_meds_title')}</Text>
-            <Text style={styles.statValue}>3 Active</Text>
-            <Text style={styles.statNote}>{t('dashboard.stats_meds_sub')}</Text>
-          </View>
-        </Animated.View>
-
-        {/* Quick actions */}
+        {/* Quick actions — no per-item entrance animation; a row of six items
+            cascading in one at a time read as too busy on every screen visit. */}
         <View style={styles.sectionMargin}>
           <Text style={styles.sectionTitle}>{t('dashboard.quick_actions')}</Text>
           <Text style={styles.sectionSubtitle}>{t('dashboard.quick_actions_sub')}</Text>
 
           <View style={styles.actionsRow}>
             {quickActions.map((action, idx) => (
-              <Animated.View
-                key={idx}
-                style={styles.actionItem}
-                entering={FadeInDown.delay(120 + idx * 40).duration(360).springify().damping(20)}>
-                <Pressable style={styles.actionPressable} onPress={() => {}}>
+              <View key={idx} style={styles.actionItem}>
+                <Pressable style={styles.actionPressable} onPress={() => handleActionPress(action.id)}>
                   <View style={styles.actionIconCircle}>
                     <action.Icon size={22} color={styles.actionIconColor.color} strokeWidth={1.75} />
                   </View>
@@ -186,34 +259,32 @@ export default function DashboardScreen({ navigation }: Props) {
                     {action.label}
                   </Text>
                 </Pressable>
-              </Animated.View>
+              </View>
             ))}
           </View>
         </View>
 
-        {/* Module list */}
+        {/* Module list — same reasoning: ten rows staggering in individually was
+            the largest source of visible motion on this screen. */}
         <SectionHeader title={t('dashboard.quick_tiles')} subtitle={t('dashboard.quick_tiles_sub')} style={styles.gridHeader} />
         <View style={styles.moduleList}>
           {tiles.map((tile, idx) => (
-            <Animated.View
+            <Pressable
               key={idx}
-              entering={FadeInDown.delay(220 + idx * 30).duration(360).springify().damping(20)}>
-              <Pressable
-                style={[styles.moduleRow, idx === tiles.length - 1 && styles.moduleRowLast]}
-                onPress={() => handleTilePress(tile.title)}>
-                <View style={styles.moduleIconCircle}>
-                  <tile.Icon size={20} color={styles.moduleIconColor.color} strokeWidth={1.75} />
-                </View>
-                <Text style={styles.moduleTitle}>{tile.title}</Text>
-                <ChevronRight size={18} color={styles.moduleChevronColor.color} strokeWidth={1.75} />
-              </Pressable>
-            </Animated.View>
+              style={[styles.moduleRow, idx === tiles.length - 1 && styles.moduleRowLast]}
+              onPress={() => handleTilePress(tile.id)}>
+              <View style={styles.moduleIconCircle}>
+                <tile.Icon size={20} color={styles.moduleIconColor.color} strokeWidth={1.75} />
+              </View>
+              <Text style={styles.moduleTitle}>{tile.title}</Text>
+              <ChevronRight size={18} color={styles.moduleChevronColor.color} strokeWidth={1.75} />
+            </Pressable>
           ))}
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerBrand}>Saheli · Smart Household AI</Text>
+          <Text style={styles.footerBrand}>Habita AI · Home & Life OS</Text>
           <Text style={styles.footerText}>{t('dashboard.footer_note')}</Text>
         </View>
       </Animated.ScrollView>
@@ -282,10 +353,15 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     justifyContent: 'center',
     borderWidth: 1.5,
     borderColor: colors.primary,
+    overflow: 'hidden',
     ...shadow.soft,
   },
   profileBtnAvatar: {
     fontSize: 20,
+  },
+  profileBtnImage: {
+    width: '100%',
+    height: '100%',
   },
   root: {
     paddingHorizontal: spacing.lg,

@@ -1,6 +1,6 @@
 # Reusable Prompts
 
-Copy-paste prompts for working on Saheli with an AI coding agent. They exist so that every session starts with the same context, every task is executed against the same standards, and the documentation never drifts from the code.
+Copy-paste prompts for working on Habita AI with an AI coding agent. They exist so that every session starts with the same context, every task is executed against the same standards, and the documentation never drifts from the code.
 
 ## The session ritual
 

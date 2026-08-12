@@ -9,7 +9,7 @@ For milestone M1 tasks and any refactor with no user-facing change. These tasks 
 ```
 Work on {{TASK_ID}} from docs/BACKLOG.md — foundation hardening, no user-facing change.
 
-Read docs/ARCHITECTURE.md §7 (known gaps) for why this debt exists, and
+Read docs/ARCHITECTURE.md §9 (known gaps) for why this debt exists, and
 docs/DECISIONS.md for the decision that created it — some debt is a deliberate trade-off,
 not an accident. If the task contradicts an accepted decision, stop and tell me.
 
@@ -39,7 +39,7 @@ If you cannot verify a screen without running the app, say so rather than assumi
 
 ## Step 4 — Record
 - Update docs/BACKLOG.md (✅ with date, or 🚧 with where it stopped)
-- Remove the resolved item from docs/ARCHITECTURE.md §7, or update it if only partly fixed
+- Remove the resolved item from docs/ARCHITECTURE.md §9, or update it if only partly fixed
 - Update the structure/conventions sections of docs/ARCHITECTURE.md and README.md if paths
   changed
 - Add a docs/DECISIONS.md entry if this changed an architectural approach (e.g. replacing

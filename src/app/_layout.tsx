@@ -9,6 +9,7 @@ import OtpScreen from './onboarding/otp';
 import ProfileScreen from './onboarding/profile';
 import DashboardScreen from './dashboard';
 import FamilyScreen from '../features/family/FamilyScreen';
+import MedicineScreen from '../features/medicine/MedicineScreen';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
 import useTheme from '../hooks/useTheme';
@@ -21,6 +22,7 @@ export type RootStackParamList = {
   Profile: { isEditing?: boolean } | undefined;
   Dashboard: undefined;
   Family: undefined;
+  Medicine: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -59,6 +61,7 @@ const AppLayout = () => {
           <Stack.Screen name="Profile" component={ProfileScreen} />
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="Family" component={FamilyScreen} />
+          <Stack.Screen name="Medicine" component={MedicineScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

@@ -19,7 +19,7 @@ type Props = StackScreenProps<RootStackParamList, 'Profile'>;
 
 const AVATAR_OPTIONS = ['👩‍💼', '👩‍⚕️', '👩‍🍳', '👩‍💻', '🧘‍♀️', '🎨', '👩‍🏫', '🌸'];
 
-const PROFILE_STORAGE_KEY = 'saheli.user_profile';
+const PROFILE_STORAGE_KEY = 'habita.user_profile';
 
 // OpenStreetMap's Nominatim — free, no API key, no new dependency (plain `fetch`).
 // Chosen over Google's Geocoding API specifically to avoid needing billing/API-key setup
@@ -31,7 +31,7 @@ async function reverseGeocode(latitude: number, longitude: number): Promise<stri
   try {
     const res = await fetch(
       `https://nominatim.openstreetmap.org/reverse?format=json&zoom=10&addressdetails=1&lat=${latitude}&lon=${longitude}`,
-      { headers: { 'User-Agent': 'SaheliApp-Prototype/1.0' } },
+      { headers: { 'User-Agent': 'HabitaAI-Prototype/1.0' } },
     );
     if (!res.ok) {
       return null;
@@ -66,7 +66,7 @@ interface ProfileDetailsResponse {
 export default function ProfileScreen({ route, navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const { paletteKey, setTheme } = useTheme();
-  const { getAccessToken, logout } = useAuth();
+  const { getAccessToken, getPhone, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const isEditing = route.params?.isEditing ?? false;
 
@@ -93,6 +93,14 @@ export default function ProfileScreen({ route, navigation }: Props) {
     });
 
     if (isEditing) {
+      // Set once the live fetch below succeeds. Guards the local-cache callback further
+      // down: an AsyncStorage read and a network call have no defined ordering, so
+      // without this, a local-cache read that happens to resolve *after* a successful
+      // live fetch could silently overwrite fresher backend data with stale cached
+      // data — confirmed live (2026-08-11, docs/DECISIONS.md D-028) as the cause of a
+      // save mismatch between the name and email fields.
+      let liveDetailsLoaded = false;
+
       getItem(PROFILE_STORAGE_KEY, {
         name: '',
         phone: '',
@@ -103,16 +111,31 @@ export default function ProfileScreen({ route, navigation }: Props) {
         photoUri: null,
       }).then((data) => {
         if (data) {
-          if (data.name) setName(data.name);
-          if (data.phone) setPhone(data.phone);
-          if (data.email) setEmail(data.email);
+          // name/email/location can also come from the live fetch below — skip them
+          // here if that already won the race. role/avatar/photoUri have no backend
+          // equivalent (see the comment on the fetch below) and always apply. `phone`
+          // is deliberately not read from here any more — see getPhone() below.
+          if (!liveDetailsLoaded) {
+            if (data.name) setName(data.name);
+            if (data.email) setEmail(data.email);
+            if (data.location) setLocation(data.location);
+          }
           if (data.role === 'household_ceo' || data.role === 'individual') {
             setRole(data.role);
           }
-          if (data.location) setLocation(data.location);
           if (data.avatar) setAvatar(data.avatar);
           if (data.photoUri) setPhotoUri(data.photoUri);
         }
+      });
+
+      // The phone number itself is never in `habita.user_profile` reliably — that key
+      // only ever gets a `phone` value once the user has saved at least once on this
+      // device, which is exactly why the field was showing empty right after a fresh
+      // sign-in (docs/DECISIONS.md D-029). The session's own phone — exactly what was
+      // verified via OTP — is always available the instant this screen can render at
+      // all, no network call needed.
+      getPhone().then((p) => {
+        if (p) setPhone(p);
       });
 
       // Local storage above is the immediate/offline fallback so the screen isn't blank
@@ -123,9 +146,19 @@ export default function ProfileScreen({ route, navigation }: Props) {
         try {
           const token = await getAccessToken();
           const details = await apiFetch<ProfileDetailsResponse>('/profile/details', { method: 'GET', token });
+          liveDetailsLoaded = true;
           if (details.name) setName(details.name);
           if (details.email) setEmail(details.email);
           if (details.city) setLocation(details.city);
+          // The account's saved language, not whatever this device currently happens to
+          // have active — confirmed live (D-029) as missing: `PUT /profile/details`
+          // saves `preferredLanguage`, but nothing ever read it back, so the picker (and
+          // the whole app) kept showing the device's last language instead of the
+          // signed-in account's own choice. `setLanguage` persists and notifies every
+          // subscribed screen, including this one's own listener above.
+          if (details.preferredLanguage && SUPPORTED_LANGS.some((l) => l.code === details.preferredLanguage)) {
+            await setLanguage(details.preferredLanguage);
+          }
           if (details.avatarUrl) {
             // Functional update: don't clobber a local photo the user just picked in
             // the (unlikely but possible) case this resolves after that.
@@ -137,7 +170,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
         }
       })();
     } else {
-      getItem<string>('saheli.user_phone', '').then((savedPhone) => {
+      getItem<string>('habita.user_phone', '').then((savedPhone) => {
         if (savedPhone) {
           setPhone(savedPhone);
         }
@@ -147,7 +180,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
     return () => {
       unsubscribe();
     };
-  }, [isEditing, getAccessToken]);
+  }, [isEditing, getAccessToken, getPhone]);
 
   // First-time setup only — prefill the location field from the device's current
   // position, but leave it fully editable. Best-effort: a denied permission, an
@@ -429,7 +462,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
               ))}
             </View>
 
-            {/* Palette picker — applies live, persists to saheli.theme.palette */}
+            {/* Palette picker — applies live, persists to habita.theme.palette */}
             <Text style={styles.label}>{t('profile.theme_label')}</Text>
             <View style={styles.themeGrid}>
               {palettes.map((palette) => {

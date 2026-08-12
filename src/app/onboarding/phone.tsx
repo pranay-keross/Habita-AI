@@ -41,7 +41,7 @@ const PhoneScreen = ({ navigation }: Props) => {
     setSubmitting(true);
     try {
       const { isNewUser } = await login(cleaned);
-      await setItem('saheli.user_phone', phone.trim());
+      await setItem('habita.user_phone', cleaned);
       navigation.navigate('Otp', { isNewUser });
     } catch (err) {
       const kind = parseAuthError(err);

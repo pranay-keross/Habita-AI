@@ -7,7 +7,7 @@ Use this as the **first message** of any new session on this repository. It load
 ## Prompt
 
 ```
-You are working on Saheli, a React Native 0.86 app for Indian households.
+You are working on Habita AI, a React Native 0.86 app for households.
 
 Before doing anything else, load context by reading these files in order:
 

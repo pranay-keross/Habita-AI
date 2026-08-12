@@ -1,351 +1,664 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert } from 'react-native';
+import React, { useCallback, useEffect, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../app/_layout';
 import type { ThemeTokens } from '../../theme';
 import useThemedStyles from '../../hooks/useThemedStyles';
+import { subscribeToLanguageChanges, t } from '../../i18n';
 import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
-import { getItem, setItem } from '../../utils/storage';
+import useAuth from '../../hooks/useAuth';
+import {
+  acceptInvite,
+  addManagedMember,
+  cancelInvite,
+  createFamily,
+  declineInvite,
+  getInvitedPhones,
+  getMyProfileName,
+  inviteMember,
+  listFamilyInviteHistory,
+  listFamilyPendingInvites,
+  listMyFamilies,
+  listMyPendingInvites,
+  parseFamilyError,
+  rememberInvitedPhone,
+  removeManagedMember,
+  removeMember,
+  resolveMyMembership,
+  updateMemberRole,
+  type FamilyErrorKind,
+  type MyMembership,
+} from './api';
+import { ASSIGNABLE_ROLES, type Family, type FamilyInvite, type FamilyMember, type FamilyRole } from './types';
 
+export type { FamilyMember } from './types';
 
 type Props = StackScreenProps<RootStackParamList, 'Family'>;
 
-export interface FamilyMember {
-  id: string;
-  name: string;
-  phone: string;
-  relation: string;
-  role: 'owner' | 'editor' | 'viewer';
-  avatar: string;
-  permissions: {
-    medicines: boolean;
-    expenses: boolean;
-    documents: boolean;
-    safety: boolean;
-  };
-}
-
-const FAMILY_STORAGE_KEY = 'saheli.family_members';
-
-const DEFAULT_MEMBERS: FamilyMember[] = [
-  {
-    id: '1',
-    name: 'Priya Sharma',
-    phone: '+91 98765 43210',
-    relation: 'Self',
-    role: 'owner',
-    avatar: '👩‍💼',
-    permissions: { medicines: true, expenses: true, documents: true, safety: true },
-  },
-  {
-    id: '2',
-    name: 'Rajesh Sharma',
-    phone: '+91 98123 45678',
-    relation: 'Spouse',
-    role: 'editor',
-    avatar: '👨‍💼',
-    permissions: { medicines: true, expenses: true, documents: true, safety: true },
-  },
-  {
-    id: '3',
-    name: 'Ananya Sharma',
-    phone: '+91 97111 22233',
-    relation: 'Daughter',
-    role: 'viewer',
-    avatar: '👧',
-    permissions: { medicines: true, expenses: false, documents: false, safety: true },
-  },
-];
+const EMPTY_MEMBERSHIP: MyMembership = { member: null, role: 'MEMBER', isOwner: false, isAdmin: false };
 
 export default function FamilyScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
-  const [members, setMembers] = useState<FamilyMember[]>(DEFAULT_MEMBERS);
-  const [showInviteModal, setShowInviteModal] = useState(false);
-  const [editingMemberId, setEditingMemberId] = useState<string | null>(null);
+  const { getAccessToken, getUserId } = useAuth();
 
-  // Form State
-  const [inviteName, setInviteName] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [family, setFamily] = useState<Family | null>(null);
+  const [myMembership, setMyMembership] = useState<MyMembership>(EMPTY_MEMBERSHIP);
+  const [invitesForMe, setInvitesForMe] = useState<FamilyInvite[]>([]);
+  const [pendingInvitesAdmin, setPendingInvitesAdmin] = useState<FamilyInvite[]>([]);
+  const [invitedPhones, setInvitedPhones] = useState<Record<string, string>>({});
+  const [localeVersion, setLocaleVersion] = useState(0);
+
+  const [showHistory, setShowHistory] = useState(false);
+  const [inviteHistory, setInviteHistory] = useState<FamilyInvite[]>([]);
+  const [loadingHistory, setLoadingHistory] = useState(false);
+
+  const [newFamilyName, setNewFamilyName] = useState('');
+  const [creatingFamily, setCreatingFamily] = useState(false);
+
+  const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [invitePhone, setInvitePhone] = useState('');
-  const [inviteRelation, setInviteRelation] = useState('Spouse');
-  const [inviteRole, setInviteRole] = useState<'editor' | 'viewer'>('editor');
-  const [permMeds, setPermMeds] = useState(true);
-  const [permExpenses, setPermExpenses] = useState(true);
-  const [permDocs, setPermDocs] = useState(false);
-  const [permSafety, setPermSafety] = useState(true);
+  const [inviteRole, setInviteRole] = useState<Exclude<FamilyRole, 'OWNER'>>('MEMBER');
+  const [inviting, setInviting] = useState(false);
 
-  useEffect(() => {
-    getItem<FamilyMember[]>(FAMILY_STORAGE_KEY, DEFAULT_MEMBERS).then((stored) => {
-      if (stored && stored.length > 0) setMembers(stored);
-    });
+  const [showManagedSheet, setShowManagedSheet] = useState(false);
+  const [managedName, setManagedName] = useState('');
+  const [managedRelationship, setManagedRelationship] = useState('');
+  const [addingManaged, setAddingManaged] = useState(false);
+
+  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
+  const [editRole, setEditRole] = useState<Exclude<FamilyRole, 'OWNER'>>('MEMBER');
+  const [savingMember, setSavingMember] = useState(false);
+
+  const [loadError, setLoadError] = useState<FamilyErrorKind | null>(null);
+
+  const errorMessageKey = useCallback((kind: FamilyErrorKind): string => {
+    const key: Record<FamilyErrorKind, string> = {
+      network: 'onboarding.network_error',
+      not_found: 'family.error_not_found',
+      no_permission: 'family.error_no_permission',
+      phone_not_registered: 'family.error_phone_not_registered',
+      already_member: 'family.error_already_member',
+      family_full: 'family.error_family_full',
+      unknown: 'family.error_generic',
+    };
+    return key[kind];
   }, []);
 
-  const saveMembers = async (updated: FamilyMember[]) => {
-    setMembers(updated);
-    await setItem(FAMILY_STORAGE_KEY, updated);
-  };
+  const showError = useCallback((err: unknown) => {
+    Alert.alert(t('onboarding.error_title'), t(errorMessageKey(parseFamilyError(err))));
+  }, [errorMessageKey]);
 
-  const openAddModal = () => {
-    setEditingMemberId(null);
-    setInviteName('');
-    setInvitePhone('');
-    setInviteRelation('Spouse');
-    setInviteRole('editor');
-    setPermMeds(true);
-    setPermExpenses(true);
-    setPermDocs(false);
-    setPermSafety(true);
-    setShowInviteModal(true);
-  };
-
-  const openEditModal = (member: FamilyMember) => {
-    setEditingMemberId(member.id);
-    setInviteName(member.name);
-    setInvitePhone(member.phone);
-    setInviteRelation(member.relation);
-    setInviteRole(member.role === 'owner' ? 'editor' : member.role);
-    setPermMeds(member.permissions.medicines);
-    setPermExpenses(member.permissions.expenses);
-    setPermDocs(member.permissions.documents);
-    setPermSafety(member.permissions.safety);
-    setShowInviteModal(true);
-  };
-
-  const handleSaveMember = async () => {
-    if (!inviteName.trim() || !invitePhone.trim()) {
-      Alert.alert('Incomplete Member Information', 'Please enter a valid name and phone number.');
+  // `silent`: used for the screen's own initial/automatic load — a fetch failure there
+  // (most commonly "no backend reachable") shouldn't greet the user with a modal alert
+  // the moment they open the screen. Renders an inline retry card instead. Reloads
+  // triggered by an explicit user action (create/invite/accept/…) keep the Alert, since
+  // those are a direct response to something the user just tapped.
+  const reload = useCallback(async (opts?: { silent?: boolean }) => {
+    const token = await getAccessToken();
+    if (!token) {
       return;
     }
+    try {
+      const [families, myInvites, profileName, userId, invitedPhoneMap] = await Promise.all([
+        listMyFamilies(token),
+        listMyPendingInvites(token),
+        getMyProfileName(),
+        getUserId(),
+        getInvitedPhones(),
+      ]);
+      setLoadError(null);
+      setInvitesForMe(myInvites);
+      setInvitedPhones(invitedPhoneMap);
+      const primary = families[0] ?? null;
+      setFamily(primary);
+      if (!primary) {
+        setMyMembership(EMPTY_MEMBERSHIP);
+        setPendingInvitesAdmin([]);
+        return;
+      }
+      const membership = resolveMyMembership(primary, userId, profileName);
+      setMyMembership(membership);
+      if (membership.isAdmin) {
+        setPendingInvitesAdmin(await listFamilyPendingInvites(primary.id, token));
+      } else {
+        setPendingInvitesAdmin([]);
+      }
+      setShowHistory(false);
+      setInviteHistory([]);
+    } catch (err) {
+      if (opts?.silent) {
+        setLoadError(parseFamilyError(err));
+      } else {
+        showError(err);
+      }
+    }
+  }, [getAccessToken, getUserId, showError]);
 
-    if (editingMemberId) {
-      // Edit existing member
-      const updated = members.map((m) => {
-        if (m.id === editingMemberId) {
-          return {
-            ...m,
-            name: inviteName.trim(),
-            phone: invitePhone.trim(),
-            relation: inviteRelation,
-            role: m.role === 'owner' ? ('owner' as const) : inviteRole,
-            permissions: {
-              medicines: permMeds,
-              expenses: permExpenses,
-              documents: permDocs,
-              safety: permSafety,
-            },
-          };
-        }
-        return m;
-      });
-      await saveMembers(updated);
-      setShowInviteModal(false);
-      Alert.alert('Member Updated', `${inviteName}'s group role and access permissions have been saved.`);
-    } else {
-      // Add new member
-      const newMember: FamilyMember = {
-        id: Date.now().toString(),
-        name: inviteName.trim(),
-        phone: invitePhone.trim(),
-        relation: inviteRelation,
-        role: inviteRole,
-        avatar: inviteRelation === 'Spouse' ? '👨‍💼' : inviteRelation === 'Parent' ? '👴' : inviteRelation === 'Child' ? '👦' : '🧑',
-        permissions: {
-          medicines: permMeds,
-          expenses: permExpenses,
-          documents: permDocs,
-          safety: permSafety,
-        },
-      };
+  useEffect(() => {
+    setLoading(true);
+    reload({ silent: true }).finally(() => setLoading(false));
+    const unsubscribe = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
+    return () => {
+      unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-      const updated = [...members, newMember];
-      await saveMembers(updated);
-      setShowInviteModal(false);
-      Alert.alert('Invitation Sent!', `An invitation SMS and access code have been dispatched to ${newMember.phone}.`);
+  const handleCreateFamily = async () => {
+    if (!newFamilyName.trim()) {
+      Alert.alert(t('family.incomplete_title'), t('family.incomplete_msg'));
+      return;
+    }
+    setCreatingFamily(true);
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        await createFamily(newFamilyName.trim(), token);
+        setNewFamilyName('');
+        await reload();
+      }
+    } catch (err) {
+      showError(err);
+    } finally {
+      setCreatingFamily(false);
     }
   };
 
-  const handleRemoveMember = (id: string, name: string) => {
-    Alert.alert('Remove Member', `Are you sure you want to remove ${name} from your family group?`, [
-      { text: 'Cancel', style: 'cancel' },
+  const handleRespondToInvite = async (invite: FamilyInvite, accept: boolean) => {
+    try {
+      const token = await getAccessToken();
+      if (!token) {
+        return;
+      }
+      if (accept) {
+        await acceptInvite(invite.id, token);
+      } else {
+        await declineInvite(invite.id, token);
+      }
+      await reload();
+    } catch (err) {
+      showError(err);
+    }
+  };
+
+  const openInviteSheet = () => {
+    setInvitePhone('');
+    setInviteRole('MEMBER');
+    setShowInviteSheet(true);
+  };
+
+  const handleSendInvite = async () => {
+    if (!family || !invitePhone.trim()) {
+      Alert.alert(t('family.incomplete_title'), t('family.incomplete_msg'));
+      return;
+    }
+    setInviting(true);
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        const phone = invitePhone.trim();
+        const invite = await inviteMember(family.id, phone, inviteRole, token);
+        await rememberInvitedPhone(invite.id, phone);
+        setShowInviteSheet(false);
+        Alert.alert(t('family.invited_title'), t('family.invited_msg', { phone }));
+        await reload();
+      }
+    } catch (err) {
+      showError(err);
+    } finally {
+      setInviting(false);
+    }
+  };
+
+  const handleCancelInvite = async (invite: FamilyInvite) => {
+    if (!family) {
+      return;
+    }
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        await cancelInvite(family.id, invite.id, token);
+        await reload();
+      }
+    } catch (err) {
+      showError(err);
+    }
+  };
+
+  const toggleInviteHistory = async () => {
+    if (showHistory) {
+      setShowHistory(false);
+      return;
+    }
+    setShowHistory(true);
+    if (!family) {
+      return;
+    }
+    setLoadingHistory(true);
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        setInviteHistory(await listFamilyInviteHistory(family.id, token));
+      }
+    } catch (err) {
+      showError(err);
+    } finally {
+      setLoadingHistory(false);
+    }
+  };
+
+  const openManagedSheet = () => {
+    setManagedName('');
+    setManagedRelationship('');
+    setShowManagedSheet(true);
+  };
+
+  const handleAddManaged = async () => {
+    if (!family || !managedName.trim() || !managedRelationship.trim()) {
+      Alert.alert(t('family.incomplete_title'), t('family.incomplete_msg'));
+      return;
+    }
+    setAddingManaged(true);
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        await addManagedMember(family.id, managedName.trim(), managedRelationship.trim(), token);
+        setShowManagedSheet(false);
+        await reload();
+      }
+    } catch (err) {
+      showError(err);
+    } finally {
+      setAddingManaged(false);
+    }
+  };
+
+  const openEditMember = (member: FamilyMember) => {
+    if (!myMembership.isAdmin || member.role === 'OWNER') {
+      return;
+    }
+    setEditingMember(member);
+    setEditRole(member.role === 'ADMIN' ? 'ADMIN' : 'MEMBER');
+  };
+
+  const handleSaveMemberRole = async () => {
+    if (!family || !editingMember) {
+      return;
+    }
+    setSavingMember(true);
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        await updateMemberRole(family.id, editingMember.id, editRole, token);
+        setEditingMember(null);
+        await reload();
+      }
+    } catch (err) {
+      showError(err);
+    } finally {
+      setSavingMember(false);
+    }
+  };
+
+  const handleRemoveMember = (member: FamilyMember) => {
+    if (!family) {
+      return;
+    }
+    Alert.alert(t('family.remove_confirm_title'), t('family.remove_confirm_msg', { name: member.name }), [
+      { text: t('family.cancel'), style: 'cancel' },
       {
-        text: 'Remove',
+        text: t('family.remove'),
         style: 'destructive',
-        onPress: () => {
-          const filtered = members.filter((m) => m.id !== id);
-          saveMembers(filtered);
-          setShowInviteModal(false);
+        onPress: async () => {
+          try {
+            const token = await getAccessToken();
+            if (token) {
+              if (member.managed && member.managedMemberId) {
+                await removeManagedMember(family.id, member.managedMemberId, token);
+              } else {
+                await removeMember(family.id, member.id, token);
+              }
+              setEditingMember(null);
+              await reload();
+            }
+          } catch (err) {
+            showError(err);
+          }
         },
       },
     ]);
   };
 
+  // Remove Member needs admin access on the *caller*, not just ownership of the row
+  // being removed — so a plain MEMBER has no self-service leave endpoint on this
+  // backend at all (docs/BACKEND_CONTEXT.md's "no self-service leave" gap). Rather than
+  // hiding the option entirely (the previous behavior, and exactly what was reported as
+  // "no option to leave"), a MEMBER still sees the entry point and gets told why it
+  // can't complete yet instead of silently having no path at all. OWNER can never be
+  // removed by anyone, including themselves, so they don't get this entry point.
+  const handleLeaveFamily = () => {
+    if (!myMembership.member) {
+      return;
+    }
+    if (!myMembership.isAdmin) {
+      Alert.alert(t('family.leave_needs_admin_title'), t('family.leave_needs_admin_msg'));
+      return;
+    }
+    const member = myMembership.member;
+    Alert.alert(t('family.leave_confirm_title'), t('family.leave_confirm_msg', { name: member.name }), [
+      { text: t('family.cancel'), style: 'cancel' },
+      {
+        text: t('family.leave'),
+        style: 'destructive',
+        onPress: async () => {
+          try {
+            const token = await getAccessToken();
+            if (token && family) {
+              await removeMember(family.id, member.id, token);
+              await reload();
+            }
+          } catch (err) {
+            showError(err);
+          }
+        },
+      },
+    ]);
+  };
+
+  const adminCount = family?.members.filter((m) => m.role === 'OWNER' || m.role === 'ADMIN').length ?? 0;
+  const managedCount = family?.members.filter((m) => m.managed).length ?? 0;
+
   return (
-    <View style={styles.root}>
-      {/* Header Bar */}
-      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}> 
+    <View style={styles.root} key={localeVersion}>
+      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
-        <Text style={styles.headerTitle}>Family & Group</Text>
-        <Pressable onPress={openAddModal} style={styles.addBtn}>
-          <Text style={styles.addBtnText}>+ Invite</Text>
-        </Pressable>
+        <Text style={styles.headerTitle}>{t('family.header_title')}</Text>
+        {family && myMembership.isAdmin ? (
+          <Pressable onPress={openInviteSheet} style={styles.addBtn}>
+            <Text style={styles.addBtnText}>{t('family.invite_btn')}</Text>
+          </Pressable>
+        ) : (
+          <View style={styles.addBtnPlaceholder} />
+        )}
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Overview Hero */}
-        <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>Household Group</Text>
-          <Text style={styles.heroSubtitle}>Share reminders, bills, emergency contacts & health logs securely.</Text>
-          <View style={styles.statsRow}>
-            <View style={styles.statChip}>
-              <Text style={styles.statNum}>{members.length}</Text>
-              <Text style={styles.statLabel}>Members</Text>
-            </View>
-            <View style={styles.statChip}>
-              <Text style={styles.statNum}>{members.filter((m) => m.role === 'editor').length + 1}</Text>
-              <Text style={styles.statLabel}>Editors</Text>
-            </View>
-            <View style={styles.statChip}>
-              <Text style={styles.statNum}>4 / 4</Text>
-              <Text style={styles.statLabel}>Modules Synced</Text>
-            </View>
+        {loading ? (
+          <View style={styles.loadingWrap}>
+            <ActivityIndicator color={styles.addBtnText.color} />
           </View>
-        </View>
+        ) : loadError ? (
+          <View style={styles.emptyState}>
+            <Text style={styles.emptyStateIcon}>📡</Text>
+            <Text style={styles.emptyStateTitle}>{t('family.load_error_title')}</Text>
+            <Text style={styles.emptyStateSub}>{t(errorMessageKey(loadError))}</Text>
+            <Button
+              title={t('family.retry_btn')}
+              onPress={() => {
+                setLoading(true);
+                reload({ silent: true }).finally(() => setLoading(false));
+              }}
+              style={styles.modalCta}
+            />
+          </View>
+        ) : (
+          <>
+            {invitesForMe.length > 0 && (
+              <View style={styles.inviteForMeSection}>
+                <Text style={styles.sectionTitle}>{t('family.invites_for_me_title')}</Text>
+                {invitesForMe.map((invite) => (
+                  <View key={invite.id} style={styles.inviteForMeCard}>
+                    <Text style={styles.inviteForMeText}>
+                      {t('family.invited_by', { name: invite.invitedByName, family: invite.familyName })}
+                    </Text>
+                    <View style={styles.inviteResponseRow}>
+                      <Pressable style={styles.acceptBtn} onPress={() => handleRespondToInvite(invite, true)}>
+                        <Text style={styles.acceptBtnText}>{t('family.accept')}</Text>
+                      </Pressable>
+                      <Pressable style={styles.declineBtn} onPress={() => handleRespondToInvite(invite, false)}>
+                        <Text style={styles.declineBtnText}>{t('family.decline')}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
 
-        {/* Section Header */}
-        <View style={styles.sectionHeader}>
-          <Text style={styles.sectionTitle}>Connected Family Members</Text>
-          <Text style={styles.sectionSub}>Tap any member tile to edit permissions and roles</Text>
-        </View>
-
-        {/* Members List */}
-        {members.map((member) => (
-          <Pressable key={member.id} style={styles.memberCard} onPress={() => openEditModal(member)}>
-            <View style={styles.memberAvatarWrap}>
-              <Text style={styles.memberAvatar}>{member.avatar}</Text>
-            </View>
-
-            <View style={styles.memberInfo}>
-              <View style={styles.nameRow}>
-                <Text style={styles.memberName}>{member.name}</Text>
-                <View style={[styles.roleBadge, member.role === 'owner' ? styles.roleOwner : styles.roleEditor]}>
-                  <Text style={styles.roleText}>{member.role.toUpperCase()}</Text>
+            {!family ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyStateIcon}>🏠</Text>
+                <Text style={styles.emptyStateTitle}>{t('family.no_family_title')}</Text>
+                <Text style={styles.emptyStateSub}>{t('family.no_family_sub')}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={newFamilyName}
+                  onChangeText={setNewFamilyName}
+                  placeholder={t('family.create_family_placeholder')}
+                  placeholderTextColor={styles.placeholder.color}
+                />
+                <Button
+                  title={t('family.create_family_btn')}
+                  onPress={handleCreateFamily}
+                  loading={creatingFamily}
+                  style={styles.modalCta}
+                />
+              </View>
+            ) : (
+              <>
+                <View style={styles.heroCard}>
+                  <Text style={styles.heroTitle}>{family.name}</Text>
+                  <Text style={styles.heroSubtitle}>{t('family.hero_subtitle')}</Text>
+                  <View style={styles.statsRow}>
+                    <View style={styles.statChip}>
+                      <Text style={styles.statNum}>{family.members.length}</Text>
+                      <Text style={styles.statLabel}>{t('family.stat_members')}</Text>
+                    </View>
+                    <View style={styles.statChip}>
+                      <Text style={styles.statNum}>{adminCount}</Text>
+                      <Text style={styles.statLabel}>{t('family.stat_admins')}</Text>
+                    </View>
+                    <View style={styles.statChip}>
+                      <Text style={styles.statNum}>{managedCount}</Text>
+                      <Text style={styles.statLabel}>{t('family.stat_managed')}</Text>
+                    </View>
+                  </View>
                 </View>
-              </View>
-              <Text style={styles.memberSub}>
-                {member.relation} · {member.phone}
-              </Text>
 
-              {/* Permissions Pills */}
-              <View style={styles.permRow}>
-                {member.permissions.medicines && <Text style={styles.permTag}>💊 Meds</Text>}
-                {member.permissions.expenses && <Text style={styles.permTag}>🧾 Expenses</Text>}
-                {member.permissions.safety && <Text style={styles.permTag}>🛡️ SOS</Text>}
-                {member.permissions.documents && <Text style={styles.permTag}>📁 Docs</Text>}
-              </View>
-            </View>
+                {!myMembership.isAdmin && (
+                  <View style={styles.readonlyBanner}>
+                    <Text style={styles.readonlyText}>{t('family.readonly_note')}</Text>
+                  </View>
+                )}
 
-            <View style={styles.editChevronWrap}>
-              <Text style={styles.editChevron}>✏️</Text>
-            </View>
-          </Pressable>
-        ))}
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>{t('family.section_title')}</Text>
+                  <Text style={styles.sectionSub}>{t('family.section_sub')}</Text>
+                </View>
 
-        {/* Invite CTA Banner */}
-        <Pressable style={styles.inviteBanner} onPress={openAddModal}>
-          <Text style={styles.inviteBannerIcon}>👪</Text>
-          <View style={styles.inviteBannerContent}>
-            <Text style={styles.inviteBannerTitle}>Add Spouse, Parents, or Kids</Text>
-            <Text style={styles.inviteBannerSub}>Assign custom permissions for household management.</Text>
-          </View>
-          <Text style={styles.inviteBannerArrow}>→</Text>
-        </Pressable>
+                {family.members.map((member) => (
+                  <Pressable
+                    key={member.id}
+                    style={styles.memberCard}
+                    disabled={!myMembership.isAdmin || member.role === 'OWNER'}
+                    onPress={() => openEditMember(member)}>
+                    <View style={styles.memberAvatarWrap}>
+                      <Text style={styles.memberAvatar}>{member.managed ? '🧓' : '🧑'}</Text>
+                    </View>
+                    <View style={styles.memberInfo}>
+                      <View style={styles.nameRow}>
+                        <Text style={styles.memberName}>{member.name}</Text>
+                        <View style={[styles.roleBadge, member.role === 'OWNER' ? styles.roleOwner : styles.roleEditor]}>
+                          <Text style={styles.roleText}>{t(`family.role_${member.role.toLowerCase()}`)}</Text>
+                        </View>
+                        {member.managed && (
+                          <View style={styles.managedBadge}>
+                            <Text style={styles.managedBadgeText}>{t('family.managed_badge')}</Text>
+                          </View>
+                        )}
+                      </View>
+                    </View>
+                    {myMembership.isAdmin && member.role !== 'OWNER' && (
+                      <View style={styles.editChevronWrap}>
+                        <Text style={styles.editChevron}>✏️</Text>
+                      </View>
+                    )}
+                  </Pressable>
+                ))}
+
+                {myMembership.isAdmin && (
+                  <Pressable style={styles.inviteBanner} onPress={openManagedSheet}>
+                    <Text style={styles.inviteBannerIcon}>👪</Text>
+                    <View style={styles.inviteBannerContent}>
+                      <Text style={styles.inviteBannerTitle}>{t('family.add_managed_title')}</Text>
+                      <Text style={styles.inviteBannerSub}>{t('family.add_managed_sub')}</Text>
+                    </View>
+                    <Text style={styles.inviteBannerArrow}>→</Text>
+                  </Pressable>
+                )}
+
+                {myMembership.isAdmin && pendingInvitesAdmin.length > 0 && (
+                  <View style={styles.inviteForMeSection}>
+                    <Text style={styles.sectionTitle}>
+                      {t('family.pending_invites_admin_title')} ({pendingInvitesAdmin.length})
+                    </Text>
+                    {pendingInvitesAdmin.map((invite) => (
+                      <View key={invite.id} style={styles.pendingAdminRow}>
+                        <Text style={styles.pendingAdminText}>
+                          {invitedPhones[invite.id]
+                            ? t('family.pending_invite_sent_to', { phone: invitedPhones[invite.id] })
+                            : t('family.status_pending')}
+                        </Text>
+                        <Pressable onPress={() => handleCancelInvite(invite)}>
+                          <Text style={styles.cancelInviteText}>{t('family.cancel_invite')}</Text>
+                        </Pressable>
+                      </View>
+                    ))}
+                  </View>
+                )}
+
+                {myMembership.isAdmin && (
+                  <View style={styles.inviteForMeSection}>
+                    <Pressable style={styles.historyToggleRow} onPress={toggleInviteHistory}>
+                      <Text style={styles.sectionTitle}>{t('family.invite_history_title')}</Text>
+                      <Text style={styles.historyToggleText}>
+                        {showHistory ? t('family.history_hide') : t('family.history_show')}
+                      </Text>
+                    </Pressable>
+                    {showHistory && (
+                      loadingHistory ? (
+                        <View style={styles.loadingWrap}>
+                          <ActivityIndicator color={styles.addBtnText.color} />
+                        </View>
+                      ) : inviteHistory.length === 0 ? (
+                        <Text style={styles.historyEmptyText}>{t('family.history_empty')}</Text>
+                      ) : (
+                        inviteHistory.map((invite) => (
+                          <View key={invite.id} style={styles.pendingAdminRow}>
+                            <Text style={styles.pendingAdminText}>
+                              {t(`family.role_${invite.role.toLowerCase()}`)} · {new Date(invite.createdAt).toLocaleDateString()}
+                            </Text>
+                            <Text style={[styles.historyStatusText, styles[`historyStatus_${invite.status}` as const]]}>
+                              {t(`family.status_${invite.status.toLowerCase()}`)}
+                            </Text>
+                          </View>
+                        ))
+                      )
+                    )}
+                  </View>
+                )}
+
+                {myMembership.member && myMembership.role !== 'OWNER' && (
+                  <Pressable style={styles.modalLeaveBtn} onPress={handleLeaveFamily}>
+                    <Text style={styles.modalLeaveText}>{t('family.leave_family')}</Text>
+                  </Pressable>
+                )}
+              </>
+            )}
+          </>
+        )}
       </ScrollView>
 
-      {/* Draggable Member Invite / Edit BottomSheet with Backdrop Blur */}
-      <BottomSheet
-        visible={showInviteModal}
-        onClose={() => setShowInviteModal(false)}
-        title={editingMemberId ? 'Edit Family Member' : 'Invite Family Member'}>
-        <Text style={styles.label}>Full Name</Text>
-        <TextInput
-          style={styles.input}
-          value={inviteName}
-          onChangeText={setInviteName}
-          placeholder="e.g. Rajesh Sharma"
-          placeholderTextColor={styles.placeholder.color}
-        />
-
-        <Text style={styles.label}>Mobile Number</Text>
+      <BottomSheet visible={showInviteSheet} onClose={() => setShowInviteSheet(false)} title={t('family.sheet_title_invite')}>
+        <View style={styles.sheetInfoBox}>
+          <Text style={styles.sheetInfoIcon}>📨</Text>
+          <Text style={styles.sheetInfoText}>{t('family.invite_helper')}</Text>
+        </View>
+        <Text style={styles.label}>{t('family.label_phone')}</Text>
         <TextInput
           style={styles.input}
           value={invitePhone}
           onChangeText={setInvitePhone}
           keyboardType="phone-pad"
-          placeholder="e.g. +91 98765 43210"
+          placeholder={t('family.placeholder_phone')}
           placeholderTextColor={styles.placeholder.color}
         />
-
-        <Text style={styles.label}>Relationship</Text>
+        <Text style={styles.label}>{t('family.label_role')}</Text>
         <View style={styles.chipRow}>
-          {['Spouse', 'Parent', 'Child', 'Staff', 'Self'].map((rel) => (
+          {ASSIGNABLE_ROLES.map((role) => (
             <Pressable
-              key={rel}
-              style={[styles.chip, inviteRelation === rel && styles.chipActive]}
-              onPress={() => setInviteRelation(rel)}>
-              <Text style={[styles.chipText, inviteRelation === rel && styles.chipTextActive]}>{rel}</Text>
+              key={role}
+              style={[styles.chip, inviteRole === role && styles.chipActive]}
+              onPress={() => setInviteRole(role)}>
+              <Text style={[styles.chipText, inviteRole === role && styles.chipTextActive]}>
+                {t(`family.role_${role.toLowerCase()}`)}
+              </Text>
             </Pressable>
           ))}
         </View>
+        <Button title={t('family.send_invitation')} onPress={handleSendInvite} loading={inviting} style={styles.modalCta} />
+      </BottomSheet>
 
-        <Text style={styles.label}>Group Role</Text>
+      <BottomSheet visible={showManagedSheet} onClose={() => setShowManagedSheet(false)} title={t('family.sheet_title_managed')}>
+        <View style={styles.sheetInfoBox}>
+          <Text style={styles.sheetInfoIcon}>🧓</Text>
+          <Text style={styles.sheetInfoText}>{t('family.managed_helper')}</Text>
+        </View>
+        <Text style={styles.label}>{t('family.label_name')}</Text>
+        <TextInput
+          style={styles.input}
+          value={managedName}
+          onChangeText={setManagedName}
+          placeholder={t('family.placeholder_name')}
+          placeholderTextColor={styles.placeholder.color}
+        />
+        <Text style={styles.label}>{t('family.label_relationship')}</Text>
+        <TextInput
+          style={styles.input}
+          value={managedRelationship}
+          onChangeText={setManagedRelationship}
+          placeholder={t('family.placeholder_relationship')}
+          placeholderTextColor={styles.placeholder.color}
+        />
+        <Button title={t('family.add_dependent_btn')} onPress={handleAddManaged} loading={addingManaged} style={styles.modalCta} />
+      </BottomSheet>
+
+      <BottomSheet visible={!!editingMember} onClose={() => setEditingMember(null)} title={t('family.sheet_title_edit')}>
+        <Text style={styles.label}>{editingMember?.name}</Text>
         <View style={styles.chipRow}>
-          <Pressable
-            style={[styles.chip, inviteRole === 'editor' && styles.chipActive]}
-            onPress={() => setInviteRole('editor')}>
-            <Text style={[styles.chipText, inviteRole === 'editor' && styles.chipTextActive]}>Editor (Full Access)</Text>
-          </Pressable>
-          <Pressable
-            style={[styles.chip, inviteRole === 'viewer' && styles.chipActive]}
-            onPress={() => setInviteRole('viewer')}>
-            <Text style={[styles.chipText, inviteRole === 'viewer' && styles.chipTextActive]}>Viewer (View Only)</Text>
-          </Pressable>
+          {ASSIGNABLE_ROLES.map((role) => (
+            <Pressable
+              key={role}
+              style={[styles.chip, editRole === role && styles.chipActive]}
+              onPress={() => setEditRole(role)}>
+              <Text style={[styles.chipText, editRole === role && styles.chipTextActive]}>
+                {t(`family.role_${role.toLowerCase()}`)}
+              </Text>
+            </Pressable>
+          ))}
         </View>
-
-        <Text style={styles.label}>Module Access Permissions</Text>
-        <View style={styles.permCheckGrid}>
-          <Pressable style={styles.checkRow} onPress={() => setPermMeds(!permMeds)}>
-            <Text style={styles.checkIcon}>{permMeds ? '☑️' : '⏹️'}</Text>
-            <Text style={styles.checkLabel}>Medicine Chest & Reminders</Text>
-          </Pressable>
-          <Pressable style={styles.checkRow} onPress={() => setPermExpenses(!permExpenses)}>
-            <Text style={styles.checkIcon}>{permExpenses ? '☑️' : '⏹️'}</Text>
-            <Text style={styles.checkLabel}>Household Expenses & Budget</Text>
-          </Pressable>
-          <Pressable style={styles.checkRow} onPress={() => setPermDocs(!permDocs)}>
-            <Text style={styles.checkIcon}>{permDocs ? '☑️' : '⏹️'}</Text>
-            <Text style={styles.checkLabel}>Document Hub & OCR Tags</Text>
-          </Pressable>
-          <Pressable style={styles.checkRow} onPress={() => setPermSafety(!permSafety)}>
-            <Text style={styles.checkIcon}>{permSafety ? '☑️' : '⏹️'}</Text>
-            <Text style={styles.checkLabel}>Safety Emergency SOS Alerts</Text>
-          </Pressable>
-        </View>
-
-        <Button title={editingMemberId ? 'Save Member Changes' : 'Send Invitation →'} onPress={handleSaveMember} style={styles.modalCta} />
-
-        {editingMemberId && (
-          <Pressable
-            style={styles.modalRemoveBtn}
-            onPress={() => handleRemoveMember(editingMemberId, inviteName)}>
-            <Text style={styles.modalRemoveText}>🗑️ Remove Member from Group</Text>
+        <Button title={t('family.save_changes')} onPress={handleSaveMemberRole} loading={savingMember} style={styles.modalCta} />
+        {editingMember && (
+          <Pressable style={styles.modalRemoveBtn} onPress={() => handleRemoveMember(editingMember)}>
+            <Text style={styles.modalRemoveText}>🗑️ {t('family.remove_member')}</Text>
           </Pressable>
         )}
       </BottomSheet>
-
     </View>
   );
 }
@@ -389,6 +702,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     paddingVertical: 6,
     borderRadius: radius.pill,
   },
+  addBtnPlaceholder: {
+    width: 1,
+  },
   addBtnText: {
     fontFamily: fonts.sansBold,
     fontSize: 12,
@@ -397,6 +713,65 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   content: {
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xxl,
+  },
+  loadingWrap: {
+    paddingVertical: spacing.xxl,
+    alignItems: 'center',
+  },
+  emptyState: {
+    marginTop: spacing.xxl,
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+  },
+  emptyStateIcon: {
+    fontSize: 40,
+    marginBottom: spacing.md,
+  },
+  emptyStateTitle: {
+    fontFamily: fonts.serif,
+    fontSize: 20,
+    color: colors.textPrimary,
+    textAlign: 'center',
+  },
+  emptyStateSub: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+    marginTop: 6,
+    marginBottom: spacing.lg,
+  },
+  inviteForMeSection: {
+    marginTop: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  inviteForMeCard: {
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.xl,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    borderWidth: 1.5,
+    borderColor: colors.turmeric,
+    borderStyle: 'dashed',
+  },
+  inviteForMeText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  readonlyBanner: {
+    backgroundColor: colors.surface,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: spacing.lg,
+  },
+  readonlyText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+    textAlign: 'center',
   },
   heroCard: {
     backgroundColor: colors.primary,
@@ -484,6 +859,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    flexWrap: 'wrap',
     gap: 8,
   },
   memberName: {
@@ -506,27 +882,50 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     fontFamily: fonts.sansBold,
     fontSize: 9,
     color: colors.textOnPrimary,
+    textTransform: 'uppercase',
   },
-  memberSub: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  permRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 6,
-  },
-  permTag: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 10,
-    color: colors.textSecondary,
-    backgroundColor: colors.surface,
+  managedBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
-    borderRadius: 4,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  managedBadgeText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 9,
+    color: colors.textMuted,
+    textTransform: 'uppercase',
+  },
+  inviteResponseRow: {
+    flexDirection: 'row',
+    gap: 8,
+    marginTop: 8,
+  },
+  acceptBtn: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+  },
+  acceptBtnText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 11,
+    color: colors.textOnPrimary,
+  },
+  declineBtn: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  declineBtnText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 11,
+    color: colors.textSecondary,
   },
   editChevronWrap: {
     width: 32,
@@ -540,6 +939,60 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   editChevron: {
     fontSize: 14,
   },
+  pendingAdminRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.md,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  pendingAdminText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 12,
+    color: colors.textMuted,
+  },
+  historyToggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  historyToggleText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 12,
+    color: colors.primary,
+  },
+  historyEmptyText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textMuted,
+    marginTop: spacing.sm,
+  },
+  historyStatusText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 11,
+    textTransform: 'uppercase',
+  },
+  historyStatus_PENDING: {
+    color: colors.turmeric,
+  },
+  historyStatus_ACCEPTED: {
+    color: colors.primary,
+  },
+  historyStatus_DECLINED: {
+    color: colors.danger,
+  },
+  historyStatus_CANCELLED: {
+    color: colors.textMuted,
+  },
+  cancelInviteText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 12,
+    color: colors.danger,
+  },
   inviteBanner: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -547,6 +1000,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     borderRadius: radius.xl,
     padding: spacing.lg,
     marginTop: spacing.sm,
+    marginBottom: spacing.md,
     borderWidth: 1.5,
     borderColor: colors.borderStrong,
     borderStyle: 'dashed',
@@ -574,62 +1028,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     color: colors.primary,
     fontFamily: fonts.sansBold,
   },
-  modalOverlay: {
-    flex: 1,
-    justifyContent: 'flex-end',
-    backgroundColor: 'rgba(15, 20, 30, 0.45)',
-  },
-  modalBackdropTap: {
-    ...StyleSheet.absoluteFill,
-  },
-
-  modalContainer: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: radius.xxl,
-    borderTopRightRadius: radius.xxl,
-    maxHeight: '85%',
-    ...shadow.medium,
-    elevation: 24,
-  },
-  modalSheetHandle: {
-    width: 40,
-    height: 5,
-    borderRadius: 2.5,
-    backgroundColor: colors.borderStrong,
-    alignSelf: 'center',
-    marginTop: 10,
-    marginBottom: 4,
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.textPrimary,
-  },
-  closeBtn: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  closeText: {
-    fontSize: 14,
-    color: colors.textMuted,
-  },
-  modalBody: {
-    paddingHorizontal: spacing.lg,
-    paddingTop: spacing.xs,
-  },
   label: {
     fontFamily: fonts.sansBold,
     fontSize: 11,
@@ -649,11 +1047,33 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     fontFamily: fonts.sansMedium,
     fontSize: 15,
     color: colors.textPrimary,
+    width: '100%',
   },
   // `placeholderTextColor` is a prop, not a style — the colour is kept here so
   // the factory stays the single place this screen reads the palette.
   placeholder: {
     color: colors.textMuted,
+  },
+  sheetInfoBox: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    gap: 10,
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.md,
+    marginBottom: 4,
+  },
+  sheetInfoIcon: {
+    fontSize: 18,
+  },
+  sheetInfoText: {
+    flex: 1,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textSecondary,
+    lineHeight: 17,
   },
   chipRow: {
     flexDirection: 'row',
@@ -680,28 +1100,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   chipTextActive: {
     color: colors.textOnPrimary,
   },
-  permCheckGrid: {
-    gap: 10,
-    marginTop: 4,
-  },
-  checkRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
-    padding: 12,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  checkIcon: {
-    fontSize: 16,
-    marginRight: 10,
-  },
-  checkLabel: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 13,
-    color: colors.textPrimary,
-  },
   modalCta: {
     marginTop: 24,
   },
@@ -719,5 +1117,17 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     fontFamily: fonts.sansBold,
     fontSize: 14,
     color: colors.danger,
+  },
+  modalLeaveBtn: {
+    marginTop: 4,
+    marginBottom: 24,
+    paddingVertical: 10,
+    alignItems: 'center',
+  },
+  modalLeaveText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.textMuted,
+    textDecorationLine: 'underline',
   },
 });

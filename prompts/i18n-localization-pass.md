@@ -9,7 +9,7 @@ For adding strings across all six locales, or retrofitting a screen that was bui
 ```
 Do a localization pass on {{TARGET — e.g. src/features/family/FamilyScreen.tsx}}.
 
-Saheli ships six languages: en, hi, bn, ta, es, ar. English is the fallback. A screen that
+Habita AI ships six languages: en, hi, bn, ta, es, ar. English is the fallback. A screen that
 is only partly localized is a visible defect (docs/DECISIONS.md D-005).
 
 ## Step 1 — Inventory

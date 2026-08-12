@@ -1,4 +1,4 @@
-// Single place the backend's base URL lives. `Saheli App Backend.postman_collection.json`
+// Single place the backend's base URL lives. `Saheli Backend — Auth, Profile & Family.postman_collection.json`
 // (repo root) documents the API this points at.
 //
 // `localhost` resolves to the device/emulator itself, not your dev machine — swap this
