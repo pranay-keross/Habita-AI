@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -60,7 +60,19 @@ interface ProfileDetailsResponse {
 type TileId = 'scan' | 'pay' | 'family' | 'money' | 'docs' | 'safety' | 'wellness' | 'style' | 'events' | 'medicine';
 type ActionId = 'scan' | 'pay' | 'meds' | 'expense' | 'fuel' | 'premium';
 
-export default function DashboardScreen({ navigation }: Props) {
+// `Date.getHours()` reads the device's own local time — already "current location time"
+// for wherever the phone actually is, no geolocation/timezone lookup needed. Boundaries
+// are the common-usage buckets (5am/12pm/5pm/9pm), not tied to any locale.
+function getGreetingKey(): string {
+  const hour = new Date().getHours();
+  if (hour < 5) return 'dashboard.greeting_night';
+  if (hour < 12) return 'dashboard.greeting_morning';
+  if (hour < 17) return 'dashboard.greeting_afternoon';
+  if (hour < 21) return 'dashboard.greeting_evening';
+  return 'dashboard.greeting_night';
+}
+
+export default function DashboardScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
@@ -93,43 +105,64 @@ export default function DashboardScreen({ navigation }: Props) {
     { id: 'events', title: t('dashboard.tile_events'), Icon: CalendarDays },
   ];
 
+  // Live GET /profile/details — deliberately *not* wired to every focus event any more
+  // (docs/DECISIONS.md): `avatarUrl` is a freshly-signed S3 URL each call, so refetching
+  // on every return-to-Dashboard changed the `<Image>` `uri` prop every time, forcing a
+  // visible reload/flicker on a photo that hadn't actually changed. Called from exactly
+  // two places below: once on this screen's first mount, and once when Profile edit
+  // signals it just saved. Trade-off, accepted deliberately: a presigned URL is only
+  // valid ~10 minutes, so a photo can go stale (broken image) if the user sits on
+  // Dashboard, or bounces to other screens and back, for longer than that without
+  // touching Profile edit — judged an acceptable cost for not re-fetching on every
+  // focus.
+  const fetchLiveProfile = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const details = await apiFetch<ProfileDetailsResponse>('/profile/details', { method: 'GET', token });
+      if (details.avatarUrl) {
+        setPhotoUri(details.avatarUrl);
+      }
+      if (details.preferredLanguage && SUPPORTED_LANGS.some((l) => l.code === details.preferredLanguage)) {
+        await setLanguage(details.preferredLanguage);
+      }
+    } catch {
+      // Offline, or profile not created yet — local cache (below) already covers
+      // the screen.
+    }
+  }, [getAccessToken]);
+
+  // First-time-this-session fetch. Deliberately `[]` — this screen stays mounted across
+  // every future focus (React Navigation pops back to it rather than remounting), so a
+  // mount-only effect really does mean "once per app session," not "once ever."
+  useEffect(() => {
+    fetchLiveProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Profile edit navigates back with `{ profileUpdated: true }` on a successful save —
+  // the other trigger for a live re-fetch. `setParams` clears the flag immediately after
+  // consuming it so a later focus (e.g. bouncing to Family and back) doesn't re-trigger
+  // this from the same stale param.
+  useEffect(() => {
+    if (route.params?.profileUpdated) {
+      fetchLiveProfile();
+      navigation.setParams({ profileUpdated: undefined });
+    }
+  }, [route.params?.profileUpdated, fetchLiveProfile, navigation]);
+
   useEffect(() => {
     const unsubFocus = navigation.addListener('focus', () => {
       setLocaleVersion((v) => v + 1);
 
-      // Set once the live fetch below succeeds — guards the local-cache callback so a
-      // slow AsyncStorage read can't resolve after a successful fetch and silently
-      // reapply a stale cached photo over a fresh one. Same pattern, same reason, as
-      // `onboarding/profile.tsx`'s edit-mode load (docs/DECISIONS.md D-028).
-      let liveProfileLoaded = false;
-
+      // Local-only, cheap — safe to re-read on every focus. `avatar` (the emoji
+      // fallback) has no backend field at all, so it always applies. `photoUri` only
+      // fills in from cache when nothing's set yet (functional update): once
+      // `fetchLiveProfile` has set a live S3 URL, a plain cache re-read on a later focus
+      // must not clobber it with a possibly-stale cached value.
       getItem(PROFILE_STORAGE_KEY, { avatar: '👩‍💼', photoUri: null }).then((data) => {
         if (data && data.avatar) setAvatar(data.avatar);
-        if (!liveProfileLoaded) {
-          setPhotoUri(data?.photoUri ?? null);
-        }
+        setPhotoUri((current) => current ?? data?.photoUri ?? null);
       });
-
-      // Previously only Profile edit ever fetched this, so the dashboard kept showing
-      // whatever photo/language happened to be cached locally until the user went
-      // looking for it — confirmed live as a real gap (docs/DECISIONS.md D-029) and
-      // fixed the same way profile.tsx's own load already was.
-      (async () => {
-        try {
-          const token = await getAccessToken();
-          const details = await apiFetch<ProfileDetailsResponse>('/profile/details', { method: 'GET', token });
-          liveProfileLoaded = true;
-          if (details.avatarUrl) {
-            setPhotoUri(details.avatarUrl);
-          }
-          if (details.preferredLanguage && SUPPORTED_LANGS.some((l) => l.code === details.preferredLanguage)) {
-            await setLanguage(details.preferredLanguage);
-          }
-        } catch {
-          // Offline, or profile not created yet — local cache above already covers
-          // the screen.
-        }
-      })();
 
       Promise.all([loadMedicines(), loadIntakeLog()]).then(([medicines, log]) => {
         setAdherence(calculateAdherence(medicines, log));
@@ -144,7 +177,7 @@ export default function DashboardScreen({ navigation }: Props) {
       unsubFocus();
       unsubLang();
     };
-  }, [navigation, getAccessToken]);
+  }, [navigation]);
 
   // Scroll handler runs entirely on the UI thread, so the app bar fade-in
   // stays glitch-free even on a busy JS thread.
@@ -216,7 +249,7 @@ export default function DashboardScreen({ navigation }: Props) {
             instead of separate staggered entrances for the greeting and the cards. */}
         <Animated.View entering={FadeInDown.duration(280)}>
           <View style={styles.greetingBlock}>
-            <Text style={styles.greetingTitle}>{t('dashboard.greeting')}</Text>
+            <Text style={styles.greetingTitle}>{t(getGreetingKey())}</Text>
             <Text style={styles.greetingSubtitle}>{t('dashboard.subheading')}</Text>
             <View style={styles.statusRow}>
               <View style={styles.statusDot} />

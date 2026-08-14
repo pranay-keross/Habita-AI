@@ -30,3 +30,20 @@ jest.mock('@react-native-community/geolocation', () => ({
   stopObserving: jest.fn(),
   setRNConfiguration: jest.fn(),
 }));
+
+// Unlike geolocation above, this one ships its own jest mock — same underlying reason
+// (reaches for a native module at import time), different fix.
+jest.mock('@react-native-community/datetimepicker', () =>
+  require('@react-native-community/datetimepicker/jest/index'),
+);
+
+// This one also ships a jest mock, but as a `setupFiles`-style script that calls
+// `jest.mock()` on its own internal (deep, build-output) module paths rather than
+// exporting a drop-in replacement — too fragile to `require()` inline here. Hand-rolled
+// instead, same shape as the geolocation mock above.
+jest.mock('@react-native-documents/picker', () => ({
+  pick: jest.fn(),
+  isErrorWithCode: jest.fn().mockReturnValue(false),
+  errorCodes: { OPERATION_CANCELED: 'OPERATION_CANCELED' },
+  types: { pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', images: 'image/*' },
+}));

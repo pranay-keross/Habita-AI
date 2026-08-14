@@ -82,8 +82,8 @@ export async function postMultipart<T>(
   return parsed as T;
 }
 
-// Every 4xx from the backend's `Saheli-Backend.postman_collection.json` examples is a
-// 400 or 401 with a structured `{message: string, ...}` body — status code alone can't
+// Every 4xx from the backend's `Saheli Backend — Auth, Profile & Family.postman_collection.json`
+// examples is a 400 or 401 with a structured `{message: string, ...}` body — status code alone can't
 // tell "phone not registered" (login) apart from "phone already registered" (register)
 // or a wrong/expired/missing OTP, since they're all 400. Match on `message` instead.
 export type AuthErrorKind =
@@ -128,9 +128,10 @@ export function parseAuthError(err: unknown): AuthErrorKind {
   }
 
   if (err.status === 401) {
-    // Only `refresh` returns 401 today ("Invalid or expired refresh token", "Invalid
-    // refresh token") — nothing calls refresh() yet, so this branch is currently unused
-    // in practice, but kept accurate for when M2-T3 wires it up.
+    // Only `refresh` returns 401 ("Invalid or expired refresh token", "Invalid refresh
+    // token") — reached in practice via `useAuth()`'s silent refresh (docs/DECISIONS.md
+    // D-027), which clears the session outright on this rather than surfacing it as a
+    // user-facing error, so this branch mostly matters for direct/manual refresh calls.
     return 'invalid_code';
   }
 

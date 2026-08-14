@@ -20,7 +20,10 @@ export type RootStackParamList = {
   Phone: undefined;
   Otp: { isNewUser: boolean } | undefined;
   Profile: { isEditing?: boolean } | undefined;
-  Dashboard: undefined;
+  // `profileUpdated`: set by profile.tsx after a successful edit-mode save, so Dashboard
+  // knows to re-fetch GET /profile/details once (fresh avatar/name/language) instead of
+  // on every focus — see docs/DECISIONS.md.
+  Dashboard: { profileUpdated?: boolean } | undefined;
   Family: undefined;
   Medicine: undefined;
 };

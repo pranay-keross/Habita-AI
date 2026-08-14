@@ -44,6 +44,20 @@ export async function refresh(refreshToken: string): Promise<TokenPair> {
   return apiFetch<TokenPair>('/auth/refresh', { method: 'POST', body: { refreshToken } });
 }
 
+// Blacklists the access token (from the Bearer header) and, if provided, the refresh
+// token too (server-side, via TokenBlacklistService) — both become unusable immediately
+// even though neither has naturally expired. `/auth/logout` sits under the public
+// `/api/auth/**` path (no `authenticated()` check), but the controller still reads
+// whatever `Authorization` header is sent, so the access token must be passed explicitly
+// here rather than relying on route-level auth.
+export async function logout(accessToken: string, refreshToken?: string): Promise<void> {
+  await apiFetch<unknown>('/auth/logout', {
+    method: 'POST',
+    body: refreshToken ? { refreshToken } : {},
+    token: accessToken,
+  });
+}
+
 // The Phone screen only ever collects a number, never a name, so there's no branch that
 // has a name ready to send `register`. Try `login` first (existing user); if the backend
 // says this number isn't registered, fall back to `register` so a first-time user still
@@ -68,5 +82,6 @@ export const authService = {
   login,
   verifyOtp,
   refresh,
+  logout,
   loginOrRegister,
 };

@@ -3,13 +3,14 @@ import { View, Text, TextInput, ScrollView, StyleSheet, KeyboardAvoidingView, Pl
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import Geolocation from '@react-native-community/geolocation';
+import type { GeolocationResponse } from '@react-native-community/geolocation';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../_layout';
 import { palettes, type ThemeTokens } from '../../theme';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import useTheme from '../../hooks/useTheme';
 import useAuth from '../../hooks/useAuth';
-import { apiFetch, postMultipart } from '../../features/auth/api';
+import { apiFetch, postMultipart, ApiError } from '../../features/auth/api';
 import { SUPPORTED_LANGS, getCurrentLanguage, setLanguage, subscribeToLanguageChanges, t } from '../../i18n';
 import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
@@ -201,17 +202,32 @@ export default function ProfileScreen({ route, navigation }: Props) {
             return;
           }
         }
+        const applyPosition = async (position: GeolocationResponse) => {
+          const { latitude, longitude } = position.coords;
+          const place = await reverseGeocode(latitude, longitude);
+          // Falls back to raw coordinates only if reverse geocoding itself failed
+          // (network error, Nominatim down, no address match) — still better than
+          // leaving the field empty when we do have a real position.
+          setLocation(place ?? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        };
+
         Geolocation.getCurrentPosition(
-          async (position) => {
-            const { latitude, longitude } = position.coords;
-            const place = await reverseGeocode(latitude, longitude);
-            // Falls back to raw coordinates only if reverse geocoding itself failed
-            // (network error, Nominatim down, no address match) — still better than
-            // leaving the field empty when we do have a real position.
-            setLocation(place ?? `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+          applyPosition,
+          () => {
+            // `enableHighAccuracy: true` (GPS) failed or timed out — retry once with
+            // the network/WiFi-based provider rather than leaving the field empty.
+            // Less accurate, but real coordinates beat none; the field stays editable
+            // regardless. `enableHighAccuracy: false` alone (the previous, only
+            // attempt) was the actual bug here — Android's network location provider
+            // can return a wildly wrong fix (seen live: a user in Kolkata prefilled to
+            // California) when it has no recent, nearby WiFi/cell fingerprint to go on,
+            // so GPS is now tried first.
+            Geolocation.getCurrentPosition(applyPosition, () => {}, {
+              enableHighAccuracy: false,
+              timeout: 10000,
+            });
           },
-          () => {},
-          { enableHighAccuracy: false, timeout: 10000 },
+          { enableHighAccuracy: true, timeout: 15000, maximumAge: 0 },
         );
       } catch {}
     };
@@ -284,7 +300,9 @@ export default function ProfileScreen({ route, navigation }: Props) {
     if (isEditing) {
       Alert.alert(t('profile.header_title'), t('profile.save_success'));
     }
-    navigation.navigate('Dashboard');
+    // `profileUpdated: true` only on an actual edit save — first-time setup already gets
+    // a fresh fetch from Dashboard's own mount effect, no signal needed for that path.
+    navigation.navigate('Dashboard', isEditing ? { profileUpdated: true } : undefined);
   };
 
   const handleLangChange = async (langCode: string) => {
@@ -363,6 +381,24 @@ export default function ProfileScreen({ route, navigation }: Props) {
     ]);
   };
 
+  // Distinguishes "you already have a pending deletion" (400, confirmed live against
+  // the deployed backend) from every other failure — the previous single generic
+  // message told the user to "try again" even when retrying could never work (a second
+  // request while one is already pending always 400s the same way).
+  const deletionErrorMessage = (err: unknown): string => {
+    if (err instanceof ApiError) {
+      if (err.status === 0) {
+        return t('onboarding.network_error');
+      }
+      const body = err.body;
+      const message = body && typeof body === 'object' && 'message' in body ? (body as { message?: unknown }).message : null;
+      if (message === 'Deletion Request already being sent') {
+        return t('profile.delete_account_already_pending');
+      }
+    }
+    return t('profile.delete_account_error');
+  };
+
   const handleDeleteAccount = () => {
     Alert.alert(t('profile.delete_account_confirm_title'), t('profile.delete_account_confirm_msg'), [
       { text: t('profile.cancel'), style: 'cancel' },
@@ -370,6 +406,20 @@ export default function ProfileScreen({ route, navigation }: Props) {
         text: t('profile.delete_account'),
         style: 'destructive',
         onPress: async () => {
+          try {
+            const token = await getAccessToken();
+            // Soft-delete: stamps `deletionRequestedAt` server-side, hard-deleted 30
+            // days later by a scheduled job — not an immediate wipe. If this call
+            // fails, the account is *not* actually scheduled for deletion, so the
+            // local wipe below must not run either — proceeding regardless would
+            // leave the user thinking they're safe while the account (and its data)
+            // still exists server-side indefinitely.
+            await apiFetch('/profile/deletion/request', { method: 'PUT', token });
+          } catch (err) {
+            console.warn('Account deletion request failed:', err);
+            Alert.alert(t('onboarding.error_title'), deletionErrorMessage(err));
+            return;
+          }
           await clearAll();
           navigation.reset({
             index: 0,

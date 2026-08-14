@@ -1,6 +1,6 @@
 import { apiFetch, ApiError } from '../auth/api';
 import { getItem, setItem } from '../../utils/storage';
-import type { Family, FamilyInvite, FamilyMember, FamilyRole } from './types';
+import type { Family, FamilyInvite, FamilyMember, FamilyRelation, FamilyRelationship, FamilyRole } from './types';
 
 // Same key `onboarding/profile.tsx` writes to (`PROFILE_STORAGE_KEY`) — read directly
 // rather than importing a screen module, same pattern already used for the inline
@@ -30,11 +30,26 @@ export async function inviteMember(
   familyId: string,
   phone: string,
   role: Exclude<FamilyRole, 'OWNER'>,
+  relation: FamilyRelation,
   token: string,
 ): Promise<FamilyInvite> {
   return apiFetch<FamilyInvite>(`/families/${familyId}/members`, {
     method: 'POST',
-    body: { phone, role },
+    body: { phone, role, relation },
+    token,
+  });
+}
+
+// Static lookup, no family context — fetched once per screen load rather than baked
+// into a constant, per the endpoint's own description ("use this instead of hardcoding
+// the enum"). `types.ts`'s `ALL_RELATIONS` mirrors the same saved example as a
+// same-shape fallback for the brief window before this resolves, and so validation
+// logic has a value to type against without waiting on a network round trip.
+export async function listRelationOptions(
+  token: string,
+): Promise<{ value: FamilyRelation; suggestedReciprocals: FamilyRelation[] }[]> {
+  return apiFetch<{ value: FamilyRelation; suggestedReciprocals: FamilyRelation[] }[]>('/families/relations', {
+    method: 'GET',
     token,
   });
 }
@@ -43,8 +58,16 @@ export async function listMyPendingInvites(token: string): Promise<FamilyInvite[
   return apiFetch<FamilyInvite[]>('/families/invites', { method: 'GET', token });
 }
 
-export async function acceptInvite(inviteId: string, token: string): Promise<Family> {
-  return apiFetch<Family>(`/families/invites/${inviteId}/accept`, { method: 'POST', token });
+export async function acceptInvite(
+  inviteId: string,
+  reciprocalRelation: FamilyRelation,
+  token: string,
+): Promise<Family> {
+  return apiFetch<Family>(`/families/invites/${inviteId}/accept`, {
+    method: 'POST',
+    body: { reciprocalRelation },
+    token,
+  });
 }
 
 export async function declineInvite(inviteId: string, token: string): Promise<void> {
@@ -65,6 +88,40 @@ export async function cancelInvite(familyId: string, inviteId: string, token: st
 // family endpoints.
 export async function listFamilyInviteHistory(familyId: string, token: string): Promise<FamilyInvite[]> {
   return apiFetch<FamilyInvite[]>(`/families/${familyId}/invites/history`, { method: 'GET', token });
+}
+
+// One FamilyRelationship per User-backed non-owner member, created on invite accept —
+// its own id, separate from the FamilyMember row, so it can be looked up/corrected via
+// updateRelationship without touching membership. Any member can read.
+export async function listRelationships(familyId: string, token: string): Promise<FamilyRelationship[]> {
+  return apiFetch<FamilyRelationship[]>(`/families/${familyId}/relationships`, { method: 'GET', token });
+}
+
+export async function getRelationship(
+  familyId: string,
+  relationshipId: string,
+  token: string,
+): Promise<FamilyRelationship> {
+  return apiFetch<FamilyRelationship>(`/families/${familyId}/relationships/${relationshipId}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+// Corrects a relationship after the fact — e.g. the invitee picked the wrong reciprocal
+// at accept time. Needs OWNER/ADMIN on the caller.
+export async function updateRelationship(
+  familyId: string,
+  relationshipId: string,
+  relation: FamilyRelation,
+  reciprocalRelation: FamilyRelation,
+  token: string,
+): Promise<FamilyRelationship> {
+  return apiFetch<FamilyRelationship>(`/families/${familyId}/relationships/${relationshipId}`, {
+    method: 'PATCH',
+    body: { relation, reciprocalRelation },
+    token,
+  });
 }
 
 export async function updateMemberRole(
@@ -201,7 +258,8 @@ export function parseFamilyError(err: unknown): FamilyErrorKind {
     message === 'Family not found' ||
     message === 'Family member not found' ||
     message === 'Invite not found' ||
-    message === 'Managed member not found in this family'
+    message === 'Managed member not found in this family' ||
+    message === 'Relationship not found'
   ) {
     return 'not_found';
   }
