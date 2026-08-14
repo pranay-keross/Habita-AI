@@ -15,7 +15,6 @@ const LanguageScreen = ({ navigation }: Props) => {
   const insets = useSafeAreaInsets();
   const [selected, setSelected] = useState('en');
   const [localeVersion, setLocaleVersion] = useState(0);
-  const [ready, setReady] = useState(false);
 
   useEffect(() => {
     let active = true;
@@ -23,13 +22,11 @@ const LanguageScreen = ({ navigation }: Props) => {
       .then((code) => {
         if (active) {
           setSelected(code);
-          setReady(true);
         }
       })
       .catch(() => {
         if (active) {
           setSelected('en');
-          setReady(true);
         }
       });
 
@@ -88,7 +85,7 @@ const LanguageScreen = ({ navigation }: Props) => {
           )}
         />
 
-        <Button title={`${t('onboarding.continue')} →`} onPress={() => navigation.navigate('Phone')} disabled={!ready} style={styles.cta} />
+        <Button title={`${t('onboarding.continue')} →`} onPress={() => navigation.navigate('Phone')} style={styles.cta} />
       </View>
     </View>
   );

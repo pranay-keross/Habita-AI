@@ -9,6 +9,8 @@ import {
   ScrollView,
   Text,
   Dimensions,
+  KeyboardAvoidingView,
+  Platform,
   NativeSyntheticEvent,
   NativeScrollEvent,
 } from 'react-native';
@@ -127,7 +129,15 @@ export default function BottomSheet({
 
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={dismissSheet} statusBarTranslucent>
-      <View style={styles.container}>
+      {/* RN's Modal renders as its own native Dialog window on Android, which does not
+          inherit the Activity's `android:windowSoftInputMode="adjustResize"` — without
+          this, the keyboard simply overlaid the bottom of the screen, covering any
+          TextInput sitting in the lower portion of the sheet instead of the sheet
+          shrinking to make room. `padding` on iOS, `height` on Android (the standard
+          pairing for a `justifyContent: 'flex-end'` container like `styles.container`). */}
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        style={styles.container}>
         {/* Pure Neutral Dark Backdrop Layer with Frosted Blur */}
         <Animated.View style={[styles.backdrop, { opacity }]}>
           <View style={[StyleSheet.absoluteFill, styles.backdropDarkDim]} />
@@ -178,7 +188,7 @@ export default function BottomSheet({
             {children}
           </ScrollView>
         </Animated.View>
-      </View>
+      </KeyboardAvoidingView>
     </Modal>
   );
 }

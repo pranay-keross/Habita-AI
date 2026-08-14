@@ -111,16 +111,20 @@ interface UserProfile {
   avatar: string; photoUri: string | null;
 }
 
-// src/features/family/types.ts — real backend shapes (D-023), no storage key at all
+// src/features/family/types.ts — real backend shapes (D-023, relation fields D-030), no storage key at all
 type FamilyRole = 'OWNER' | 'ADMIN' | 'MEMBER';   // OWNER permanent, no permission matrix
+type FamilyRelation = 'MOTHER' | 'FATHER' | 'SON' | /* …19 total, see types.ts's ALL_RELATIONS */ 'OTHER';
 interface FamilyMember {
   id: string; name: string; role: FamilyRole;
   managed: boolean; managedMemberId: string | null;   // true = a dependent, no login of their own
+  relationshipId: string | null; relatedToUserId: string | null; relatedToName: string | null;
+  relation: FamilyRelation | null; reciprocalRelation: FamilyRelation | null;   // null for OWNER/managed
 }
 interface Family { id: string; name: string; ownerUserId: string; members: FamilyMember[] }
 interface FamilyInvite {
   id: string; familyId: string; familyName: string; invitedByName: string;
   role: FamilyRole; status: 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED'; createdAt: string;
+  relation: FamilyRelation; suggestedReciprocalRelations: FamilyRelation[];
 }
 
 // src/features/medicine/types.ts — stored at habita.medicines / habita.medicine_intake_log
