@@ -53,6 +53,42 @@ This repository is the React Native 0.86 client. It is mostly still a **static, 
 ### Medicine Chest
 `src/features/medicine/MedicineScreen.tsx` (`M4-T1`–`M4-T3`, `M4-T5`) — the first SRS-mapped domain module, built as the template for the rest. Add/edit medicines (name, dosage, a multi-select morning/afternoon/evening/night schedule, stock count) via a bottom sheet; mark a scheduled dose "taken" for the day, which decrements stock and logs to `habita.medicine_intake_log`. A pure `calculateAdherence()` function drives both the screen's own stat and the dashboard's "7-day adherence" card. Its own data is still local-only; the permission gate now reads the real Family backend — a plain `MEMBER` gets read-only access, `ADMIN`/`OWNER` get full access, and having no family at all still means full access. Local notification reminders (`M4-T4`) are still undecided — needs a library choice.
 
+### Expense Groups & Money (`src/features/money/`)
+A complete 4-screen expense sharing, multi-currency conversion, and debt settlement system designed in accordance with Google Material UI guidelines & Habita AI's warm pastel design language. Tapping **"Money"** or **"Add expense"** on the Dashboard routes directly to:
+1. **Expense Groups (`ExpenseGroupsScreen.tsx`)**: Group list, net balance summary cards ("You owe" vs "You get back"), group creation modal with emoji icon selection and member management.
+2. **Group Details (`GroupDetailsScreen.tsx`)**: Segmented tabs for **Expenses** (itemized logs), **Balances** (simplified pairwise debt matrix: who owes whom), and **Summary** (category spend breakdown analytics).
+3. **Add / Split Expense (`AddSplitExpenseScreen.tsx`)**: Form with multi-currency support (INR ₹, USD $, EUR €, AED, GBP) with live exchange rate conversion, category tags, paid-by selector, and 3 interactive split modes:
+   - **Equal**: Automatic equal division among members.
+   - **Percentage (%)**: Custom percentage input per member with real-time validation (must sum to 100%).
+   - **Shares**: Weighted multiplier shares (e.g. 1 share, 2 shares).
+4. **Expense Details / Settle Up (`ExpenseDetailsSettleUpScreen.tsx`)**: Detailed itemized share view for existing expenses, and a full **Settle Up** mode (select Payer/Payee, payment method: UPI 💳, Cash 💵, Bank 🏦, and record settlement to automatically recalculate balances), backed by a persistent settlement history log.
+
+### Ambient Voice AI Engine & Voice Settings (`src/features/voice/`)
+A high-fidelity natural language voice command interface and configuration suite designed for multi-domain orchestration (money, health, inventory, reminders):
+1. **Voice Command Screen (`VoiceScreen.tsx`)**:
+   - **Interactive Listening Banner**: Deep teal hero banner with animated concentric glowing rings and real-time audio wave graphic overlays.
+   - **Quick Suggestion Chips**: Tap-to-speak voice prompt presets:
+     - `"Add ₹150 for dinner in Goa Trip"`
+     - `"What's the balance in Home Rent & Bills?"`
+     - `"Remind me to pay electricity bill"`
+   - **Recent Spoken Commands Log**: Detailed card history displaying query intent, timestamp, module tag, and execution status (`✔`).
+   - **What You Can Ask Grid**: Quick action cards covering **Groups & Balances**, **Add Expense**, **Spending Summary**, **Bills & Reminders**, **Inventory & Stock**, and **Contacts**.
+   - **Bottom Voice Input Bar**: Floating microphone button (`#054E63`) flanked by animated audio wave bars.
+2. **Voice Settings Screen (`VoiceSettingsScreen.tsx`)**:
+   - Tapped via the top-right settings gear icon (`⚙`) on `VoiceScreen.tsx`.
+   - **Language Selection**: Switch speech recognition locale between English 🇬🇧, Hindi 🇮🇳, Bengali 🇮🇳, Tamil 🇮🇳, Spanish 🇪🇸, and Arabic 🇸🇦.
+   - **Recognition Engine Mode**: Choose between Dual-LLM Cloud AI Engine and On-Device Offline Recognition.
+   - **Audio & Controls**: Toggle chimes/sound feedback, auto-submitting after 2s silence, and ambient noise cancellation.
+   - **Hands-Free & Privacy**: Enable `"Hey Habita"` wake word detection, command history logging, or wipe all stored voice logs with `clearVoiceHistory()`.
+
+### Document Hub (`src/features/dochub/`)
+A complete 5-page digital vault, document management, and expiration alerting system:
+1. **Document Hub (`DocHubScreen.tsx`)**: Main repository list, category filter chips (Passports 📘, Visas 🛂, Licenses 🪪, Insurance 🏥, Warranties 🏷️, Property 🏠, Tax 🧾), real-time search bar, and warning banner.
+2. **Document Details (`DocDetailsScreen.tsx`)**: Full document detail view with owner attribution, masked document number with toggle reveal (`👁️`), validity status pill, and encrypted file attachment view.
+3. **Add Document (`AddDocScreen.tsx`)**: Template choice hub to pick pre-built document templates or perform custom file uploads.
+4. **Document Template / Form (`DocTemplateFormScreen.tsx`)**: Tailored form fields for **Passport**, **Visa**, **Driver's License**, and **Health Insurance** with attachment picker (`@react-native-documents/picker`).
+5. **Expiration & Alerts (`ExpirationAlertsScreen.tsx`)**: Warning center categorizing **Expired** (red alert) and **Expiring Soon** (within 60 days, orange alert) documents with 1-tap expiry date renewal modals.
+
 ### Design system
 - Three palettes in `src/theme.ts`: Terracotta (default), Ocean Breeze, Midnight (dark).
 - Shared tokens: `colors`, `spacing`, `radius`, `fonts`, `shadow`.

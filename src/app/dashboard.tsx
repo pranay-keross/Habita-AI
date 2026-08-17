@@ -22,6 +22,8 @@ import CreditCard from 'lucide-react-native/icons/credit-card';
 import Users from 'lucide-react-native/icons/users';
 import TrendingUp from 'lucide-react-native/icons/trending-up';
 import FolderOpen from 'lucide-react-native/icons/folder-open';
+import Package from 'lucide-react-native/icons/package';
+import Mic from 'lucide-react-native/icons/mic';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import HeartPulse from 'lucide-react-native/icons/heart-pulse';
 import Shirt from 'lucide-react-native/icons/shirt';
@@ -201,15 +203,27 @@ export default function DashboardScreen({ navigation, route }: Props) {
       navigation.navigate('Family');
     } else if (id === 'medicine') {
       navigation.navigate('Medicine');
+    } else if (id === 'money') {
+      navigation.navigate('ExpenseGroups');
+    } else if (id === 'docs') {
+      navigation.navigate('DocHub');
+    } else if (id === 'safety') {
+      navigation.navigate('Staff');
+    } else if (id === 'style') {
+      navigation.navigate('Wardrobe');
+    } else if (id === 'scan' || id === 'pay') {
+      navigation.navigate('Voice');
     }
-    // Other tiles have no screen yet — see docs/BACKLOG.md M5-M7.
   };
 
   const handleActionPress = (id: ActionId) => {
     if (id === 'meds') {
       navigation.navigate('Medicine');
+    } else if (id === 'expense') {
+      navigation.navigate('ExpenseGroups');
+    } else if (id === 'scan' || id === 'pay') {
+      navigation.navigate('Voice');
     }
-    // Other quick actions have no screen yet — see docs/BACKLOG.md M5-M7.
   };
 
   return (
@@ -297,8 +311,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {/* Module list — same reasoning: ten rows staggering in individually was
-            the largest source of visible motion on this screen. */}
+        {/* Module list */}
         <SectionHeader title={t('dashboard.quick_tiles')} subtitle={t('dashboard.quick_tiles_sub')} style={styles.gridHeader} />
         <View style={styles.moduleList}>
           {tiles.map((tile, idx) => (
