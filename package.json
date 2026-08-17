@@ -6,6 +6,7 @@
     "android": "react-native run-android",
     "ios": "react-native run-ios",
     "lint": "eslint .",
+    "dev": "react-native start",
     "start": "react-native start",
     "test": "jest"
   },
@@ -30,7 +31,7 @@
     "react-native-safe-area-context": "^5.8.0",
     "react-native-screens": "^4.26.2",
     "react-native-svg": "^15.15.5",
-    "react-native-worklets": "^0.10.3"
+    "react-native-worklets": "0.10.3"
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",

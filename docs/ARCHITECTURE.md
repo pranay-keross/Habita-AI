@@ -37,6 +37,8 @@ Habita AI is a **React Native client that is mostly still backend-free, with a f
 
 There is still no state container (no Redux/Zustand/Context store) and no general API/service layer — `src/features/auth/api.ts` and `src/features/family/api.ts` are each scoped to their own domain, not a repository pattern for the whole app. Screen-local `useState` plus `AsyncStorage` remains the state model everywhere else. This was a deliberate choice for the static-design phase (`docs/DECISIONS.md` D-002); D-012 and D-023 each narrow that decision's scope rather than replacing it — D-002 itself is unchanged and still governs every other domain (dashboard, documents, money, medicine's own data, …) until each gets its own such exception.
 
+`src/features/household/HouseholdOperationsScreen.tsx` remains a static, localized M5 overview (`M5-T0`) for the unfinished domains. Its Caregiver card now opens `src/features/staff/`, the usual `types.ts` / `staffStore.ts` / `StaffScreen.tsx` local-first module (`M5-T6`). Resources, events, and vehicles remain separate follow-up modules under their existing M5 task rows.
+
 ---
 
 ## 2. Navigation
@@ -162,6 +164,9 @@ Since `M1-T2` (2026-07-30) this is the **only** path to storage — `src/utils/s
 | `habita.session` | `hooks/useAuth.ts` | `{accessToken, refreshToken, expiresIn, userId, issuedAt, phone}` JSON | added `M2-T1`/`M2-T4` (`docs/DECISIONS.md` D-012); presence of this key is what `signedIn` means — see §6 |
 | `habita.medicines` | `features/medicine/medicineStore.ts` | `Medicine[]` JSON | added `M4-T2`; empty until the user adds a first medicine |
 | `habita.medicine_intake_log` | `features/medicine/medicineStore.ts` | `IntakeLogEntry[]` JSON | added `M4-T3`; append-only, one entry per marked-taken dose; read by `calculateAdherence()` |
+| `habita.caregivers` | `features/staff/staffStore.ts` | `Caregiver[]` JSON | added `M5-T6`; local caregiver and domestic-staff profiles |
+| `habita.resource_log` | `features/resources/resourceStore.ts` | `ResourceLog[]` JSON | added `M5-T9`; local delivery history |
+| `habita.quick_tap_items` | `features/resources/resourceStore.ts` | `QuickTapItem[]` JSON | added `M5-T9`; user-managed dashboard delivery counters |
 
 `clearAll()` (Delete Account) wipes **all** of the above, including language, palette, and the session — so Delete Account also signs the device out. `handleSignOut` in `profile.tsx` calls `useAuth().logout()`, which since `M2-T6` clears `habita.session` and, since `docs/DECISIONS.md` D-028 (2026-08-11), also clears the account-scoped keys below via `clearAccountData()` — `habita.user_profile`, `habita.medicines`, `habita.medicine_intake_log` — so a second phone number signing in on the same device no longer inherits the first account's cached name/photo/medicines. Device preferences (`habita.lang`, `habita.theme.palette`) are deliberately left alone, and `habita.user_phone` is left alone too (the very next onboarding screen always overwrites it). The same clearing also runs pre-emptively inside `verify()` if the cached profile's phone doesn't match the number just verified, as a safety net for sessions that went stale without an explicit sign-out.
 

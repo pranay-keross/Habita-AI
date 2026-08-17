@@ -10,6 +10,10 @@ import ProfileScreen from './onboarding/profile';
 import DashboardScreen from './dashboard';
 import FamilyScreen from '../features/family/FamilyScreen';
 import MedicineScreen from '../features/medicine/MedicineScreen';
+import HouseholdOperationsScreen from '../features/household/HouseholdOperationsScreen';
+import HouseholdAreaScreen from '../features/household/HouseholdAreaScreen';
+import StaffScreen from '../features/staff/StaffScreen';
+import ResourcesScreen from '../features/resources/ResourcesScreen';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
 import useTheme from '../hooks/useTheme';
@@ -26,6 +30,10 @@ export type RootStackParamList = {
   Dashboard: { profileUpdated?: boolean } | undefined;
   Family: undefined;
   Medicine: undefined;
+  HouseholdOperations: undefined;
+  HouseholdArea: { area: 'caregiver' | 'resources' | 'events' | 'assets' };
+  Staff: undefined;
+  Resources: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -65,6 +73,10 @@ const AppLayout = () => {
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="Family" component={FamilyScreen} />
           <Stack.Screen name="Medicine" component={MedicineScreen} />
+          <Stack.Screen name="HouseholdOperations" component={HouseholdOperationsScreen} />
+          <Stack.Screen name="HouseholdArea" component={HouseholdAreaScreen} />
+          <Stack.Screen name="Staff" component={StaffScreen} />
+          <Stack.Screen name="Resources" component={ResourcesScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

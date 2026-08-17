@@ -17,60 +17,64 @@ Starting dev server on http://localhost:8081
                         ▒▒▓▓▓▓▒▒
 
 
+ WARN  the transform cache was reset.
                 Welcome to Metro v0.84.4
               Fast - Scalable - Integrated
 
 
  INFO  Dev server ready. Press Ctrl+C to exit.
- INFO  Interactive mode is not supported in this environment
+ INFO  Key commands available:
+
+   r  - reload app(s)
+   d  - open Dev Menu
+   j  - open DevTools
+
  BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js ▓▓▓▓▓▓▓▓▓▓░░░░░░ 63% (608/763)
-transform[stderr]: (node:5488) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
-transform[stderr]: (node:20132) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
-transform[stderr]: (node:6632) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
-transform[stderr]: (node:34352) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
-transform[stderr]: (node:28192) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
-transform[stderr]: (node:28356) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
-transform[stderr]: (node:32356) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
-transform[stderr]: (node:27744) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
-transform[stderr]: (node:7952) Warning: The 'NO_COLOR' env is ignored due to the 'FORCE_COLOR' env being set.
-transform[stderr]: (Use `node --trace-warnings ...` to show where the warning was created)
+ BUNDLE  ./index.js ▓▓▓▓░░░░░░░░░░░░ 25% (217/428)
+ BUNDLE  ./index.js ▓▓▓▓▓▓▓▓▓▓▓░░░░░ 69% (976/1167)
+ BUNDLE  ./index.js ▓▓▓▓▓▓▓▓▓▓▓▓▓▓▓░ 94% (1719/1770)
  BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- ERROR  [timeout] connection terminated with Device for app='com.sahelicli' on device='sdk_gphone16k_x86_64 - 17 - API 37' after not responding for 60 seconds.
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- ERROR  [timeout] connection terminated with Device for app='com.sahelicli' on device='sdk_gphone16k_x86_64 - 17 - API 37' after not responding for 60 seconds.
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- ERROR  [timeout] connection terminated with Device for app='com.sahelicli' on device='sdk_gphone16k_x86_64 - 17 - API 37' after not responding for 60 seconds.
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- BUNDLE  ./index.js ░░░░░░░░░░░░░░░░ 0% (0/1)
- BUNDLE  ./index.js 
- ERROR  [timeout] connection terminated with Device for app='com.sahelicli' on device='sdk_gphone16k_x86_64 - 17 - API 37' after not responding for 60 seconds.
+ ERROR  Error: Unable to resolve module ../features/household/HouseholdAreaScreen from D:\Projects\Sahel\src\app\_layout.tsx: 
+
+None of these files exist:
+  * src\features\household\HouseholdAreaScreen(.android.js|.native.js|.js|.android.jsx|.native.jsx|.jsx|.android.json|.native.json|.json|.android.ts|.native.ts|.ts|.android.tsx|.native.tsx|.tsx)
+  * src\features\household\HouseholdAreaScreen
+  12 | import MedicineScreen from '../features/medicine/MedicineScreen';
+  13 | import HouseholdOperationsScreen from '../features/household/HouseholdOperationsScreen';
+> 14 | import HouseholdAreaScreen from '../features/household/HouseholdAreaScreen';
+     |                                  ^
+  15 | import type { ThemeTokens } from '../theme';
+  16 | import useThemedStyles from '../hooks/useThemedStyles';
+  17 | import useTheme from '../hooks/useTheme';
+    at ModuleResolver.resolveDependency (D:\Projects\Sahel\node_modules\metro\src\node-haste\DependencyGraph\ModuleResolution.js:143:15)
+    at DependencyGraph.resolveDependency (D:\Projects\Sahel\node_modules\metro\src\node-haste\DependencyGraph.js:263:43)
+    at D:\Projects\Sahel\node_modules\metro\src\lib\transformHelpers.js:165:21
+    at resolveDependencies (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\buildSubgraph.js:43:25)
+    at visit (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\buildSubgraph.js:81:30)
+    at process.processTicksAndRejections (node:internal/process/task_queues:104:5)
+    at async Promise.all (index 0)
+    at async buildSubgraph (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\buildSubgraph.js:105:3)
+    at async Graph._buildDelta (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\Graph.js:163:22)
+    at async Graph.traverseDependencies (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\Graph.js:50:19)
+ ERROR  Error: Unable to resolve module ../features/household/HouseholdAreaScreen from D:\Projects\Sahel\src\app\_layout.tsx: 
+
+None of these files exist:
+  * src\features\household\HouseholdAreaScreen(.android.js|.native.js|.js|.android.jsx|.native.jsx|.jsx|.android.json|.native.json|.json|.android.ts|.native.ts|.ts|.android.tsx|.native.tsx|.tsx)
+  * src\features\household\HouseholdAreaScreen
+  12 | import MedicineScreen from '../features/medicine/MedicineScreen';
+  13 | import HouseholdOperationsScreen from '../features/household/HouseholdOperationsScreen';
+> 14 | import HouseholdAreaScreen from '../features/household/HouseholdAreaScreen';
+     |                                  ^
+  15 | import type { ThemeTokens } from '../theme';
+  16 | import useThemedStyles from '../hooks/useThemedStyles';
+  17 | import useTheme from '../hooks/useTheme';
+    at ModuleResolver.resolveDependency (D:\Projects\Sahel\node_modules\metro\src\node-haste\DependencyGraph\ModuleResolution.js:143:15)
+    at DependencyGraph.resolveDependency (D:\Projects\Sahel\node_modules\metro\src\node-haste\DependencyGraph.js:263:43)
+    at D:\Projects\Sahel\node_modules\metro\src\lib\transformHelpers.js:165:21
+    at resolveDependencies (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\buildSubgraph.js:43:25)
+    at visit (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\buildSubgraph.js:81:30)
+    at async Promise.all (index 0)
+    at async buildSubgraph (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\buildSubgraph.js:105:3)
+    at async Graph._buildDelta (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\Graph.js:163:22)
+    at async Graph.traverseDependencies (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\Graph.js:50:19)
+    at async DeltaCalculator._getChangedDependencies (D:\Projects\Sahel\node_modules\metro\src\DeltaBundler\DeltaCalculator.js:200:42)

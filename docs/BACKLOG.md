@@ -25,7 +25,7 @@ Every task is sized to be completed in one focused session and is executable wit
 | M2 | Auth & session (make it real) | 🚧 In progress | 6 / 9 | OTP, session lifecycle, guards, dependents (`M2-T9` done via D-023) |
 | M3 | Family module completion | ✅ Done, superseded | 6 / 6 | Data layer replaced by the real backend (`M8-T3`, D-023) — UX decisions carry forward |
 | M4 | Health & Life-Stage Suite | 🚧 In progress | 5 / 10 | Medical Chest done, now backend-integrated when a family exists (`M4-T10`); Wellness/CBT, Cycle tracking next |
-| M5 | Household Ledger & Assets | ⏳ Ready | 0 / 12 | Documents, Staff/Caregivers, Resources, Events, Vehicles |
+| M5 | Household Ledger & Assets | 🚧 In progress | 2 / 12 | Documents, Staff/Caregivers, Resources, Events, Vehicles |
 | M6 | Global Finance & Commerce | ⏳ Ready | 0 / 6 | Multi-currency expenses, payment rails |
 | M7 | Lifestyle & Smart Living | ⏳ Ready | 0 / 6 | Pantry, Wardrobe, Voice, live dashboard |
 | M8 | Backend & AI integration | 🚧 In progress | 1 / 6 | Family sharing real (`M8-T3`); everything else still needs the backend reached (`M8-T1`) |
@@ -143,15 +143,16 @@ Goal: covers SRS Module Group 3 in full — Household Document Hub (`dochub`), C
 
 | ID | Task | Acceptance criteria | Status |
 | --- | --- | --- | --- |
+| M5-T0 | Static `Household Operations` overview route and dashboard tile | One localized, token-based screen presents the four Module Group 3 domains without implying unfinished integrations work | ✅ 2026-08-17 |
 | M5-T1 | `src/features/documents/` scaffold + dashboard tile wiring (Document Hub) | Tile navigates | ⏳ |
 | M5-T2 | Document capture via `react-native-image-picker` (already a dependency) and local file references | Documents persist with title, category, date, URI | 🔒 needs M5-T1 |
 | M5-T3 | Categories, tags, and search over stored documents | Filtering works offline | 🔒 needs M5-T2 |
 | M5-T4 | Expiry reminders for documents with an expiry date (insurance, licence, passport, visa) | Due items surface as dashboard "Due" count | 🔒 needs M5-T2 |
 | M5-T5 | Define the OCR hook-point: an interface the AI provider will implement, with a manual-entry fallback | Interface exists and is called; no provider required to ship | 🔒 needs M8-T1 for the real implementation |
-| M5-T6 | `src/features/staff/` scaffold: caregiver/domestic-staff profiles (SRS Caregiver & Home Services Hub) | Tile navigates; CRUD persists to `habita.caregivers` | ⏳ |
+| M5-T6 | `src/features/staff/` scaffold: caregiver/domestic-staff profiles (SRS Caregiver & Home Services Hub) | Tile navigates; CRUD persists to `habita.caregivers` | ✅ 2026-08-17 |
 | M5-T7 | Attendance logging and hourly/monthly rate capture per caregiver | Attendance entries persist and are attributable to a caregiver | 🔒 needs M5-T6 |
 | M5-T8 | Local wage ledger — advances, tips, and a formatted summary view (no real money movement until `M8`) | Ledger totals compute correctly; summary matches entries | 🔒 needs M5-T7 |
-| M5-T9 | `src/features/resources/` scaffold: recurring-delivery quick-tap counters (SRS Resource & Utility Logistics) | Tile navigates; taps persist to `habita.resource_log` | ⏳ |
+| M5-T9 | `src/features/resources/` scaffold: recurring-delivery quick-tap counters (SRS Resource & Utility Logistics) | Tile navigates; taps persist to `habita.resource_log` | ✅ 2026-08-17 |
 | M5-T10 | Utility bill capture routed through the OCR hook-point from M5-T5 | Capture → prefilled resource entry | 🔒 needs M5-T5, M5-T9 |
 | M5-T11 | `src/features/events/` scaffold: event folders and budget line items, feeding the dashboard "Pending" count | Dashboard pending count derived from real events | ⏳ |
 | M5-T12 | `src/features/vehicles/` scaffold: vehicle records plus a general property asset vault (appliance warranties, manuals, maintenance tasks) | The "Add fuel" quick action (currently goes nowhere) routes to a real screen; asset entries persist | ⏳ |

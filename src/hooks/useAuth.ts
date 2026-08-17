@@ -2,6 +2,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { getItem, setItem, removeItem } from '../utils/storage';
 import { authService, type TokenPair } from '../features/auth/auth';
 import { MEDICINE_STORAGE_KEY, INTAKE_LOG_STORAGE_KEY } from '../features/medicine/medicineStore';
+import { CAREGIVER_STORAGE_KEY } from '../features/staff/staffStore';
+import { QUICK_TAP_STORAGE_KEY, RESOURCE_LOG_STORAGE_KEY } from '../features/resources/resourceStore';
 
 const SESSION_KEY = 'habita.session';
 
@@ -16,7 +18,7 @@ const PROFILE_STORAGE_KEY = 'habita.user_profile';
 // number just entered, before this ever runs, so clearing it here would erase the value
 // the very next screen needs. `habita.lang`/`habita.theme.palette` are device
 // preferences, not account data, and are never touched by this.
-const ACCOUNT_SCOPED_KEYS = [PROFILE_STORAGE_KEY, MEDICINE_STORAGE_KEY, INTAKE_LOG_STORAGE_KEY];
+const ACCOUNT_SCOPED_KEYS = [PROFILE_STORAGE_KEY, MEDICINE_STORAGE_KEY, INTAKE_LOG_STORAGE_KEY, CAREGIVER_STORAGE_KEY, RESOURCE_LOG_STORAGE_KEY, QUICK_TAP_STORAGE_KEY];
 
 async function clearAccountData(): Promise<void> {
   await Promise.all(ACCOUNT_SCOPED_KEYS.map((key) => removeItem(key)));

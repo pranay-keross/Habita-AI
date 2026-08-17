@@ -26,6 +26,7 @@ import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import HeartPulse from 'lucide-react-native/icons/heart-pulse';
 import Shirt from 'lucide-react-native/icons/shirt';
 import CalendarDays from 'lucide-react-native/icons/calendar-days';
+import House from 'lucide-react-native/icons/house';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import type { RootStackParamList } from './_layout';
 import type { ThemeTokens } from '../theme';
@@ -34,6 +35,8 @@ import SectionHeader from '../components/SectionHeader';
 import { subscribeToLanguageChanges, setLanguage, SUPPORTED_LANGS, t } from '../i18n';
 import { getItem } from '../utils/storage';
 import { calculateAdherence, loadIntakeLog, loadMedicines } from '../features/medicine/medicineStore';
+import { loadQuickTapItems, saveResourceLogs } from '../features/resources/resourceStore';
+import type { QuickTapItem, ResourceLog } from '../features/resources/types';
 import useAuth from '../hooks/useAuth';
 import { apiFetch } from '../features/auth/api';
 
@@ -57,7 +60,7 @@ interface ProfileDetailsResponse {
 
 // Stable IDs a translation reword can't break — `handleTilePress`/quick actions
 // route on these, never on the (locale-dependent) label text. See `M1-T7`.
-type TileId = 'scan' | 'pay' | 'family' | 'money' | 'docs' | 'safety' | 'wellness' | 'style' | 'events' | 'medicine';
+type TileId = 'scan' | 'pay' | 'family' | 'money' | 'docs' | 'safety' | 'wellness' | 'style' | 'events' | 'medicine' | 'household';
 type ActionId = 'scan' | 'pay' | 'meds' | 'expense' | 'fuel' | 'premium';
 
 // `Date.getHours()` reads the device's own local time — already "current location time"
@@ -81,6 +84,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [localeVersion, setLocaleVersion] = useState(0);
   const [adherence, setAdherence] = useState<number | null>(null);
+  const [resourceItems, setResourceItems] = useState<QuickTapItem[]>([]);
 
   // Dynamic translated arrays evaluated on render
   const quickActions: { id: ActionId; label: string; Icon: LucideIcon }[] = [
@@ -103,6 +107,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
     { id: 'wellness', title: t('dashboard.tile_wellness'), Icon: HeartPulse },
     { id: 'style', title: t('dashboard.tile_style'), Icon: Shirt },
     { id: 'events', title: t('dashboard.tile_events'), Icon: CalendarDays },
+    { id: 'household', title: t('dashboard.tile_household_operations'), Icon: House },
   ];
 
   // Live GET /profile/details — deliberately *not* wired to every focus event any more
@@ -167,6 +172,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
       Promise.all([loadMedicines(), loadIntakeLog()]).then(([medicines, log]) => {
         setAdherence(calculateAdherence(medicines, log));
       });
+      loadQuickTapItems().then((items) => setResourceItems(items.filter((item) => item.active)));
     });
 
     const unsubLang = subscribeToLanguageChanges(() => {
@@ -201,6 +207,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
       navigation.navigate('Family');
     } else if (id === 'medicine') {
       navigation.navigate('Medicine');
+    } else if (id === 'household') {
+      navigation.navigate('HouseholdOperations');
     }
     // Other tiles have no screen yet — see docs/BACKLOG.md M5-M7.
   };
@@ -210,6 +218,15 @@ export default function DashboardScreen({ navigation, route }: Props) {
       navigation.navigate('Medicine');
     }
     // Other quick actions have no screen yet — see docs/BACKLOG.md M5-M7.
+  };
+
+  const handleResourceTap = async (item: QuickTapItem) => {
+    const { loadResourceLogs } = await import('../features/resources/resourceStore');
+    const existing = await loadResourceLogs();
+    const entry: ResourceLog = {
+      id: String(Date.now()), quickTapItemId: item.id, itemName: item.name, quantity: 1, note: '', loggedAt: Date.now(),
+    };
+    await saveResourceLogs([entry, ...existing]);
   };
 
   return (
@@ -296,6 +313,13 @@ export default function DashboardScreen({ navigation, route }: Props) {
             ))}
           </View>
         </View>
+
+        {resourceItems.length > 0 ? (
+          <View style={styles.resourcePanel}>
+            <View style={styles.resourceHeader}><View><Text style={styles.sectionTitle}>{t('resources.dashboard_title')}</Text><Text style={styles.sectionSubtitle}>{t('resources.dashboard_subtitle')}</Text></View><Pressable onPress={() => navigation.navigate('Resources')}><Text style={styles.resourceOpen}>{t('resources.open')}</Text></Pressable></View>
+            <View style={styles.resourceTaps}>{resourceItems.slice(0, 4).map((item) => <Pressable key={item.id} style={styles.resourceTap} onPress={() => handleResourceTap(item)}><Text style={styles.resourceTapPlus}>+</Text><Text style={styles.resourceTapName} numberOfLines={1}>{item.name}</Text></Pressable>)}</View>
+          </View>
+        ) : null}
 
         {/* Module list — same reasoning: ten rows staggering in individually was
             the largest source of visible motion on this screen. */}
@@ -466,6 +490,13 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   sectionMargin: {
     marginBottom: spacing.xl,
   },
+  resourcePanel: { marginBottom: spacing.xl },
+  resourceHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  resourceOpen: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary, marginTop: 5 },
+  resourceTaps: { flexDirection: 'row', gap: spacing.sm },
+  resourceTap: { flex: 1, minHeight: 72, padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, justifyContent: 'space-between' },
+  resourceTapPlus: { fontFamily: fonts.serif, fontSize: 20, color: colors.primary },
+  resourceTapName: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textPrimary },
   sectionTitle: {
     fontFamily: fonts.serif,
     fontSize: 22,
