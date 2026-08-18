@@ -29,6 +29,8 @@ import {
   DEFAULT_VOICE_SETTINGS,
 } from './voiceStore';
 import type { VoiceSettings } from './types';
+import { VOICE_COLORS } from './constants/colors';
+import { subscribeToLanguageChanges, setLanguage, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'VoiceSettings'>;
 
@@ -47,6 +49,14 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
 
   const [loading, setLoading] = useState(true);
   const [settings, setSettings] = useState<VoiceSettings>(DEFAULT_VOICE_SETTINGS);
+  const [, setLocaleVersion] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -60,20 +70,23 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
     const updated = { ...settings, [key]: value };
     setSettings(updated);
     saveVoiceSettings(updated);
+    if (key === 'language') {
+      setLanguage(value as string);
+    }
   };
 
   const handleClearHistory = () => {
     Alert.alert(
-      'Clear Voice History',
-      'Are you sure you want to delete all recorded voice command logs from this device?',
+      t('voice_assistant.clear_history_confirm_title'),
+      t('voice_assistant.clear_history_confirm_msg'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('voice_assistant.cancel'), style: 'cancel' },
         {
-          text: 'Clear All',
+          text: t('voice_assistant.clear_all'),
           style: 'destructive',
           onPress: async () => {
             await clearVoiceHistory();
-            Alert.alert('Cleared', 'Voice command history has been wiped.');
+            Alert.alert(t('voice_assistant.cleared_title'), t('voice_assistant.cleared_msg'));
           },
         },
       ],
@@ -83,7 +96,7 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
   if (loading) {
     return (
       <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color="#0284C7" />
+        <ActivityIndicator size="large" color={VOICE_COLORS.accentBlue} />
       </View>
     );
   }
@@ -95,15 +108,15 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>Voice Settings</Text>
+        <Text style={styles.headerTitle}>{t('voice_assistant.settings_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Language Selection Section */}
         <View style={styles.sectionHeader}>
-          <Globe size={18} color="#0284C7" />
-          <Text style={styles.sectionTitle}>Speech Recognition Language</Text>
+          <Globe size={18} color={VOICE_COLORS.accentBlue} />
+          <Text style={styles.sectionTitle}>{t('voice_assistant.speech_language')}</Text>
         </View>
 
         <View style={styles.card}>
@@ -116,7 +129,7 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
                 <Text style={styles.flagEmoji}>{lang.flag}</Text>
                 <Text style={styles.langLabel}>{lang.label}</Text>
                 {settings.language === lang.code && (
-                  <Check size={18} color="#0284C7" />
+                  <Check size={18} color={VOICE_COLORS.accentBlue} />
                 )}
               </Pressable>
             </React.Fragment>
@@ -125,8 +138,8 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
 
         {/* Engine Mode Section */}
         <View style={styles.sectionHeader}>
-          <Sparkles size={18} color="#0284C7" />
-          <Text style={styles.sectionTitle}>Recognition Engine</Text>
+          <Sparkles size={18} color={VOICE_COLORS.accentBlue} />
+          <Text style={styles.sectionTitle}>{t('voice_assistant.recognition_engine')}</Text>
         </View>
 
         <View style={styles.card}>
@@ -134,12 +147,12 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
             style={styles.modeRow}
             onPress={() => updateSetting('recognitionMode', 'cloud')}>
             <View style={styles.modeTextWrap}>
-              <Text style={styles.modeTitle}>Dual-LLM Cloud AI Engine</Text>
+              <Text style={styles.modeTitle}>{t('voice_assistant.cloud_engine_title')}</Text>
               <Text style={styles.modeSub}>
-                Highest accuracy, understands complex household finance & medical commands.
+                {t('voice_assistant.cloud_engine_sub')}
               </Text>
             </View>
-            {settings.recognitionMode === 'cloud' && <Check size={18} color="#0284C7" />}
+            {settings.recognitionMode === 'cloud' && <Check size={18} color={VOICE_COLORS.accentBlue} />}
           </Pressable>
 
           <View style={styles.divider} />
@@ -148,32 +161,32 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
             style={styles.modeRow}
             onPress={() => updateSetting('recognitionMode', 'offline')}>
             <View style={styles.modeTextWrap}>
-              <Text style={styles.modeTitle}>On-Device Offline Recognition</Text>
+              <Text style={styles.modeTitle}>{t('voice_assistant.offline_engine_title')}</Text>
               <Text style={styles.modeSub}>
-                Faster response time, operates without internet connection.
+                {t('voice_assistant.offline_engine_sub')}
               </Text>
             </View>
-            {settings.recognitionMode === 'offline' && <Check size={18} color="#0284C7" />}
+            {settings.recognitionMode === 'offline' && <Check size={18} color={VOICE_COLORS.accentBlue} />}
           </Pressable>
         </View>
 
         {/* Audio & Feedback Settings */}
         <View style={styles.sectionHeader}>
-          <Volume2 size={18} color="#0284C7" />
-          <Text style={styles.sectionTitle}>Audio & Controls</Text>
+          <Volume2 size={18} color={VOICE_COLORS.accentBlue} />
+          <Text style={styles.sectionTitle}>{t('voice_assistant.audio_controls')}</Text>
         </View>
 
         <View style={styles.card}>
           <View style={styles.switchRow}>
             <View style={styles.switchTextWrap}>
-              <Text style={styles.settingTitle}>Audio Feedback Sounds</Text>
-              <Text style={styles.settingSub}>Play a chime tone when microphone starts listening.</Text>
+              <Text style={styles.settingTitle}>{t('voice_assistant.audio_feedback_title')}</Text>
+              <Text style={styles.settingSub}>{t('voice_assistant.audio_feedback_sub')}</Text>
             </View>
             <Switch
               value={settings.soundFeedback}
               onValueChange={(val) => updateSetting('soundFeedback', val)}
               trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.soundFeedback ? '#0284C7' : '#F1F5F9'}
+              thumbColor={settings.soundFeedback ? VOICE_COLORS.accentBlue : '#F1F5F9'}
             />
           </View>
 
@@ -181,14 +194,14 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
 
           <View style={styles.switchRow}>
             <View style={styles.switchTextWrap}>
-              <Text style={styles.settingTitle}>Auto-Submit Spoken Commands</Text>
-              <Text style={styles.settingSub}>Execute voice intents automatically after 2s of silence.</Text>
+              <Text style={styles.settingTitle}>{t('voice_assistant.auto_submit_title')}</Text>
+              <Text style={styles.settingSub}>{t('voice_assistant.auto_submit_sub')}</Text>
             </View>
             <Switch
               value={settings.autoSubmit}
               onValueChange={(val) => updateSetting('autoSubmit', val)}
               trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.autoSubmit ? '#0284C7' : '#F1F5F9'}
+              thumbColor={settings.autoSubmit ? VOICE_COLORS.accentBlue : '#F1F5F9'}
             />
           </View>
 
@@ -196,64 +209,64 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
 
           <View style={styles.switchRow}>
             <View style={styles.switchTextWrap}>
-              <Text style={styles.settingTitle}>Noise Cancellation</Text>
-              <Text style={styles.settingSub}>Filter background home noise during microphone capture.</Text>
+              <Text style={styles.settingTitle}>{t('voice_assistant.noise_cancel_title')}</Text>
+              <Text style={styles.settingSub}>{t('voice_assistant.noise_cancel_sub')}</Text>
             </View>
             <Switch
               value={settings.noiseCancellation}
               onValueChange={(val) => updateSetting('noiseCancellation', val)}
               trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.noiseCancellation ? '#0284C7' : '#F1F5F9'}
+              thumbColor={settings.noiseCancellation ? VOICE_COLORS.accentBlue : '#F1F5F9'}
             />
           </View>
         </View>
 
         {/* Wake Word Detection */}
         <View style={styles.sectionHeader}>
-          <Mic size={18} color="#0284C7" />
-          <Text style={styles.sectionTitle}>Wake Word & Hands-Free</Text>
+          <Mic size={18} color={VOICE_COLORS.accentBlue} />
+          <Text style={styles.sectionTitle}>{t('voice_assistant.wake_word_title')}</Text>
         </View>
 
         <View style={styles.card}>
           <View style={styles.switchRow}>
             <View style={styles.switchTextWrap}>
-              <Text style={styles.settingTitle}>Hands-Free "Hey Habita"</Text>
-              <Text style={styles.settingSub}>Listen for wake word trigger without tapping the mic button.</Text>
+              <Text style={styles.settingTitle}>{t('voice_assistant.hands_free_title')}</Text>
+              <Text style={styles.settingSub}>{t('voice_assistant.hands_free_sub')}</Text>
             </View>
             <Switch
               value={settings.wakeWordEnabled}
               onValueChange={(val) => updateSetting('wakeWordEnabled', val)}
               trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.wakeWordEnabled ? '#0284C7' : '#F1F5F9'}
+              thumbColor={settings.wakeWordEnabled ? VOICE_COLORS.accentBlue : '#F1F5F9'}
             />
           </View>
         </View>
 
         {/* Privacy & Logs */}
         <View style={styles.sectionHeader}>
-          <ShieldCheck size={18} color="#0284C7" />
-          <Text style={styles.sectionTitle}>Privacy & History</Text>
+          <ShieldCheck size={18} color={VOICE_COLORS.accentBlue} />
+          <Text style={styles.sectionTitle}>{t('voice_assistant.privacy_history_title')}</Text>
         </View>
 
         <View style={styles.card}>
           <View style={styles.switchRow}>
             <View style={styles.switchTextWrap}>
-              <Text style={styles.settingTitle}>Save Voice Command History</Text>
-              <Text style={styles.settingSub}>Keep local logs of past voice intents for quick review.</Text>
+              <Text style={styles.settingTitle}>{t('voice_assistant.save_history_title')}</Text>
+              <Text style={styles.settingSub}>{t('voice_assistant.save_history_sub')}</Text>
             </View>
             <Switch
               value={settings.saveHistory}
               onValueChange={(val) => updateSetting('saveHistory', val)}
               trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.saveHistory ? '#0284C7' : '#F1F5F9'}
+              thumbColor={settings.saveHistory ? VOICE_COLORS.accentBlue : '#F1F5F9'}
             />
           </View>
 
           <View style={styles.divider} />
 
           <Pressable style={styles.clearBtnRow} onPress={handleClearHistory}>
-            <Trash2 size={18} color="#EF4444" />
-            <Text style={styles.clearBtnText}>Clear Voice History Log</Text>
+            <Trash2 size={18} color={VOICE_COLORS.dangerRed} />
+            <Text style={styles.clearBtnText}>{t('voice_assistant.clear_history_log')}</Text>
           </Pressable>
         </View>
       </ScrollView>

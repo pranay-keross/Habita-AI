@@ -22,6 +22,7 @@ import {
   getGroupSyncDetails,
 } from '../expenseStore';
 import type { Expense, ExpenseGroup, MemberBalance, PairwiseDebt } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'GroupDetails'>;
 
@@ -31,6 +32,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { groupId } = route.params;
+  const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<ExpenseGroup | undefined>();
@@ -52,10 +54,14 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
   };
 
   useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     const unsubscribe = navigation.addListener('focus', () => {
       fetchDetail();
     });
-    return unsubscribe;
+    return () => {
+      unsubLang();
+      unsubscribe();
+    };
   }, [navigation, groupId]);
 
   if (loading) {
@@ -69,7 +75,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
   if (!group) {
     return (
       <View style={[styles.root, styles.center]}>
-        <Text style={styles.errorText}>Expense Group Not Found</Text>
+        <Text style={styles.errorText}>{t('expenses.group_not_found')}</Text>
       </View>
     );
   }
@@ -101,17 +107,17 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
 
       {/* Hero Group Net Banner */}
       <View style={styles.groupHeroCard}>
-        <Text style={styles.groupHeroLabel}>Group Total Spend</Text>
+        <Text style={styles.groupHeroLabel}>{t('expenses.group_total_spend')}</Text>
         <Text style={styles.groupHeroTotal}>
           ₹{totalSpend.toLocaleString('en-IN')}
         </Text>
         <View style={styles.myNetBadge}>
           {myNet > 0 ? (
-            <Text style={styles.myNetGreen}>You get back ₹{myNet.toLocaleString('en-IN')}</Text>
+            <Text style={styles.myNetGreen}>{t('expenses.you_get_back_amount', { amount: myNet.toLocaleString('en-IN') })}</Text>
           ) : myNet < 0 ? (
-            <Text style={styles.myNetOrange}>You owe ₹{Math.abs(myNet).toLocaleString('en-IN')}</Text>
+            <Text style={styles.myNetOrange}>{t('expenses.you_owe_amount', { amount: Math.abs(myNet).toLocaleString('en-IN') })}</Text>
           ) : (
-            <Text style={styles.myNetSettled}>You are all settled up</Text>
+            <Text style={styles.myNetSettled}>{t('expenses.all_settled_up_msg')}</Text>
           )}
         </View>
       </View>
@@ -123,7 +129,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
           onPress={() => setActiveTab('expenses')}>
           <Receipt size={16} color={activeTab === 'expenses' ? '#004F63' : styles.placeholder.color} />
           <Text style={[styles.tabText, activeTab === 'expenses' && styles.tabTextActive]}>
-            Expenses
+            {t('expenses.tab_expenses')}
           </Text>
         </Pressable>
 
@@ -132,7 +138,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
           onPress={() => setActiveTab('balances')}>
           <Users size={16} color={activeTab === 'balances' ? '#004F63' : styles.placeholder.color} />
           <Text style={[styles.tabText, activeTab === 'balances' && styles.tabTextActive]}>
-            Balances
+            {t('expenses.tab_balances')}
           </Text>
         </Pressable>
 
@@ -141,7 +147,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
           onPress={() => setActiveTab('summary')}>
           <PieChart size={16} color={activeTab === 'summary' ? '#004F63' : styles.placeholder.color} />
           <Text style={[styles.tabText, activeTab === 'summary' && styles.tabTextActive]}>
-            Summary
+            {t('expenses.tab_summary')}
           </Text>
         </Pressable>
       </View>
@@ -153,8 +159,8 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
             {expenses.length === 0 ? (
               <View style={styles.emptyStateCard}>
                 <Receipt size={36} color={styles.placeholder.color} />
-                <Text style={styles.emptyTitle}>No Expenses Yet</Text>
-                <Text style={styles.emptySub}>Tap + to add your first split expense.</Text>
+                <Text style={styles.emptyTitle}>{t('expenses.no_expenses_title')}</Text>
+                <Text style={styles.emptySub}>{t('expenses.no_expenses_sub')}</Text>
               </View>
             ) : (
               expenses.map((expense) => {
@@ -178,8 +184,9 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
                       <View style={{ flex: 1 }}>
                         <Text style={styles.expenseTitle}>{expense.title}</Text>
                         <Text style={styles.expenseSub}>
-                          {isPaidByMe ? 'You paid' : `${payerMember?.name || 'Someone'} paid`} ₹
-                          {expense.baseAmountINR.toLocaleString('en-IN')}
+                          {isPaidByMe
+                            ? `${t('expenses.you_paid')} ₹${expense.baseAmountINR.toLocaleString('en-IN')}`
+                            : `${t('expenses.someone_paid', { name: payerMember?.name || 'Someone' })} ₹${expense.baseAmountINR.toLocaleString('en-IN')}`}
                         </Text>
                       </View>
                       <Text style={styles.expenseAmountText}>
@@ -196,12 +203,12 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
         {/* TAB 2: BALANCES & DEBT MATRIX */}
         {activeTab === 'balances' && (
           <View>
-            <Text style={styles.sectionTitle}>Pairwise Debt Matrix</Text>
+            <Text style={styles.sectionTitle}>{t('expenses.debt_matrix_title')}</Text>
             {pairwiseDebts.length === 0 ? (
               <View style={styles.emptyStateCard}>
                 <HandCoins size={36} color="#16A34A" />
-                <Text style={styles.emptyTitle}>All Settled Up!</Text>
-                <Text style={styles.emptySub}>No member owes any money in this group.</Text>
+                <Text style={styles.emptyTitle}>{t('expenses.all_settled_title')}</Text>
+                <Text style={styles.emptySub}>{t('expenses.no_debt_sub')}</Text>
               </View>
             ) : (
               pairwiseDebts.map((debt, index) => {
@@ -210,8 +217,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
                     <View style={styles.debtRow}>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.debtText}>
-                          <Text style={styles.boldText}>{debt.payerName}</Text> owes{' '}
-                          <Text style={styles.boldText}>{debt.payeeName}</Text>
+                          {t('expenses.owes_text', { payer: debt.payerName, payee: debt.payeeName })}
                         </Text>
                         <Text style={styles.debtAmount}>₹{debt.amountINR.toLocaleString('en-IN')}</Text>
                       </View>
@@ -225,7 +231,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
                             settlePayeeId: debt.payeeId,
                           })
                         }>
-                        <Text style={styles.settleBtnText}>Settle Up</Text>
+                        <Text style={styles.settleBtnText}>{t('expenses.settle_up_btn')}</Text>
                       </Pressable>
                     </View>
                   </View>
@@ -238,7 +244,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
         {/* TAB 3: SPEND SUMMARY ANALYTICS */}
         {activeTab === 'summary' && (
           <View>
-            <Text style={styles.sectionTitle}>Category Breakdown</Text>
+            <Text style={styles.sectionTitle}>{t('expenses.cat_breakdown_title')}</Text>
             <View style={styles.card}>
               {Object.entries(categoryBreakdown).map(([cat, amt]) => (
                 <View key={cat} style={styles.analyticsRow}>
@@ -248,7 +254,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
               ))}
             </View>
 
-            <Text style={[styles.sectionTitle, { marginTop: 16 }]}>Member Net Balances</Text>
+            <Text style={[styles.sectionTitle, { marginTop: 16 }]}>{t('expenses.member_net_balances')}</Text>
             <View style={styles.card}>
               {balances.map((b) => (
                 <View key={b.memberId} style={styles.analyticsRow}>
@@ -266,7 +272,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
                       ? `+₹${b.netBalanceINR.toLocaleString('en-IN')}`
                       : b.netBalanceINR < 0
                       ? `-₹${Math.abs(b.netBalanceINR).toLocaleString('en-IN')}`
-                      : 'Settled'}
+                      : t('expenses.settled_up')}
                   </Text>
                 </View>
               ))}
