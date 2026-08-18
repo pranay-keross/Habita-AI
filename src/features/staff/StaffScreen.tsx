@@ -1,3 +1,7 @@
+// @refresh reset
+// Keep this screen remounted after Fast Refresh. Its form state evolves frequently,
+// and preserving an older hook queue after a new state hook is added causes React's
+// "Should have a queue" development error.
 import React, { useEffect, useState } from 'react';
 import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -13,8 +17,8 @@ import SectionHeader from '../../components/SectionHeader';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
-import { loadCaregivers, saveCaregivers } from './staffStore';
-import type { Caregiver, CaregiverRateType } from './types';
+import { loadCaregivers, loadCaregiverTransactions, saveCaregivers, saveCaregiverTransactions } from './staffStore';
+import type { Caregiver, CaregiverRateType, CaregiverTransaction } from './types';
 
 type Props = StackScreenProps<RootStackParamList, 'Staff'>;
 
@@ -22,6 +26,7 @@ export default function StaffScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const [caregivers, setCaregivers] = useState<Caregiver[]>([]);
+  const [transactions, setTransactions] = useState<CaregiverTransaction[]>([]);
   const [loading, setLoading] = useState(true);
   const [sheetVisible, setSheetVisible] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
@@ -32,9 +37,14 @@ export default function StaffScreen({ navigation }: Props) {
   const [phone, setPhone] = useState('');
   const [notes, setNotes] = useState('');
   const [localeVersion, setLocaleVersion] = useState(0);
+  const [extraSheetVisible, setExtraSheetVisible] = useState(false);
+  const [extraCaregiverId, setExtraCaregiverId] = useState<string | null>(null);
+  const [editingExtraPaymentId, setEditingExtraPaymentId] = useState<string | null>(null);
+  const [extraAmount, setExtraAmount] = useState('');
+  const [extraReason, setExtraReason] = useState('');
 
   useEffect(() => {
-    loadCaregivers().then((items) => { setCaregivers(items); setLoading(false); });
+    Promise.all([loadCaregivers(), loadCaregiverTransactions()]).then(([items, savedTransactions]) => { setCaregivers(items); setTransactions(savedTransactions); setLoading(false); });
     const unsubscribe = subscribeToLanguageChanges(() => setLocaleVersion((version) => version + 1));
     return () => { unsubscribe(); };
   }, []);
@@ -79,6 +89,32 @@ export default function StaffScreen({ navigation }: Props) {
     ]);
   };
 
+  const openExtraPayment = () => {
+    // Do not stack one BottomSheet Modal on another: Android then has two keyboard
+    // avoidance and drag responders active, which makes focused fields jump/bounce.
+    // Close the caregiver sheet first, then open the payment sheet after its dismiss
+    // animation completes.
+    const existingPayment = transactions.find((entry) => entry.caregiverId === editingId);
+    setExtraCaregiverId(editingId);
+    setEditingExtraPaymentId(existingPayment?.id ?? null);
+    setExtraAmount(existingPayment ? String(existingPayment.amount) : '');
+    setExtraReason(existingPayment?.reason ?? '');
+    setSheetVisible(false);
+    setTimeout(() => setExtraSheetVisible(true), 250);
+  };
+  const saveExtraPayment = async () => {
+    const amount = Number(extraAmount);
+    if (!extraCaregiverId || !Number.isFinite(amount) || amount <= 0 || !extraReason.trim()) {
+      Alert.alert(t('staff.incomplete_title'), t('staff.extra_incomplete')); return;
+    }
+    const next = editingExtraPaymentId
+      ? transactions.map((entry) => entry.id === editingExtraPaymentId ? { ...entry, amount, reason: extraReason.trim() } : entry)
+      : [{ id: String(Date.now()), caregiverId: extraCaregiverId, amount, reason: extraReason.trim(), createdAt: Date.now() }, ...transactions];
+    setTransactions(next); await saveCaregiverTransactions(next); setExtraSheetVisible(false);
+  };
+  const extraFor = (caregiverId: string) => transactions.filter((entry) => entry.caregiverId === caregiverId).reduce((sum, entry) => sum + entry.amount, 0);
+  const latestExtraFor = (caregiverId: string) => transactions.find((entry) => entry.caregiverId === caregiverId);
+
   return (
     <View key={localeVersion} style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
@@ -102,6 +138,7 @@ export default function StaffScreen({ navigation }: Props) {
           <Card key={caregiver.id} style={styles.caregiverCard} onPress={() => openEdit(caregiver)}>
             <View style={styles.cardTop}><View style={styles.avatar}><Text style={styles.avatarText}>{caregiver.name.slice(0, 1).toUpperCase()}</Text></View><View style={styles.cardTitleWrap}><Text style={styles.name}>{caregiver.name}</Text><Text style={styles.service}>{caregiver.service}</Text></View></View>
             <Text style={styles.rate}>{t(caregiver.rateType === 'hourly' ? 'staff.hourly_rate' : 'staff.monthly_rate', { rate: caregiver.rate.toLocaleString() })}</Text>
+            {extraFor(caregiver.id) > 0 ? <View style={styles.paymentSummary}><Text style={styles.extraTotal}>{t('staff.extra_total', { amount: extraFor(caregiver.id).toLocaleString() })}</Text>{latestExtraFor(caregiver.id)?.reason ? <Text style={styles.extraReason}>{latestExtraFor(caregiver.id)?.reason}</Text> : null}<Text style={styles.totalPayable}>{t('staff.total_payable', { amount: (caregiver.rate + extraFor(caregiver.id)).toLocaleString() })}</Text></View> : null}
             {caregiver.phone ? <View style={styles.phoneRow}><Phone size={14} color={styles.phoneIcon.color} /><Text style={styles.phone}>{caregiver.phone}</Text></View> : null}
           </Card>
         ))}
@@ -113,8 +150,16 @@ export default function StaffScreen({ navigation }: Props) {
         <Text style={styles.label}>{t('staff.rate_label')}</Text><TextInput value={rate} onChangeText={setRate} keyboardType="decimal-pad" placeholder={t('staff.rate_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
         <Text style={styles.label}>{t('staff.phone_label')}</Text><TextInput value={phone} onChangeText={setPhone} keyboardType="phone-pad" placeholder={t('staff.phone_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
         <Text style={styles.label}>{t('staff.notes_label')}</Text><TextInput value={notes} onChangeText={setNotes} placeholder={t('staff.notes_placeholder')} placeholderTextColor={styles.placeholder.color} style={[styles.input, styles.notesInput]} multiline />
-        <Button title={t('staff.save')} onPress={save} />
+        <Button title={t('staff.save')} onPress={save} style={styles.saveButton} />
+        {editingId ? <Pressable style={styles.extraButton} onPress={openExtraPayment}><Text style={styles.extraButtonText}>{t('staff.add_extra')}</Text></Pressable> : null}
         {editingId ? <Pressable style={styles.removeButton} onPress={remove}><Text style={styles.removeText}>{t('staff.remove')}</Text></Pressable> : null}
+      </BottomSheet>
+      <BottomSheet visible={extraSheetVisible} onClose={() => setExtraSheetVisible(false)} title={t('staff.extra_title')}>
+        <Text style={styles.extraHelp}>{t('staff.extra_help')}</Text>
+        <Text style={styles.label}>{t('staff.extra_amount')}</Text><TextInput value={extraAmount} onChangeText={setExtraAmount} keyboardType="decimal-pad" placeholder={t('staff.extra_amount_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
+        <Text style={styles.label}>{t('staff.extra_reason')}</Text><View style={styles.reasonRow}>{['rainy', 'overtime', 'bonus'].map((reason) => <Pressable key={reason} onPress={() => setExtraReason(t(`staff.reason_${reason}`))} style={styles.reasonChip}><Text style={styles.reasonText}>{t(`staff.reason_${reason}`)}</Text></Pressable>)}</View>
+        <TextInput value={extraReason} onChangeText={setExtraReason} placeholder={t('staff.extra_reason_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
+        <Button title={t('staff.save_extra')} onPress={saveExtraPayment} style={styles.saveButton} />
       </BottomSheet>
     </View>
   );
@@ -124,6 +169,6 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) => StyleShe
   screen: { flex: 1, backgroundColor: colors.background }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
   backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }, backIcon: { color: colors.textPrimary }, headerTitle: { flex: 1, marginLeft: spacing.md, fontFamily: fonts.serif, fontSize: 21, color: colors.textPrimary }, addButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, addButtonText: { fontFamily: fonts.sansMedium, fontSize: 24, color: colors.surface },
   content: { padding: spacing.lg, gap: spacing.md }, hero: { backgroundColor: colors.surfaceElevated, marginBottom: spacing.md }, heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blush, marginBottom: spacing.md }, heroIconColor: { color: colors.primary }, heroTitle: { fontFamily: fonts.serif, fontSize: 25, color: colors.textPrimary, marginBottom: 5 }, heroDescription: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, count: { marginTop: spacing.md, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary },
-  empty: { alignItems: 'flex-start' }, emptyTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.textPrimary, marginBottom: 5 }, emptyText: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, emptyButton: { marginTop: spacing.lg, alignSelf: 'stretch' }, caregiverCard: { padding: spacing.lg }, cardTop: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }, avatarText: { fontFamily: fonts.serif, fontSize: 19, color: colors.primary }, cardTitleWrap: { flex: 1 }, name: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.textPrimary }, service: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary, marginTop: 2 }, rate: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.primary, marginTop: spacing.md }, phoneRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm }, phoneIcon: { color: colors.textMuted }, phone: { marginLeft: spacing.xs, fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary },
-  label: { marginTop: spacing.md, marginBottom: spacing.xs, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface }, placeholder: { color: colors.textMuted }, notesInput: { minHeight: 86, textAlignVertical: 'top' }, choiceRow: { flexDirection: 'row', gap: spacing.sm }, choice: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: spacing.sm, alignItems: 'center' }, choiceSelected: { backgroundColor: colors.blush, borderColor: colors.primary }, choiceText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary }, choiceTextSelected: { color: colors.primary }, removeButton: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.xs }, removeText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.danger },
+  empty: { alignItems: 'flex-start' }, emptyTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.textPrimary, marginBottom: 5 }, emptyText: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, emptyButton: { marginTop: spacing.lg, alignSelf: 'stretch' }, caregiverCard: { padding: spacing.lg }, cardTop: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }, avatarText: { fontFamily: fonts.serif, fontSize: 19, color: colors.primary }, cardTitleWrap: { flex: 1 }, name: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.textPrimary }, service: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary, marginTop: 2 }, rate: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.primary, marginTop: spacing.md }, paymentSummary: { marginTop: 4 }, extraTotal: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.forest }, extraReason: { marginTop: 2, fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary }, totalPayable: { marginTop: 3, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, phoneRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm }, phoneIcon: { color: colors.textMuted }, phone: { marginLeft: spacing.xs, fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary },
+  label: { marginTop: spacing.md, marginBottom: spacing.xs, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface }, placeholder: { color: colors.textMuted }, notesInput: { minHeight: 86, textAlignVertical: 'top' }, choiceRow: { flexDirection: 'row', gap: spacing.sm }, choice: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: spacing.sm, alignItems: 'center' }, choiceSelected: { backgroundColor: colors.blush, borderColor: colors.primary }, choiceText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary }, choiceTextSelected: { color: colors.primary }, saveButton: { marginTop: spacing.lg }, extraButton: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md }, extraButtonText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.primary }, removeButton: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.xs }, removeText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.danger }, extraHelp: { marginTop: spacing.sm, fontFamily: fonts.sans, fontSize: 13, lineHeight: 19, color: colors.textSecondary }, reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm }, reasonChip: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.blush }, reasonText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.primary },
 });

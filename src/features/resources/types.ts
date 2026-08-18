@@ -14,3 +14,20 @@ export interface ResourceLog {
   loggedAt: number;
   note: string;
 }
+
+export type UtilityType =
+  | 'electricity'
+  | 'gas'
+  | 'internet'
+  | 'water'
+  | 'waste';
+
+export interface UtilityBill {
+  id: string;
+  type: UtilityType;
+  provider: string;
+  amount: number;
+  dueDate: string;
+  paid: boolean;
+  createdAt: number;
+}

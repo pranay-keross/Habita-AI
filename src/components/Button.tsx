@@ -56,7 +56,7 @@ const makeStyles = ({colors, fonts, radius, spacing}: ThemeTokens) => StyleSheet
   },
   label: {
     fontSize: 16,
-    color: colors.surface,
+    color: colors.textOnPrimary,
     fontFamily: fonts.sansMedium,
   },
 });

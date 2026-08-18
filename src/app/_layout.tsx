@@ -14,6 +14,8 @@ import HouseholdOperationsScreen from '../features/household/HouseholdOperations
 import HouseholdAreaScreen from '../features/household/HouseholdAreaScreen';
 import StaffScreen from '../features/staff/StaffScreen';
 import ResourcesScreen from '../features/resources/ResourcesScreen';
+import EventBudgetsScreen from '../features/events/EventBudgetsScreen';
+import VehiclesScreen from '../features/assets/VehiclesScreen';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
 import useTheme from '../hooks/useTheme';
@@ -34,6 +36,8 @@ export type RootStackParamList = {
   HouseholdArea: { area: 'caregiver' | 'resources' | 'events' | 'assets' };
   Staff: undefined;
   Resources: undefined;
+  EventBudgets: undefined;
+  Vehicles: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -65,7 +69,8 @@ const AppLayout = () => {
             headerShown: false,
             contentStyle: { backgroundColor: theme.colors.background },
             animation: 'slide_from_right',
-          }}>
+          }}
+        >
           <Stack.Screen name="Language" component={LanguageScreen} />
           <Stack.Screen name="Phone" component={PhoneScreen} />
           <Stack.Screen name="Otp" component={OtpScreen} />
@@ -73,23 +78,29 @@ const AppLayout = () => {
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="Family" component={FamilyScreen} />
           <Stack.Screen name="Medicine" component={MedicineScreen} />
-          <Stack.Screen name="HouseholdOperations" component={HouseholdOperationsScreen} />
+          <Stack.Screen
+            name="HouseholdOperations"
+            component={HouseholdOperationsScreen}
+          />
           <Stack.Screen name="HouseholdArea" component={HouseholdAreaScreen} />
           <Stack.Screen name="Staff" component={StaffScreen} />
           <Stack.Screen name="Resources" component={ResourcesScreen} />
+          <Stack.Screen name="EventBudgets" component={EventBudgetsScreen} />
+          <Stack.Screen name="Vehicles" component={VehiclesScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>
   );
 };
 
-const makeStyles = ({ colors }: ThemeTokens) => StyleSheet.create({
-  loading: {
-    flex: 1,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-});
+const makeStyles = ({ colors }: ThemeTokens) =>
+  StyleSheet.create({
+    loading: {
+      flex: 1,
+      backgroundColor: colors.background,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
 
 export default AppLayout;

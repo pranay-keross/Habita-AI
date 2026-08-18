@@ -37,7 +37,7 @@ Habita AI is a **React Native client that is mostly still backend-free, with a f
 
 There is still no state container (no Redux/Zustand/Context store) and no general API/service layer — `src/features/auth/api.ts` and `src/features/family/api.ts` are each scoped to their own domain, not a repository pattern for the whole app. Screen-local `useState` plus `AsyncStorage` remains the state model everywhere else. This was a deliberate choice for the static-design phase (`docs/DECISIONS.md` D-002); D-012 and D-023 each narrow that decision's scope rather than replacing it — D-002 itself is unchanged and still governs every other domain (dashboard, documents, money, medicine's own data, …) until each gets its own such exception.
 
-`src/features/household/HouseholdOperationsScreen.tsx` remains a static, localized M5 overview (`M5-T0`) for the unfinished domains. Its Caregiver card now opens `src/features/staff/`, the usual `types.ts` / `staffStore.ts` / `StaffScreen.tsx` local-first module (`M5-T6`). Resources, events, and vehicles remain separate follow-up modules under their existing M5 task rows.
+`src/features/household/HouseholdOperationsScreen.tsx` remains a static, localized M5 overview (`M5-T0`) for unfinished domains. Its Caregiver and Resources cards open their local-first modules (`src/features/staff/`, `src/features/resources/`), each following the `types.ts` / `*Store.ts` / `*Screen.tsx` shape. Events and vehicles remain separate follow-up modules under their existing M5 task rows.
 
 ---
 
@@ -165,6 +165,7 @@ Since `M1-T2` (2026-07-30) this is the **only** path to storage — `src/utils/s
 | `habita.medicines` | `features/medicine/medicineStore.ts` | `Medicine[]` JSON | added `M4-T2`; empty until the user adds a first medicine |
 | `habita.medicine_intake_log` | `features/medicine/medicineStore.ts` | `IntakeLogEntry[]` JSON | added `M4-T3`; append-only, one entry per marked-taken dose; read by `calculateAdherence()` |
 | `habita.caregivers` | `features/staff/staffStore.ts` | `Caregiver[]` JSON | added `M5-T6`; local caregiver and domestic-staff profiles |
+| `habita.caregiver_transactions` | `features/staff/staffStore.ts` | `CaregiverTransaction[]` JSON | extra-payment records, added after M5-T6 |
 | `habita.resource_log` | `features/resources/resourceStore.ts` | `ResourceLog[]` JSON | added `M5-T9`; local delivery history |
 | `habita.quick_tap_items` | `features/resources/resourceStore.ts` | `QuickTapItem[]` JSON | added `M5-T9`; user-managed dashboard delivery counters |
 

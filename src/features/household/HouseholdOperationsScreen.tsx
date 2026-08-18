@@ -24,13 +24,21 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
   const [localeVersion, setLocaleVersion] = useState(0);
 
   useEffect(() => {
-    const unsubscribe = subscribeToLanguageChanges(() => setLocaleVersion((version) => version + 1));
+    const unsubscribe = subscribeToLanguageChanges(() =>
+      setLocaleVersion(version => version + 1),
+    );
     return () => {
       unsubscribe();
     };
   }, []);
 
-  const sections: { id: 'caregiver' | 'resources' | 'events' | 'assets'; title: string; description: string; highlights: string[]; Icon: LucideIcon }[] = [
+  const sections: {
+    id: 'caregiver' | 'resources' | 'events' | 'assets';
+    title: string;
+    description: string;
+    highlights: string[];
+    Icon: LucideIcon;
+  }[] = [
     {
       id: 'caregiver',
       title: t('household.caregiver_title'),
@@ -84,42 +92,82 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
           accessibilityRole="button"
           accessibilityLabel={t('household.back')}
           style={styles.backButton}
-          onPress={() => navigation.goBack()}>
-          <ArrowLeft size={20} color={styles.backIcon.color} strokeWidth={1.8} />
+          onPress={() => navigation.goBack()}
+        >
+          <ArrowLeft
+            size={20}
+            color={styles.backIcon.color}
+            strokeWidth={1.8}
+          />
         </Pressable>
         <Text style={styles.headerTitle}>{t('household.header_title')}</Text>
       </View>
 
-      <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + 28 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Sparkles size={22} color={styles.heroIconColor.color} strokeWidth={1.8} />
+            <Sparkles
+              size={22}
+              color={styles.heroIconColor.color}
+              strokeWidth={1.8}
+            />
           </View>
           <Text style={styles.heroTitle}>{t('household.hero_title')}</Text>
-          <Text style={styles.heroDescription}>{t('household.hero_description')}</Text>
+          <Text style={styles.heroDescription}>
+            {t('household.hero_description')}
+          </Text>
         </View>
 
-        <SectionHeader title={t('household.sections_title')} subtitle={t('household.sections_subtitle')} />
+        <SectionHeader
+          title={t('household.sections_title')}
+          subtitle={t('household.sections_subtitle')}
+        />
 
         <View style={styles.cards}>
           {sections.map(({ id, title, description, highlights, Icon }) => (
-            <Card key={id} style={styles.card} onPress={() => id === 'caregiver' ? navigation.navigate('Staff') : id === 'resources' ? navigation.navigate('Resources') : navigation.navigate('HouseholdArea', { area: id })}>
+            <Card
+              key={id}
+              style={styles.card}
+              onPress={() =>
+                id === 'caregiver'
+                  ? navigation.navigate('Staff')
+                  : id === 'resources'
+                  ? navigation.navigate('Resources')
+                  : id === 'events'
+                  ? navigation.navigate('EventBudgets')
+                  : id === 'assets'
+                  ? navigation.navigate('Vehicles')
+                  : navigation.navigate('HouseholdArea', { area: id })
+              }
+            >
               <View style={styles.cardTopRow}>
                 <View style={styles.sectionIcon}>
-                  <Icon size={21} color={styles.sectionIconColor.color} strokeWidth={1.8} />
+                  <Icon
+                    size={21}
+                    color={styles.sectionIconColor.color}
+                    strokeWidth={1.8}
+                  />
                 </View>
               </View>
               <Text style={styles.cardTitle}>{title}</Text>
               <Text style={styles.cardDescription}>{description}</Text>
               <View style={styles.highlightList}>
-                {highlights.map((highlight) => (
+                {highlights.map(highlight => (
                   <View key={highlight} style={styles.highlightRow}>
                     <View style={styles.highlightDot} />
                     <Text style={styles.highlightText}>{highlight}</Text>
                   </View>
                 ))}
               </View>
-              <Text style={styles.openWorkspace}>{t('household.open_workspace')}</Text>
+              <Text style={styles.openWorkspace}>
+                {t('household.open_workspace')}
+              </Text>
             </Card>
           ))}
         </View>
@@ -128,37 +176,106 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
   );
 }
 
-const makeStyles = ({ colors, fonts, spacing }: ThemeTokens) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background },
-  header: {
-    flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md,
-    borderBottomWidth: 1, borderBottomColor: colors.border, backgroundColor: colors.background,
-  },
-  backButton: {
-    width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border,
-  },
-  backIcon: { color: colors.textPrimary },
-  headerTitle: { marginLeft: spacing.md, fontFamily: fonts.serif, fontSize: 22, color: colors.textPrimary },
-  content: { padding: spacing.lg },
-  hero: { marginBottom: spacing.xl },
-  heroIcon: {
-    width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center',
-    backgroundColor: colors.blush, marginBottom: spacing.md,
-  },
-  heroIconColor: { color: colors.primary },
-  heroTitle: { fontFamily: fonts.serif, fontSize: 28, color: colors.textPrimary, marginBottom: 6 },
-  heroDescription: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 21, color: colors.textSecondary },
-  cards: { gap: spacing.md },
-  card: { padding: spacing.lg },
-  cardTopRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
-  sectionIcon: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blush },
-  sectionIconColor: { color: colors.primary },
-  cardTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.textPrimary, marginBottom: 4 },
-  cardDescription: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary },
-  highlightList: { marginTop: spacing.md, gap: 7 },
-  highlightRow: { flexDirection: 'row', alignItems: 'center' },
-  highlightDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: colors.turmeric, marginRight: spacing.sm },
-  highlightText: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textPrimary },
-  openWorkspace: { marginTop: spacing.md, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary },
-});
+const makeStyles = ({ colors, fonts, spacing }: ThemeTokens) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      backgroundColor: colors.background,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    backIcon: { color: colors.textPrimary },
+    headerTitle: {
+      marginLeft: spacing.md,
+      fontFamily: fonts.serif,
+      fontSize: 22,
+      color: colors.textPrimary,
+    },
+    content: { padding: spacing.lg },
+    hero: { marginBottom: spacing.xl },
+    heroIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.blush,
+      marginBottom: spacing.md,
+    },
+    heroIconColor: { color: colors.primary },
+    heroTitle: {
+      fontFamily: fonts.serif,
+      fontSize: 28,
+      color: colors.textPrimary,
+      marginBottom: 6,
+    },
+    heroDescription: {
+      fontFamily: fonts.sans,
+      fontSize: 14,
+      lineHeight: 21,
+      color: colors.textSecondary,
+    },
+    cards: { gap: spacing.md },
+    card: { padding: spacing.lg },
+    cardTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    sectionIcon: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.blush,
+    },
+    sectionIconColor: { color: colors.primary },
+    cardTitle: {
+      fontFamily: fonts.serif,
+      fontSize: 20,
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    cardDescription: {
+      fontFamily: fonts.sans,
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.textSecondary,
+    },
+    highlightList: { marginTop: spacing.md, gap: 7 },
+    highlightRow: { flexDirection: 'row', alignItems: 'center' },
+    highlightDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: colors.turmeric,
+      marginRight: spacing.sm,
+    },
+    highlightText: {
+      flex: 1,
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.textPrimary,
+    },
+    openWorkspace: {
+      marginTop: spacing.md,
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.primary,
+    },
+  });

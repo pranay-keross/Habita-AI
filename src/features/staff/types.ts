@@ -10,3 +10,11 @@ export interface Caregiver {
   notes: string;
   createdAt: number;
 }
+
+export interface CaregiverTransaction {
+  id: string;
+  caregiverId: string;
+  amount: number;
+  reason: string;
+  createdAt: number;
+}

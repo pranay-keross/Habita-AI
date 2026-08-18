@@ -136,7 +136,7 @@ export default function BottomSheet({
           shrinking to make room. `padding` on iOS, `height` on Android (the standard
           pairing for a `justifyContent: 'flex-end'` container like `styles.container`). */}
       <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
         style={styles.container}>
         {/* Pure Neutral Dark Backdrop Layer with Frosted Blur */}
         <Animated.View style={[styles.backdrop, { opacity }]}>
@@ -160,10 +160,9 @@ export default function BottomSheet({
               maxHeight: SCREEN_HEIGHT * maxHeightPercent,
               transform: [{ translateY }],
             },
-          ]}
-          {...panResponder.panHandlers}>
+          ]}>
           {/* Top Handle Bar */}
-          <View style={styles.handleContainer}>
+          <View style={styles.handleContainer} {...panResponder.panHandlers}>
             <View style={styles.handle} />
           </View>
 

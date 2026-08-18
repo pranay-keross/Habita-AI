@@ -1,10 +1,21 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import DateTimePicker, {
+  type DateTimePickerEvent,
+} from '@react-native-community/datetimepicker';
+import {
+  Alert,
+  Pressable,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  View,
+} from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Droplets from 'lucide-react-native/icons/droplets';
-import MoreHorizontal from 'lucide-react-native/icons/more-horizontal';
+import Ellipsis from 'lucide-react-native/icons/ellipsis';
 import type { RootStackParamList } from '../../app/_layout';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
@@ -13,48 +24,897 @@ import SectionHeader from '../../components/SectionHeader';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
-import { loadQuickTapItems, loadResourceLogs, saveQuickTapItems, saveResourceLogs } from './resourceStore';
-import type { QuickTapItem, ResourceLog } from './types';
+import {
+  loadQuickTapItems,
+  loadResourceLogs,
+  loadUtilityBills,
+  saveQuickTapItems,
+  saveResourceLogs,
+  saveUtilityBills,
+} from './resourceStore';
+import type {
+  QuickTapItem,
+  ResourceLog,
+  UtilityBill,
+  UtilityType,
+} from './types';
 
 type Props = StackScreenProps<RootStackParamList, 'Resources'>;
 
-function startOfToday(): number { const date = new Date(); date.setHours(0, 0, 0, 0); return date.getTime(); }
+const UTILITY_TYPES: { type: UtilityType; label: string }[] = [
+  { type: 'electricity', label: 'Electricity' },
+  { type: 'gas', label: 'Gas' },
+  { type: 'internet', label: 'Internet' },
+  { type: 'water', label: 'Water' },
+  { type: 'waste', label: 'Waste collection' },
+];
 
-export default function ResourcesScreen({ navigation }: Props) {
-  const styles = useThemedStyles(makeStyles); const insets = useSafeAreaInsets();
-  const [items, setItems] = useState<QuickTapItem[]>([]); const [logs, setLogs] = useState<ResourceLog[]>([]);
-  const [itemSheet, setItemSheet] = useState(false); const [logSheet, setLogSheet] = useState(false);
-  const [editingItemId, setEditingItemId] = useState<string | null>(null); const [editingLogId, setEditingLogId] = useState<string | null>(null);
-  const [name, setName] = useState(''); const [unitLabel, setUnitLabel] = useState(''); const [quantity, setQuantity] = useState('1'); const [note, setNote] = useState('');
-  const [logItemId, setLogItemId] = useState(''); const [localeVersion, setLocaleVersion] = useState(0);
-
-  useEffect(() => { Promise.all([loadQuickTapItems(), loadResourceLogs()]).then(([savedItems, savedLogs]) => { setItems(savedItems); setLogs(savedLogs); }); const unsub = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1)); return () => { unsub(); }; }, []);
-  const activeItems = items.filter((item) => item.active);
-  const todayLogs = useMemo(() => logs.filter((log) => log.loggedAt >= startOfToday()), [logs]);
-  const persistItems = async (next: QuickTapItem[]) => { setItems(next); await saveQuickTapItems(next); };
-  const persistLogs = async (next: ResourceLog[]) => { setLogs(next); await saveResourceLogs(next); };
-  const openItem = (item?: QuickTapItem) => { setEditingItemId(item?.id ?? null); setName(item?.name ?? ''); setUnitLabel(item?.unitLabel ?? ''); setItemSheet(true); };
-  const openLog = (item?: QuickTapItem, log?: ResourceLog) => { setEditingLogId(log?.id ?? null); setLogItemId(log?.quickTapItemId ?? item?.id ?? activeItems[0]?.id ?? ''); setQuantity(String(log?.quantity ?? 1)); setNote(log?.note ?? ''); setLogSheet(true); };
-  const saveItem = async () => { if (!name.trim() || !unitLabel.trim()) { Alert.alert(t('resources.incomplete_title'), t('resources.item_incomplete')); return; } const next = { name: name.trim(), unitLabel: unitLabel.trim() }; if (editingItemId) await persistItems(items.map((item) => item.id === editingItemId ? { ...item, ...next } : item)); else await persistItems([...items, { id: String(Date.now()), active: true, createdAt: Date.now(), ...next }]); setItemSheet(false); };
-  const saveLog = async () => { const amount = Number(quantity); const item = items.find((entry) => entry.id === logItemId); if (!item || !Number.isFinite(amount) || amount <= 0) { Alert.alert(t('resources.incomplete_title'), t('resources.log_incomplete')); return; } const next = { quickTapItemId: item.id, itemName: item.name, quantity: amount, note: note.trim() }; if (editingLogId) await persistLogs(logs.map((log) => log.id === editingLogId ? { ...log, ...next } : log)); else await persistLogs([{ id: String(Date.now()), loggedAt: Date.now(), ...next }, ...logs]); setLogSheet(false); };
-  const removeItem = () => { const target = items.find((item) => item.id === editingItemId); if (!target) return; Alert.alert(t('resources.remove_item_title'), t('resources.remove_item_message', { name: target.name }), [{ text: t('resources.cancel'), style: 'cancel' }, { text: t('resources.remove'), style: 'destructive', onPress: async () => { await persistItems(items.filter((item) => item.id !== target.id)); setItemSheet(false); } }]); };
-  const removeLog = () => { if (!editingLogId) return; Alert.alert(t('resources.remove_log_title'), t('resources.remove_log_message'), [{ text: t('resources.cancel'), style: 'cancel' }, { text: t('resources.remove'), style: 'destructive', onPress: async () => { await persistLogs(logs.filter((log) => log.id !== editingLogId)); setLogSheet(false); } }]); };
-  const formatTime = (time: number) => new Date(time).toLocaleString();
-  return <View key={localeVersion} style={styles.screen}>
-    <View style={[styles.header, { paddingTop: insets.top + 8 }]}><Pressable accessibilityRole="button" accessibilityLabel={t('resources.back')} style={styles.backButton} onPress={() => navigation.goBack()}><ArrowLeft size={20} color={styles.backIcon.color} /></Pressable><Text style={styles.headerTitle}>{t('resources.header_title')}</Text><Pressable accessibilityRole="button" accessibilityLabel={t('resources.add_item')} style={styles.addButton} onPress={() => openItem()}><Text style={styles.addButtonText}>+</Text></Pressable></View>
-    <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]} showsVerticalScrollIndicator={false}>
-      <Card style={styles.hero}><View style={styles.heroIcon}><Droplets size={24} color={styles.heroIconColor.color} /></View><Text style={styles.heroTitle}>{t('resources.hero_title')}</Text><Text style={styles.heroText}>{t('resources.hero_description')}</Text><View style={styles.summaryRow}><View><Text style={styles.summaryValue}>{todayLogs.length}</Text><Text style={styles.summaryLabel}>{t('resources.today_logs')}</Text></View><View><Text style={styles.summaryValue}>{activeItems.length}</Text><Text style={styles.summaryLabel}>{t('resources.active_items')}</Text></View></View></Card>
-      <SectionHeader title={t('resources.quick_tap_title')} subtitle={t('resources.quick_tap_subtitle')} />
-      {activeItems.length === 0 ? <Card style={styles.empty}><Text style={styles.emptyTitle}>{t('resources.empty_title')}</Text><Text style={styles.emptyText}>{t('resources.empty_text')}</Text><Button title={t('resources.add_first')} onPress={() => openItem()} style={styles.emptyButton} /></Card> : <View style={styles.tapGrid}>{activeItems.map((item) => <View key={item.id} style={styles.tapWrap}><Pressable style={styles.tapCard} onPress={() => openLog(item)}><Text style={styles.tapPlus}>+</Text><Text style={styles.tapName}>{item.name}</Text><Text style={styles.tapUnit}>{item.unitLabel}</Text></Pressable><Pressable accessibilityLabel={t('resources.edit_item')} style={styles.itemMenu} onPress={() => openItem(item)}><MoreHorizontal size={18} color={styles.menuIcon.color} /></Pressable></View>)}</View>}
-      <SectionHeader title={t('resources.history_title')} subtitle={t('resources.history_subtitle')} style={styles.historyHeader} />
-      {logs.length === 0 ? <Text style={styles.noHistory}>{t('resources.no_history')}</Text> : logs.slice(0, 12).map((log) => <Pressable key={log.id} style={styles.logRow} onPress={() => openLog(undefined, log)}><View style={styles.logBadge}><Text style={styles.logBadgeText}>{log.quantity}</Text></View><View style={styles.logCopy}><Text style={styles.logName}>{log.itemName}</Text><Text style={styles.logMeta}>{formatTime(log.loggedAt)}{log.note ? ` · ${log.note}` : ''}</Text></View><Text style={styles.editText}>{t('resources.edit')}</Text></Pressable>)}
-      <Card style={styles.ocrNote}><Text style={styles.ocrTitle}>{t('resources.ocr_title')}</Text><Text style={styles.ocrText}>{t('resources.ocr_description')}</Text></Card>
-    </ScrollView>
-    <BottomSheet visible={itemSheet} onClose={() => setItemSheet(false)} title={t(editingItemId ? 'resources.edit_item_title' : 'resources.add_item_title')}><Text style={styles.label}>{t('resources.item_name')}</Text><TextInput style={styles.input} value={name} onChangeText={setName} placeholder={t('resources.item_name_placeholder')} placeholderTextColor={styles.placeholder.color} /><Text style={styles.label}>{t('resources.unit_label')}</Text><TextInput style={styles.input} value={unitLabel} onChangeText={setUnitLabel} placeholder={t('resources.unit_placeholder')} placeholderTextColor={styles.placeholder.color} /><Button title={t('resources.save_item')} onPress={saveItem} style={styles.saveButton} />{editingItemId ? <Pressable style={styles.removeButton} onPress={removeItem}><Text style={styles.removeText}>{t('resources.remove')}</Text></Pressable> : null}</BottomSheet>
-    <BottomSheet visible={logSheet} onClose={() => setLogSheet(false)} title={t(editingLogId ? 'resources.edit_log_title' : 'resources.add_log_title')}><Text style={styles.label}>{t('resources.choose_item')}</Text><View style={styles.choiceRow}>{activeItems.map((item) => <Pressable key={item.id} onPress={() => setLogItemId(item.id)} style={[styles.choice, logItemId === item.id && styles.choiceSelected]}><Text style={[styles.choiceText, logItemId === item.id && styles.choiceTextSelected]}>{item.name}</Text></Pressable>)}</View><Text style={styles.label}>{t('resources.quantity')}</Text><TextInput style={styles.input} value={quantity} onChangeText={setQuantity} keyboardType="decimal-pad" placeholder="1" placeholderTextColor={styles.placeholder.color} /><Text style={styles.label}>{t('resources.note')}</Text><TextInput style={styles.input} value={note} onChangeText={setNote} placeholder={t('resources.note_placeholder')} placeholderTextColor={styles.placeholder.color} /><Button title={t('resources.save_log')} onPress={saveLog} style={styles.saveButton} />{editingLogId ? <Pressable style={styles.removeButton} onPress={removeLog}><Text style={styles.removeText}>{t('resources.remove')}</Text></Pressable> : null}</BottomSheet>
-  </View>;
+function startOfToday(): number {
+  const date = new Date();
+  date.setHours(0, 0, 0, 0);
+  return date.getTime();
 }
 
-const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }, backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }, backIcon: { color: colors.textPrimary }, headerTitle: { flex: 1, marginLeft: spacing.md, fontFamily: fonts.serif, fontSize: 21, color: colors.textPrimary }, addButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, addButtonText: { fontFamily: fonts.sansMedium, fontSize: 24, color: colors.textOnPrimary }, content: { padding: spacing.lg }, hero: { backgroundColor: colors.surfaceElevated, marginBottom: spacing.xl }, heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blush, marginBottom: spacing.md }, heroIconColor: { color: colors.primary }, heroTitle: { fontFamily: fonts.serif, fontSize: 25, color: colors.textPrimary, marginBottom: 5 }, heroText: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, summaryRow: { flexDirection: 'row', gap: spacing.xl, marginTop: spacing.lg }, summaryValue: { fontFamily: fonts.serif, fontSize: 21, color: colors.primary }, summaryLabel: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary }, empty: { alignItems: 'flex-start' }, emptyTitle: { fontFamily: fonts.serif, fontSize: 19, color: colors.textPrimary }, emptyText: { marginTop: 4, fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, emptyButton: { alignSelf: 'stretch', marginTop: spacing.lg }, tapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, tapWrap: { width: '48%', position: 'relative' }, tapCard: { minHeight: 116, borderRadius: radius.lg, padding: spacing.md, backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border, ...shadow.soft }, tapPlus: { fontFamily: fonts.serif, fontSize: 26, color: colors.primary }, tapName: { marginTop: spacing.xs, fontFamily: fonts.sansMedium, fontSize: 14, color: colors.textPrimary }, tapUnit: { marginTop: 2, fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted }, itemMenu: { position: 'absolute', top: spacing.sm, right: spacing.sm, padding: 4 }, menuIcon: { color: colors.textMuted }, historyHeader: { marginTop: spacing.xl, marginBottom: spacing.md }, noHistory: { fontFamily: fonts.sans, fontSize: 14, color: colors.textMuted }, logRow: { flexDirection: 'row', alignItems: 'center', paddingVertical: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border }, logBadge: { width: 34, height: 34, borderRadius: 17, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blush, marginRight: spacing.sm }, logBadgeText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary }, logCopy: { flex: 1 }, logName: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.textPrimary }, logMeta: { marginTop: 2, fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted }, editText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.primary }, ocrNote: { marginTop: spacing.xl, backgroundColor: colors.turmericSoft }, ocrTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textPrimary, marginBottom: 4 }, ocrText: { fontFamily: fonts.sans, fontSize: 13, lineHeight: 19, color: colors.textSecondary }, label: { marginTop: spacing.md, marginBottom: spacing.xs, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surface, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary }, placeholder: { color: colors.textMuted }, choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, choice: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }, choiceSelected: { backgroundColor: colors.blush, borderColor: colors.primary }, choiceText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary }, choiceTextSelected: { color: colors.primary }, saveButton: { marginTop: spacing.lg }, removeButton: { alignItems: 'center', paddingVertical: spacing.md }, removeText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.danger },
-});
+export default function ResourcesScreen({ navigation }: Props) {
+  const styles = useThemedStyles(makeStyles);
+  const insets = useSafeAreaInsets();
+  const [items, setItems] = useState<QuickTapItem[]>([]);
+  const [logs, setLogs] = useState<ResourceLog[]>([]);
+  const [utilityBills, setUtilityBills] = useState<UtilityBill[]>([]);
+  const [itemSheet, setItemSheet] = useState(false);
+  const [logSheet, setLogSheet] = useState(false);
+  const [utilitySheet, setUtilitySheet] = useState(false);
+  const [editingItemId, setEditingItemId] = useState<string | null>(null);
+  const [editingLogId, setEditingLogId] = useState<string | null>(null);
+  const [editingUtilityId, setEditingUtilityId] = useState<string | null>(null);
+  const [name, setName] = useState('');
+  const [unitLabel, setUnitLabel] = useState('');
+  const [quantity, setQuantity] = useState('1');
+  const [note, setNote] = useState('');
+  const [logItemId, setLogItemId] = useState('');
+  const [utilityType, setUtilityType] = useState<UtilityType>('electricity');
+  const [provider, setProvider] = useState('');
+  const [billAmount, setBillAmount] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  const [showDueDatePicker, setShowDueDatePicker] = useState(false);
+  const [localeVersion, setLocaleVersion] = useState(0);
+
+  useEffect(() => {
+    Promise.all([
+      loadQuickTapItems(),
+      loadResourceLogs(),
+      loadUtilityBills(),
+    ]).then(([savedItems, savedLogs, savedBills]) => {
+      setItems(savedItems);
+      setLogs(savedLogs);
+      setUtilityBills(savedBills);
+    });
+    const unsub = subscribeToLanguageChanges(() =>
+      setLocaleVersion(v => v + 1),
+    );
+    return () => {
+      unsub();
+    };
+  }, []);
+  const activeItems = items.filter(item => item.active);
+  const todayLogs = useMemo(
+    () => logs.filter(log => log.loggedAt >= startOfToday()),
+    [logs],
+  );
+  const persistItems = async (next: QuickTapItem[]) => {
+    setItems(next);
+    await saveQuickTapItems(next);
+  };
+  const persistLogs = async (next: ResourceLog[]) => {
+    setLogs(next);
+    await saveResourceLogs(next);
+  };
+  const persistUtilityBills = async (next: UtilityBill[]) => {
+    setUtilityBills(next);
+    await saveUtilityBills(next);
+  };
+  const openItem = (item?: QuickTapItem) => {
+    setEditingItemId(item?.id ?? null);
+    setName(item?.name ?? '');
+    setUnitLabel(item?.unitLabel ?? '');
+    setItemSheet(true);
+  };
+  const openLog = (item?: QuickTapItem, log?: ResourceLog) => {
+    setEditingLogId(log?.id ?? null);
+    setLogItemId(log?.quickTapItemId ?? item?.id ?? activeItems[0]?.id ?? '');
+    setQuantity(String(log?.quantity ?? 1));
+    setNote(log?.note ?? '');
+    setLogSheet(true);
+  };
+  const openUtility = (bill?: UtilityBill) => {
+    setEditingUtilityId(bill?.id ?? null);
+    setUtilityType(bill?.type ?? 'electricity');
+    setProvider(bill?.provider ?? '');
+    setBillAmount(bill ? String(bill.amount) : '');
+    setDueDate(bill?.dueDate ?? '');
+    setShowDueDatePicker(false);
+    setUtilitySheet(true);
+  };
+  const saveItem = async () => {
+    if (!name.trim() || !unitLabel.trim()) {
+      Alert.alert(
+        t('resources.incomplete_title'),
+        t('resources.item_incomplete'),
+      );
+      return;
+    }
+    const next = { name: name.trim(), unitLabel: unitLabel.trim() };
+    if (editingItemId)
+      await persistItems(
+        items.map(item =>
+          item.id === editingItemId ? { ...item, ...next } : item,
+        ),
+      );
+    else
+      await persistItems([
+        ...items,
+        {
+          id: String(Date.now()),
+          active: true,
+          createdAt: Date.now(),
+          ...next,
+        },
+      ]);
+    setItemSheet(false);
+  };
+  const saveLog = async () => {
+    const amount = Number(quantity);
+    const item = items.find(entry => entry.id === logItemId);
+    if (!item || !Number.isFinite(amount) || amount <= 0) {
+      Alert.alert(
+        t('resources.incomplete_title'),
+        t('resources.log_incomplete'),
+      );
+      return;
+    }
+    const next = {
+      quickTapItemId: item.id,
+      itemName: item.name,
+      quantity: amount,
+      note: note.trim(),
+    };
+    if (editingLogId)
+      await persistLogs(
+        logs.map(log => (log.id === editingLogId ? { ...log, ...next } : log)),
+      );
+    else
+      await persistLogs([
+        { id: String(Date.now()), loggedAt: Date.now(), ...next },
+        ...logs,
+      ]);
+    setLogSheet(false);
+  };
+  const saveUtility = async () => {
+    const amount = Number(billAmount);
+    if (
+      !provider.trim() ||
+      !Number.isFinite(amount) ||
+      amount < 0 ||
+      !dueDate.trim()
+    ) {
+      Alert.alert(
+        'Complete the details',
+        'Enter a provider, amount, and due date.',
+      );
+      return;
+    }
+    const next = {
+      type: utilityType,
+      provider: provider.trim(),
+      amount,
+      dueDate: dueDate.trim(),
+    };
+    if (editingUtilityId) {
+      await persistUtilityBills(
+        utilityBills.map(bill =>
+          bill.id === editingUtilityId ? { ...bill, ...next } : bill,
+        ),
+      );
+    } else {
+      await persistUtilityBills([
+        { id: String(Date.now()), createdAt: Date.now(), paid: false, ...next },
+        ...utilityBills,
+      ]);
+    }
+    setUtilitySheet(false);
+  };
+  const toggleUtilityPaid = async (bill: UtilityBill) => {
+    await persistUtilityBills(
+      utilityBills.map(entry =>
+        entry.id === bill.id ? { ...entry, paid: !entry.paid } : entry,
+      ),
+    );
+  };
+  const formatDueDate = (value: string) => {
+    const date = new Date(`${value}T00:00:00`);
+    return Number.isNaN(date.getTime())
+      ? value
+      : date.toLocaleDateString(undefined, {
+          day: 'numeric',
+          month: 'short',
+          year: 'numeric',
+        });
+  };
+  const dueDateValue = (value: string) => {
+    const date = new Date(`${value}T00:00:00`);
+    return Number.isNaN(date.getTime()) ? new Date() : date;
+  };
+  const handleDueDateChange = (
+    event: DateTimePickerEvent,
+    selectedDate?: Date,
+  ) => {
+    setShowDueDatePicker(false);
+    if (event.type !== 'set' || !selectedDate) return;
+    const year = selectedDate.getFullYear();
+    const month = String(selectedDate.getMonth() + 1).padStart(2, '0');
+    const day = String(selectedDate.getDate()).padStart(2, '0');
+    setDueDate(`${year}-${month}-${day}`);
+  };
+  const removeItem = () => {
+    const target = items.find(item => item.id === editingItemId);
+    if (!target) return;
+    Alert.alert(
+      t('resources.remove_item_title'),
+      t('resources.remove_item_message', { name: target.name }),
+      [
+        { text: t('resources.cancel'), style: 'cancel' },
+        {
+          text: t('resources.remove'),
+          style: 'destructive',
+          onPress: async () => {
+            await persistItems(items.filter(item => item.id !== target.id));
+            setItemSheet(false);
+          },
+        },
+      ],
+    );
+  };
+  const removeLog = () => {
+    if (!editingLogId) return;
+    Alert.alert(
+      t('resources.remove_log_title'),
+      t('resources.remove_log_message'),
+      [
+        { text: t('resources.cancel'), style: 'cancel' },
+        {
+          text: t('resources.remove'),
+          style: 'destructive',
+          onPress: async () => {
+            await persistLogs(logs.filter(log => log.id !== editingLogId));
+            setLogSheet(false);
+          },
+        },
+      ],
+    );
+  };
+  const formatTime = (time: number) => new Date(time).toLocaleString();
+  return (
+    <View key={localeVersion} style={styles.screen}>
+      <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('resources.back')}
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <ArrowLeft size={20} color={styles.backIcon.color} />
+        </Pressable>
+        <Text style={styles.headerTitle}>{t('resources.header_title')}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={t('resources.add_item')}
+          style={styles.addButton}
+          onPress={() => openItem()}
+        >
+          <Text style={styles.addButtonText}>+</Text>
+        </Pressable>
+      </View>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + 28 },
+        ]}
+        showsVerticalScrollIndicator={false}
+      >
+        <Card style={styles.hero}>
+          <View style={styles.heroIcon}>
+            <Droplets size={24} color={styles.heroIconColor.color} />
+          </View>
+          <Text style={styles.heroTitle}>{t('resources.hero_title')}</Text>
+          <Text style={styles.heroText}>{t('resources.hero_description')}</Text>
+          <View style={styles.summaryRow}>
+            <View>
+              <Text style={styles.summaryValue}>{todayLogs.length}</Text>
+              <Text style={styles.summaryLabel}>
+                {t('resources.today_logs')}
+              </Text>
+            </View>
+            <View>
+              <Text style={styles.summaryValue}>{activeItems.length}</Text>
+              <Text style={styles.summaryLabel}>
+                {t('resources.active_items')}
+              </Text>
+            </View>
+          </View>
+        </Card>
+        <SectionHeader
+          title={t('resources.quick_tap_title')}
+          subtitle={t('resources.quick_tap_subtitle')}
+        />
+        {activeItems.length === 0 ? (
+          <Card style={styles.empty}>
+            <Text style={styles.emptyTitle}>{t('resources.empty_title')}</Text>
+            <Text style={styles.emptyText}>{t('resources.empty_text')}</Text>
+            <Button
+              title={t('resources.add_first')}
+              onPress={() => openItem()}
+              style={styles.emptyButton}
+            />
+          </Card>
+        ) : (
+          <View style={styles.tapGrid}>
+            {activeItems.map(item => (
+              <View key={item.id} style={styles.tapWrap}>
+                <Pressable style={styles.tapCard} onPress={() => openLog(item)}>
+                  <Text style={styles.tapPlus}>+</Text>
+                  <Text style={styles.tapName}>{item.name}</Text>
+                  <Text style={styles.tapUnit}>{item.unitLabel}</Text>
+                </Pressable>
+                <Pressable
+                  accessibilityLabel={t('resources.edit_item')}
+                  style={styles.itemMenu}
+                  onPress={() => openItem(item)}
+                >
+                  <Ellipsis size={18} color={styles.menuIcon.color} />
+                </Pressable>
+              </View>
+            ))}
+          </View>
+        )}
+        <SectionHeader
+          title={t('resources.history_title')}
+          subtitle={t('resources.history_subtitle')}
+          style={styles.historyHeader}
+        />
+        <Button
+          title="Log a delivery"
+          onPress={() => openLog()}
+          disabled={activeItems.length === 0}
+        />
+        {logs.length === 0 ? (
+          <Text style={styles.noHistory}>{t('resources.no_history')}</Text>
+        ) : (
+          logs.slice(0, 12).map(log => (
+            <Pressable
+              key={log.id}
+              style={styles.logRow}
+              onPress={() => openLog(undefined, log)}
+            >
+              <View style={styles.logBadge}>
+                <Text style={styles.logBadgeText}>{log.quantity}</Text>
+              </View>
+              <View style={styles.logCopy}>
+                <Text style={styles.logName}>{log.itemName}</Text>
+                <Text style={styles.logMeta}>
+                  {formatTime(log.loggedAt)}
+                  {log.note ? ` · ${log.note}` : ''}
+                </Text>
+              </View>
+              <Text style={styles.editText}>{t('resources.edit')}</Text>
+            </Pressable>
+          ))
+        )}
+        <SectionHeader
+          title="Utility bills"
+          subtitle="Track providers, amounts, due dates, and payment status."
+          style={styles.historyHeader}
+        />
+        <Button title="Add utility bill" onPress={() => openUtility()} />
+        {utilityBills.length === 0 ? (
+          <Text style={styles.noHistory}>No utility bills added yet.</Text>
+        ) : (
+          utilityBills.map(bill => (
+            <Pressable
+              key={bill.id}
+              style={styles.utilityRow}
+              onPress={() => openUtility(bill)}
+            >
+              <View style={styles.utilityCopy}>
+                <Text style={styles.utilityName}>
+                  {
+                    UTILITY_TYPES.find(option => option.type === bill.type)
+                      ?.label
+                  }
+                </Text>
+                <Text style={styles.utilityMeta}>
+                  {bill.provider} · Due {formatDueDate(bill.dueDate)}
+                </Text>
+              </View>
+              <View style={styles.utilityStatus}>
+                <Text style={styles.utilityAmount}>
+                  ₹{bill.amount.toLocaleString()}
+                </Text>
+                <Pressable
+                  onPress={() => toggleUtilityPaid(bill)}
+                  hitSlop={8}
+                  style={[styles.paidPill, bill.paid && styles.paidPillDone]}
+                >
+                  <Text
+                    style={[
+                      styles.paidStatus,
+                      bill.paid && styles.paidStatusDone,
+                    ]}
+                  >
+                    {bill.paid ? '✓ Paid' : 'Mark as paid'}
+                  </Text>
+                </Pressable>
+              </View>
+            </Pressable>
+          ))
+        )}
+        <Card style={styles.ocrNote}>
+          <Text style={styles.ocrTitle}>{t('resources.ocr_title')}</Text>
+          <Text style={styles.ocrText}>{t('resources.ocr_description')}</Text>
+          <Text style={styles.ocrTip}>
+            For a clearer scan, photograph the full bill in good light and keep
+            the due date visible.
+          </Text>
+          <Pressable style={styles.ocrAction} onPress={() => openUtility()}>
+            <Text style={styles.ocrActionText}>Add bill manually</Text>
+          </Pressable>
+        </Card>
+      </ScrollView>
+      <BottomSheet
+        visible={itemSheet}
+        onClose={() => setItemSheet(false)}
+        title={t(
+          editingItemId
+            ? 'resources.edit_item_title'
+            : 'resources.add_item_title',
+        )}
+      >
+        <Text style={styles.label}>{t('resources.item_name')}</Text>
+        <TextInput
+          style={styles.input}
+          value={name}
+          onChangeText={setName}
+          placeholder={t('resources.item_name_placeholder')}
+          placeholderTextColor={styles.placeholder.color}
+        />
+        <Text style={styles.label}>{t('resources.unit_label')}</Text>
+        <TextInput
+          style={styles.input}
+          value={unitLabel}
+          onChangeText={setUnitLabel}
+          placeholder={t('resources.unit_placeholder')}
+          placeholderTextColor={styles.placeholder.color}
+        />
+        <Button
+          title={t('resources.save_item')}
+          onPress={saveItem}
+          style={styles.saveButton}
+        />
+        {editingItemId ? (
+          <Pressable style={styles.removeButton} onPress={removeItem}>
+            <Text style={styles.removeText}>{t('resources.remove')}</Text>
+          </Pressable>
+        ) : null}
+      </BottomSheet>
+      <BottomSheet
+        visible={logSheet}
+        onClose={() => setLogSheet(false)}
+        title={t(
+          editingLogId ? 'resources.edit_log_title' : 'resources.add_log_title',
+        )}
+      >
+        <Text style={styles.label}>{t('resources.choose_item')}</Text>
+        <View style={styles.choiceRow}>
+          {activeItems.map(item => (
+            <Pressable
+              key={item.id}
+              onPress={() => setLogItemId(item.id)}
+              style={[
+                styles.choice,
+                logItemId === item.id && styles.choiceSelected,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.choiceText,
+                  logItemId === item.id && styles.choiceTextSelected,
+                ]}
+              >
+                {item.name}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.label}>{t('resources.quantity')}</Text>
+        <TextInput
+          style={styles.input}
+          value={quantity}
+          onChangeText={setQuantity}
+          keyboardType="decimal-pad"
+          placeholder="1"
+          placeholderTextColor={styles.placeholder.color}
+        />
+        <Text style={styles.label}>{t('resources.note')}</Text>
+        <TextInput
+          style={styles.input}
+          value={note}
+          onChangeText={setNote}
+          placeholder={t('resources.note_placeholder')}
+          placeholderTextColor={styles.placeholder.color}
+        />
+        <Button
+          title={t('resources.save_log')}
+          onPress={saveLog}
+          style={styles.saveButton}
+        />
+        {editingLogId ? (
+          <Pressable style={styles.removeButton} onPress={removeLog}>
+            <Text style={styles.removeText}>{t('resources.remove')}</Text>
+          </Pressable>
+        ) : null}
+      </BottomSheet>
+      <BottomSheet
+        visible={utilitySheet}
+        onClose={() => setUtilitySheet(false)}
+        title={editingUtilityId ? 'Edit utility bill' : 'Add utility bill'}
+      >
+        <Text style={styles.label}>Utility type</Text>
+        <View style={styles.choiceRow}>
+          {UTILITY_TYPES.map(option => (
+            <Pressable
+              key={option.type}
+              onPress={() => setUtilityType(option.type)}
+              style={[
+                styles.choice,
+                utilityType === option.type && styles.choiceSelected,
+              ]}
+            >
+              <Text
+                style={[
+                  styles.choiceText,
+                  utilityType === option.type && styles.choiceTextSelected,
+                ]}
+              >
+                {option.label}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.label}>Provider</Text>
+        <TextInput
+          style={styles.input}
+          value={provider}
+          onChangeText={setProvider}
+          placeholder="e.g., Tata Power"
+          placeholderTextColor={styles.placeholder.color}
+        />
+        <Text style={styles.label}>Bill amount</Text>
+        <TextInput
+          style={styles.input}
+          value={billAmount}
+          onChangeText={setBillAmount}
+          keyboardType="decimal-pad"
+          placeholder="e.g., 1200"
+          placeholderTextColor={styles.placeholder.color}
+        />
+        <Text style={styles.label}>Due date</Text>
+        <Pressable
+          style={styles.input}
+          onPress={() => setShowDueDatePicker(true)}
+        >
+          <Text style={dueDate ? styles.dateValue : styles.placeholder}>
+            {dueDate ? formatDueDate(dueDate) : 'Choose a due date'}
+          </Text>
+        </Pressable>
+        {showDueDatePicker ? (
+          <DateTimePicker
+            value={dueDate ? dueDateValue(dueDate) : new Date()}
+            mode="date"
+            display="default"
+            onChange={handleDueDateChange}
+          />
+        ) : null}
+        <Button
+          title="Save utility bill"
+          onPress={saveUtility}
+          style={styles.saveButton}
+        />
+      </BottomSheet>
+    </View>
+  );
+}
+
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
+  StyleSheet.create({
+    screen: { flex: 1, backgroundColor: colors.background },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    backIcon: { color: colors.textPrimary },
+    headerTitle: {
+      flex: 1,
+      marginLeft: spacing.md,
+      fontFamily: fonts.serif,
+      fontSize: 21,
+      color: colors.textPrimary,
+    },
+    addButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.primary,
+    },
+    addButtonText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 24,
+      color: colors.textOnPrimary,
+    },
+    content: { padding: spacing.lg },
+    hero: { backgroundColor: colors.surfaceElevated, marginBottom: spacing.xl },
+    heroIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.blush,
+      marginBottom: spacing.md,
+    },
+    heroIconColor: { color: colors.primary },
+    heroTitle: {
+      fontFamily: fonts.serif,
+      fontSize: 25,
+      color: colors.textPrimary,
+      marginBottom: 5,
+    },
+    heroText: {
+      fontFamily: fonts.sans,
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.textSecondary,
+    },
+    summaryRow: {
+      flexDirection: 'row',
+      gap: spacing.xl,
+      marginTop: spacing.lg,
+    },
+    summaryValue: {
+      fontFamily: fonts.serif,
+      fontSize: 21,
+      color: colors.primary,
+    },
+    summaryLabel: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    empty: { alignItems: 'flex-start' },
+    emptyTitle: {
+      fontFamily: fonts.serif,
+      fontSize: 19,
+      color: colors.textPrimary,
+    },
+    emptyText: {
+      marginTop: 4,
+      fontFamily: fonts.sans,
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.textSecondary,
+    },
+    emptyButton: { alignSelf: 'stretch', marginTop: spacing.lg },
+    tapGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    tapWrap: { width: '48%', position: 'relative' },
+    tapCard: {
+      minHeight: 116,
+      borderRadius: radius.lg,
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...shadow.soft,
+    },
+    tapPlus: { fontFamily: fonts.serif, fontSize: 26, color: colors.primary },
+    tapName: {
+      marginTop: spacing.xs,
+      fontFamily: fonts.sansMedium,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    tapUnit: {
+      marginTop: 2,
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+    itemMenu: {
+      position: 'absolute',
+      top: spacing.sm,
+      right: spacing.sm,
+      padding: 4,
+    },
+    menuIcon: { color: colors.textMuted },
+    historyHeader: { marginTop: spacing.xl, marginBottom: spacing.md },
+    noHistory: {
+      fontFamily: fonts.sans,
+      fontSize: 14,
+      color: colors.textMuted,
+    },
+    logRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    logBadge: {
+      width: 34,
+      height: 34,
+      borderRadius: 17,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.blush,
+      marginRight: spacing.sm,
+    },
+    logBadgeText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.primary,
+    },
+    logCopy: { flex: 1 },
+    logName: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    logMeta: {
+      marginTop: 2,
+      fontFamily: fonts.sans,
+      fontSize: 11,
+      color: colors.textMuted,
+    },
+    editText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.primary,
+    },
+    utilityRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    utilityCopy: { flex: 1 },
+    utilityName: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    utilityMeta: {
+      marginTop: 2,
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      color: colors.textMuted,
+    },
+    utilityStatus: { alignItems: 'flex-end', marginLeft: spacing.sm },
+    utilityAmount: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    paidStatus: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.primary,
+    },
+    paidStatusDone: { color: colors.forest },
+    paidPill: {
+      marginTop: spacing.xs,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: radius.pill,
+      backgroundColor: colors.blush,
+    },
+    paidPillDone: { backgroundColor: colors.surfaceElevated },
+    ocrNote: { marginTop: spacing.xl, backgroundColor: colors.turmericSoft },
+    ocrTitle: {
+      fontFamily: fonts.serif,
+      fontSize: 18,
+      color: colors.textPrimary,
+      marginBottom: 4,
+    },
+    ocrText: {
+      fontFamily: fonts.sans,
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.textSecondary,
+    },
+    ocrTip: {
+      marginTop: spacing.sm,
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      lineHeight: 18,
+      color: colors.textSecondary,
+    },
+    ocrAction: { alignSelf: 'flex-start', marginTop: spacing.md },
+    ocrActionText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.primary,
+    },
+    label: {
+      marginTop: spacing.md,
+      marginBottom: spacing.xs,
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.textPrimary,
+    },
+    input: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.surface,
+      fontFamily: fonts.sans,
+      fontSize: 15,
+      color: colors.textPrimary,
+    },
+    placeholder: { color: colors.textMuted },
+    dateValue: {
+      fontFamily: fonts.sans,
+      fontSize: 15,
+      color: colors.textPrimary,
+    },
+    choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    choice: {
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+    },
+    choiceSelected: {
+      backgroundColor: colors.blush,
+      borderColor: colors.primary,
+    },
+    choiceText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    choiceTextSelected: { color: colors.primary },
+    saveButton: { marginTop: spacing.lg },
+    removeButton: { alignItems: 'center', paddingVertical: spacing.md },
+    removeText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 14,
+      color: colors.danger,
+    },
+  });
