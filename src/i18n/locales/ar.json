@@ -669,6 +669,20 @@
     "worn_alert_title": "Outfit Marked Worn!",
     "worn_alert_msg": "Updated wear history count for all items in this outfit.",
     "outfit_saved_title": "Outfit Saved!",
-    "outfit_saved_msg": "Outfit added to your saved style collection."
+    "outfit_saved_msg": "Outfit added to your saved style collection.""ocr_status_label": "الحالة",
+    "ocr_status_pending": "قيد القراءة…",
+    "ocr_status_processed": "تمت المعالجة",
+    "ocr_status_failed": "تعذّرت القراءة",
+    "prescription_processed_title": "تمت قراءة الوصفة",
+    "prescription_processed_msg": "تم رفع وصفتك الطبية. أي أدوية أمكن قراءتها منها أُضيفت إلى قائمتك.",
+    "prescription_empty_msg": "تم رفع وصفتك الطبية، ولكن لم نتمكن من العثور على أي أدوية فيها.",
+    "prescription_failed_title": "تعذّرت قراءة الوصفة",
+    "prescription_failed_msg": "لم نتمكن من قراءة هذا المستند — قد يكون غير واضح أو بتنسيق غير مدعوم. لا يزال بإمكانك إضافة الأدوية يدويًا.",
+    "confirm_quantity_title": "تأكيد الكمية",
+    "confirm_quantity_progress": "{{current}} من {{total}}",
+    "confirm_quantity_intro": "أضفنا {{name}} من وصفتك الطبية. كم لديك منه؟",
+    "confirm_quantity_save": "حفظ ومتابعة",
+    "confirm_quantity_skip": "تخطي الآن",
+    "confirm_quantity_invalid_msg": "الرجاء إدخال كمية صالحة."
   }
 }
