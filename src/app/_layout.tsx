@@ -153,9 +153,9 @@ const AppLayout = () => {
           <Stack.Screen name="OutfitDetails" component={OutfitDetailsScreen} />
           <Stack.Screen name="Voice" component={VoiceScreen} />
           <Stack.Screen name="VoiceSettings" component={VoiceSettingsScreen} />
-        </Stack.Navigator>
-      </NavigationContainer>
-    </SafeAreaProvider>
+        </Stack.Navigator >
+      </NavigationContainer >
+    </SafeAreaProvider >
   );
 };
 

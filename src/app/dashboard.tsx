@@ -328,12 +328,14 @@ export default function DashboardScreen({ navigation, route }: Props) {
           </View>
         </View>
 
-        {resourceItems.length > 0 ? (
-          <View style={styles.resourcePanel}>
-            <View style={styles.resourceHeader}><View><Text style={styles.sectionTitle}>{t('resources.dashboard_title')}</Text><Text style={styles.sectionSubtitle}>{t('resources.dashboard_subtitle')}</Text></View><Pressable onPress={() => navigation.navigate('Resources')}><Text style={styles.resourceOpen}>{t('resources.open')}</Text></Pressable></View>
-            <View style={styles.resourceTaps}>{resourceItems.slice(0, 4).map((item) => <Pressable key={item.id} style={styles.resourceTap} onPress={() => handleResourceTap(item)}><Text style={styles.resourceTapPlus}>+</Text><Text style={styles.resourceTapName} numberOfLines={1}>{item.name}</Text></Pressable>)}</View>
-          </View>
-        ) : null}
+        {
+          resourceItems.length > 0 ? (
+            <View style={styles.resourcePanel}>
+              <View style={styles.resourceHeader}><View><Text style={styles.sectionTitle}>{t('resources.dashboard_title')}</Text><Text style={styles.sectionSubtitle}>{t('resources.dashboard_subtitle')}</Text></View><Pressable onPress={() => navigation.navigate('Resources')}><Text style={styles.resourceOpen}>{t('resources.open')}</Text></Pressable></View>
+              <View style={styles.resourceTaps}>{resourceItems.slice(0, 4).map((item) => <Pressable key={item.id} style={styles.resourceTap} onPress={() => handleResourceTap(item)}><Text style={styles.resourceTapPlus}>+</Text><Text style={styles.resourceTapName} numberOfLines={1}>{item.name}</Text></Pressable>)}</View>
+            </View>
+          ) : null
+        }
 
         {/* Module list — same reasoning: ten rows staggering in individually was
             the largest source of visible motion on this screen. */}
@@ -359,8 +361,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
           <Text style={styles.footerBrand}>Habita AI · Home & Life OS</Text>
           <Text style={styles.footerText}>{t('dashboard.footer_note')}</Text>
         </View>
-      </Animated.ScrollView>
-    </View>
+      </Animated.ScrollView >
+    </View >
   );
 }
 
