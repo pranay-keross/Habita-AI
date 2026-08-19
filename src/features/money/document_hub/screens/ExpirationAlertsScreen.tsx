@@ -23,12 +23,14 @@ import BottomSheet from '../../../../components/BottomSheet';
 import Button from '../../../../components/Button';
 import { loadDocuments, getDocStatus, updateDocument } from '../docStore';
 import type { DocHubEntry } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'ExpirationAlerts'>;
 
 export default function ExpirationAlertsScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [docs, setDocs] = useState<DocHubEntry[]>([]);
@@ -44,7 +46,11 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
   };
 
   useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     fetchAlerts();
+    return () => {
+      unsubLang();
+    };
   }, []);
 
   const expiredList = docs.filter((d) => getDocStatus(d.expiryDate).status === 'expired');
@@ -65,7 +71,7 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
     });
     setUpdating(false);
 
-    Alert.alert('Updated!', `Expiry date for "${selectedDoc.title}" updated.`);
+    Alert.alert(t('doc_hub.updated_alert_title'), t('doc_hub.updated_alert_msg', { title: selectedDoc.title }));
     setSelectedDoc(null);
     fetchAlerts();
   };
@@ -77,7 +83,7 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>Expiration & Alerts</Text>
+        <Text style={styles.headerTitle}>{t('doc_hub.alerts_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -89,9 +95,9 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
               <AlertTriangle size={24} color="#EA580C" />
             </View>
             <View style={{ flex: 1 }}>
-              <Text style={styles.alertHeroTitle}>Document Warning Center</Text>
+              <Text style={styles.alertHeroTitle}>{t('doc_hub.warning_center')}</Text>
               <Text style={styles.alertHeroSub}>
-                Track passports, visas, insurance policies & licenses requiring renewal.
+                {t('doc_hub.warning_center_sub')}
               </Text>
             </View>
           </View>
@@ -99,12 +105,12 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
           <View style={styles.alertStatsRow}>
             <View style={[styles.statBox, styles.statBoxRed]}>
               <Text style={styles.statNumberRed}>{expiredList.length}</Text>
-              <Text style={styles.statLabelRed}>Expired</Text>
+              <Text style={styles.statLabelRed}>{t('doc_hub.status_expired')}</Text>
             </View>
 
             <View style={[styles.statBox, styles.statBoxOrange]}>
               <Text style={styles.statNumberOrange}>{expiringList.length}</Text>
-              <Text style={styles.statLabelOrange}>Expiring Soon</Text>
+              <Text style={styles.statLabelOrange}>{t('doc_hub.expiring_count_stat', { count: '' }).trim() || 'Expiring Soon'}</Text>
             </View>
           </View>
         </View>
@@ -114,9 +120,9 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
         ) : expiredList.length === 0 && expiringList.length === 0 ? (
           <View style={styles.emptyStateCard}>
             <CheckCircle2 size={40} color="#16A34A" />
-            <Text style={styles.emptyTitle}>All Documents Up-To-Date!</Text>
+            <Text style={styles.emptyTitle}>{t('doc_hub.all_current_title')}</Text>
             <Text style={styles.emptySub}>
-              No expired or expiring documents found in your repository.
+              {t('doc_hub.all_current_sub')}
             </Text>
           </View>
         ) : (
@@ -124,7 +130,7 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
             {/* Expired Documents Section */}
             {expiredList.length > 0 && (
               <>
-                <Text style={styles.sectionTitleRed}>Expired Documents ({expiredList.length})</Text>
+                <Text style={styles.sectionTitleRed}>{t('doc_hub.status_expired')} ({expiredList.length})</Text>
                 {expiredList.map((doc) => {
                   const { daysLeft } = getDocStatus(doc.expiryDate);
                   return (
@@ -133,10 +139,10 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
                         <FileText size={20} color="#EF4444" />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.docTitle}>{doc.title}</Text>
-                          <Text style={styles.docMember}>Owner: {doc.memberName}</Text>
+                          <Text style={styles.docMember}>{t('doc_hub.owner_label', { name: doc.memberName })}</Text>
                         </View>
                         <View style={styles.badgeExpired}>
-                          <Text style={styles.textExpired}>Expired</Text>
+                          <Text style={styles.textExpired}>{t('doc_hub.status_expired')}</Text>
                         </View>
                       </View>
 
@@ -144,14 +150,14 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
                         <View style={styles.clockRow}>
                           <Clock size={12} color="#EF4444" />
                           <Text style={styles.daysExpiredText}>
-                            Expired {Math.abs(daysLeft)} days ago ({doc.expiryDate})
+                            {t('doc_hub.expired_days_ago', { count: Math.abs(daysLeft) })} ({doc.expiryDate})
                           </Text>
                         </View>
 
                         <Pressable
                           style={styles.renewBtnRed}
                           onPress={() => handleOpenRenewModal(doc)}>
-                          <Text style={styles.renewBtnTextRed}>Update Expiry</Text>
+                          <Text style={styles.renewBtnTextRed}>{t('doc_hub.update_renew')}</Text>
                         </Pressable>
                       </View>
                     </View>
@@ -164,7 +170,7 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
             {expiringList.length > 0 && (
               <>
                 <Text style={styles.sectionTitleOrange}>
-                  Expiring Soon ({expiringList.length})
+                  {t('doc_hub.action_needed', { count: expiringList.length })}
                 </Text>
                 {expiringList.map((doc) => {
                   const { daysLeft } = getDocStatus(doc.expiryDate);
@@ -174,10 +180,10 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
                         <FileText size={20} color="#EA580C" />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.docTitle}>{doc.title}</Text>
-                          <Text style={styles.docMember}>Owner: {doc.memberName}</Text>
+                          <Text style={styles.docMember}>{t('doc_hub.owner_label', { name: doc.memberName })}</Text>
                         </View>
                         <View style={styles.badgeExpiring}>
-                          <Text style={styles.textExpiring}>{daysLeft} days left</Text>
+                          <Text style={styles.textExpiring}>{t('doc_hub.status_days_left', { count: daysLeft })}</Text>
                         </View>
                       </View>
 
@@ -185,14 +191,14 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
                         <View style={styles.clockRow}>
                           <Clock size={12} color="#EA580C" />
                           <Text style={styles.daysExpiringText}>
-                            Expires on {doc.expiryDate}
+                            {t('doc_hub.expires_label', { date: doc.expiryDate })}
                           </Text>
                         </View>
 
                         <Pressable
                           style={styles.renewBtnOrange}
                           onPress={() => handleOpenRenewModal(doc)}>
-                          <Text style={styles.renewBtnTextOrange}>Update Expiry</Text>
+                          <Text style={styles.renewBtnTextOrange}>{t('doc_hub.update_renew')}</Text>
                         </Pressable>
                       </View>
                     </View>
@@ -209,9 +215,9 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
         <BottomSheet
           visible={!!selectedDoc}
           onClose={() => setSelectedDoc(null)}
-          title={`Update ${selectedDoc.title}`}>
+          title={t('doc_hub.renew_modal_title')}>
           <View style={styles.modalContent}>
-            <Text style={styles.modalLabel}>New Expiration Date (YYYY-MM-DD)</Text>
+            <Text style={styles.modalLabel}>{t('doc_hub.new_expiry_label')}</Text>
             <TextInput
               style={styles.modalInput}
               value={newExpiry}
@@ -219,9 +225,8 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
               placeholder="e.g. 2030-04-11"
               placeholderTextColor={styles.placeholder.color}
             />
-
             <Button
-              title="Save Updated Expiry Date"
+              title={t('doc_hub.save_new_expiry')}
               onPress={handleSaveRenewal}
               loading={updating}
               style={{ marginTop: 16 }}
