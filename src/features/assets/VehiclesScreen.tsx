@@ -236,13 +236,11 @@ export default function VehiclesScreen({ navigation }: Props) {
     if (event.type === 'set' && selected)
       setInsuranceExpiry(toDateKey(selected));
   };
-  const reviewed = vehicles.filter(vehicle => vehicle.documentReviewed).length;
   const pendingReview = vehicles.filter(
     vehicle => vehicle.documentName && !vehicle.documentReviewed,
   ).length;
   const missingDocs = vehicles.filter(vehicle => !vehicle.documentName).length;
   const vehiclesWithDocs = vehicles.filter(vehicle => !!vehicle.documentName).length;
-  const assetCategories = new Set(assets.map(asset => asset.category)).size;
   const mostCommonAssetCategory = (() => {
     if (assets.length === 0) return 'No items yet';
     const counts = assets.reduce<Record<string, number>>((memo, asset) => {
@@ -306,20 +304,8 @@ export default function VehiclesScreen({ navigation }: Props) {
             <Text style={styles.metricLabel}>Documented</Text>
           </Card>
           <Card style={styles.metric}>
-            <Text style={styles.metricValue}>{reviewed}</Text>
-            <Text style={styles.metricLabel}>Reviewed</Text>
-          </Card>
-          <Card style={styles.metric}>
             <Text style={styles.metricValue}>{pendingReview}</Text>
             <Text style={styles.metricLabel}>Needs review</Text>
-          </Card>
-          <Card style={styles.metric}>
-            <Text style={styles.metricValue}>{assets.length}</Text>
-            <Text style={styles.metricLabel}>Assets</Text>
-          </Card>
-          <Card style={styles.metric}>
-            <Text style={styles.metricValue}>{assetCategories}</Text>
-            <Text style={styles.metricLabel}>Categories</Text>
           </Card>
         </View>
         <View style={styles.summaryStrip}>
