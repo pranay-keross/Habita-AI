@@ -28,26 +28,22 @@ import {
   removeManagedMember,
   removeMember,
   resolveMyMembership,
-  updateMemberRole,
-  updateRelationship,
   type FamilyErrorKind,
   type MyMembership,
 } from './api';
 import {
   ALL_RELATIONS,
-  ASSIGNABLE_ROLES,
   type Family,
   type FamilyInvite,
   type FamilyMember,
   type FamilyRelation,
-  type FamilyRole,
 } from './types';
 
 export type { FamilyMember } from './types';
 
 type Props = StackScreenProps<RootStackParamList, 'Family'>;
 
-const EMPTY_MEMBERSHIP: MyMembership = { member: null, role: 'MEMBER', isOwner: false, isAdmin: false };
+const EMPTY_MEMBERSHIP: MyMembership = { member: null, role: 'MEMBER', isOwner: false, isCreator: false };
 
 export default function FamilyScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
@@ -78,7 +74,6 @@ export default function FamilyScreen({ navigation }: Props) {
 
   const [showInviteSheet, setShowInviteSheet] = useState(false);
   const [invitePhone, setInvitePhone] = useState('');
-  const [inviteRole, setInviteRole] = useState<Exclude<FamilyRole, 'OWNER'>>('MEMBER');
   const [inviteRelation, setInviteRelation] = useState<FamilyRelation | null>(null);
   const [inviting, setInviting] = useState(false);
 
@@ -92,12 +87,6 @@ export default function FamilyScreen({ navigation }: Props) {
   const [addingManaged, setAddingManaged] = useState(false);
 
   const [viewingMember, setViewingMember] = useState<FamilyMember | null>(null);
-
-  const [editingMember, setEditingMember] = useState<FamilyMember | null>(null);
-  const [editRole, setEditRole] = useState<Exclude<FamilyRole, 'OWNER'>>('MEMBER');
-  const [editRelation, setEditRelation] = useState<FamilyRelation | null>(null);
-  const [editReciprocalRelation, setEditReciprocalRelation] = useState<FamilyRelation | null>(null);
-  const [savingMember, setSavingMember] = useState(false);
 
   const [loadError, setLoadError] = useState<FamilyErrorKind | null>(null);
 
@@ -154,11 +143,8 @@ export default function FamilyScreen({ navigation }: Props) {
       }
       const membership = resolveMyMembership(primary, userId, profileName);
       setMyMembership(membership);
-      if (membership.isAdmin) {
-        setPendingInvitesAdmin(await listFamilyPendingInvites(primary.id, token));
-      } else {
-        setPendingInvitesAdmin([]);
-      }
+      // Any member can see pending invites now — there is no admin-only read tier.
+      setPendingInvitesAdmin(await listFamilyPendingInvites(primary.id, token));
       setShowHistory(false);
       setInviteHistory([]);
     } catch (err) {
@@ -240,7 +226,6 @@ export default function FamilyScreen({ navigation }: Props) {
 
   const openInviteSheet = () => {
     setInvitePhone('');
-    setInviteRole('MEMBER');
     setInviteRelation(null);
     setShowInviteSheet(true);
   };
@@ -255,7 +240,7 @@ export default function FamilyScreen({ navigation }: Props) {
       const token = await getAccessToken();
       if (token) {
         const phone = invitePhone.trim();
-        const invite = await inviteMember(family.id, phone, inviteRole, inviteRelation, token);
+        const invite = await inviteMember(family.id, phone, inviteRelation, token);
         await rememberInvitedPhone(invite.id, phone);
         setShowInviteSheet(false);
         Alert.alert(t('family.invited_title'), t('family.invited_msg', { phone }));
@@ -331,54 +316,11 @@ export default function FamilyScreen({ navigation }: Props) {
     }
   };
 
-  const openEditMember = (member: FamilyMember) => {
-    if (!myMembership.isAdmin || member.role === 'OWNER') {
-      return;
-    }
-    setEditingMember(member);
-    setEditRole(member.role === 'ADMIN' ? 'ADMIN' : 'MEMBER');
-    setEditRelation(member.relation);
-    setEditReciprocalRelation(member.reciprocalRelation);
-  };
-
-  // Every member, admin or not, can open this — it's the only way a plain MEMBER (e.g.
-  // an invite recipient who just accepted) has to see anyone else's relation, since the
-  // full edit sheet stays admin-only. Read-only: no role/relation controls, just what
-  // `GET /families/{id}` already returned.
+  // Every member can open this — read-only, just what `GET /families/{id}` already
+  // returned. The only action available from here is Remove, and that's gated
+  // separately (creator-only, never on the OWNER's own row) inside the sheet itself.
   const openViewMember = (member: FamilyMember) => {
     setViewingMember(member);
-  };
-
-  const handleMemberPress = (member: FamilyMember) => {
-    if (myMembership.isAdmin && member.role !== 'OWNER') {
-      openEditMember(member);
-    } else {
-      openViewMember(member);
-    }
-  };
-
-  const handleSaveMemberRole = async () => {
-    if (!family || !editingMember) {
-      return;
-    }
-    setSavingMember(true);
-    try {
-      const token = await getAccessToken();
-      if (token) {
-        await updateMemberRole(family.id, editingMember.id, editRole, token);
-        // Only a User-backed, invite-accepted member has a relationship row to correct —
-        // the owner and managed members never do (types.ts's FamilyMember doc comment).
-        if (editingMember.relationshipId && editRelation && editReciprocalRelation) {
-          await updateRelationship(family.id, editingMember.relationshipId, editRelation, editReciprocalRelation, token);
-        }
-        setEditingMember(null);
-        await reload();
-      }
-    } catch (err) {
-      showError(err);
-    } finally {
-      setSavingMember(false);
-    }
   };
 
   const handleRemoveMember = (member: FamilyMember) => {
@@ -399,7 +341,7 @@ export default function FamilyScreen({ navigation }: Props) {
               } else {
                 await removeMember(family.id, member.id, token);
               }
-              setEditingMember(null);
+              setViewingMember(null);
               await reload();
             }
           } catch (err) {
@@ -410,19 +352,12 @@ export default function FamilyScreen({ navigation }: Props) {
     ]);
   };
 
-  // Remove Member needs admin access on the *caller*, not just ownership of the row
-  // being removed — so a plain MEMBER has no self-service leave endpoint on this
-  // backend at all (docs/BACKEND_CONTEXT.md's "no self-service leave" gap). Rather than
-  // hiding the option entirely (the previous behavior, and exactly what was reported as
-  // "no option to leave"), a MEMBER still sees the entry point and gets told why it
-  // can't complete yet instead of silently having no path at all. OWNER can never be
-  // removed by anyone, including themselves, so they don't get this entry point.
+  // Any non-creator member can leave on their own now (self-removal via removeMember) —
+  // the backend used to require admin access on the caller for this, blocking a plain
+  // MEMBER from leaving at all. The creator (OWNER) can never be removed, including by
+  // themselves, so they don't get this entry point (see the render condition below).
   const handleLeaveFamily = () => {
     if (!myMembership.member) {
-      return;
-    }
-    if (!myMembership.isAdmin) {
-      Alert.alert(t('family.leave_needs_admin_title'), t('family.leave_needs_admin_msg'));
       return;
     }
     const member = myMembership.member;
@@ -446,7 +381,6 @@ export default function FamilyScreen({ navigation }: Props) {
     ]);
   };
 
-  const adminCount = family?.members.filter((m) => m.role === 'OWNER' || m.role === 'ADMIN').length ?? 0;
   const managedCount = family?.members.filter((m) => m.managed).length ?? 0;
 
   // `member.relation`/`relatedToName` describe one directed edge — "this member relates
@@ -481,7 +415,7 @@ export default function FamilyScreen({ navigation }: Props) {
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <Text style={styles.headerTitle}>{t('family.header_title')}</Text>
-        {family && myMembership.isAdmin ? (
+        {family ? (
           <Pressable onPress={openInviteSheet} style={styles.addBtn}>
             <Text style={styles.addBtnText}>{t('family.invite_btn')}</Text>
           </Pressable>
@@ -565,21 +499,11 @@ export default function FamilyScreen({ navigation }: Props) {
                       <Text style={styles.statLabel}>{t('family.stat_members')}</Text>
                     </View>
                     <View style={styles.statChip}>
-                      <Text style={styles.statNum}>{adminCount}</Text>
-                      <Text style={styles.statLabel}>{t('family.stat_admins')}</Text>
-                    </View>
-                    <View style={styles.statChip}>
                       <Text style={styles.statNum}>{managedCount}</Text>
                       <Text style={styles.statLabel}>{t('family.stat_managed')}</Text>
                     </View>
                   </View>
                 </View>
-
-                {!myMembership.isAdmin && (
-                  <View style={styles.readonlyBanner}>
-                    <Text style={styles.readonlyText}>{t('family.readonly_note')}</Text>
-                  </View>
-                )}
 
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>{t('family.section_title')}</Text>
@@ -589,7 +513,7 @@ export default function FamilyScreen({ navigation }: Props) {
                 {family.members.map((member) => {
                   const displayRelation = getDisplayRelation(member);
                   return (
-                    <Pressable key={member.id} style={styles.memberCard} onPress={() => handleMemberPress(member)}>
+                    <Pressable key={member.id} style={styles.memberCard} onPress={() => openViewMember(member)}>
                       <View style={styles.memberAvatarWrap}>
                         <Text style={styles.memberAvatar}>{member.managed ? '🧓' : '🧑'}</Text>
                       </View>
@@ -614,26 +538,22 @@ export default function FamilyScreen({ navigation }: Props) {
                         </View>
                       </View>
                       <View style={styles.editChevronWrap}>
-                        <Text style={styles.editChevron}>
-                          {myMembership.isAdmin && member.role !== 'OWNER' ? '✏️' : '›'}
-                        </Text>
+                        <Text style={styles.editChevron}>›</Text>
                       </View>
                     </Pressable>
                   );
                 })}
 
-                {myMembership.isAdmin && (
-                  <Pressable style={styles.inviteBanner} onPress={openManagedSheet}>
-                    <Text style={styles.inviteBannerIcon}>👪</Text>
-                    <View style={styles.inviteBannerContent}>
-                      <Text style={styles.inviteBannerTitle}>{t('family.add_managed_title')}</Text>
-                      <Text style={styles.inviteBannerSub}>{t('family.add_managed_sub')}</Text>
-                    </View>
-                    <Text style={styles.inviteBannerArrow}>→</Text>
-                  </Pressable>
-                )}
+                <Pressable style={styles.inviteBanner} onPress={openManagedSheet}>
+                  <Text style={styles.inviteBannerIcon}>👪</Text>
+                  <View style={styles.inviteBannerContent}>
+                    <Text style={styles.inviteBannerTitle}>{t('family.add_managed_title')}</Text>
+                    <Text style={styles.inviteBannerSub}>{t('family.add_managed_sub')}</Text>
+                  </View>
+                  <Text style={styles.inviteBannerArrow}>→</Text>
+                </Pressable>
 
-                {myMembership.isAdmin && pendingInvitesAdmin.length > 0 && (
+                {pendingInvitesAdmin.length > 0 && (
                   <View style={styles.inviteForMeSection}>
                     <Text style={styles.sectionTitle}>
                       {t('family.pending_invites_admin_title')} ({pendingInvitesAdmin.length})
@@ -653,36 +573,34 @@ export default function FamilyScreen({ navigation }: Props) {
                   </View>
                 )}
 
-                {myMembership.isAdmin && (
-                  <View style={styles.inviteForMeSection}>
-                    <Pressable style={styles.historyToggleRow} onPress={toggleInviteHistory}>
-                      <Text style={styles.sectionTitle}>{t('family.invite_history_title')}</Text>
-                      <Text style={styles.historyToggleText}>
-                        {showHistory ? t('family.history_hide') : t('family.history_show')}
-                      </Text>
-                    </Pressable>
-                    {showHistory && (
-                      loadingHistory ? (
-                        <View style={styles.loadingWrap}>
-                          <ActivityIndicator color={styles.addBtnText.color} />
+                <View style={styles.inviteForMeSection}>
+                  <Pressable style={styles.historyToggleRow} onPress={toggleInviteHistory}>
+                    <Text style={styles.sectionTitle}>{t('family.invite_history_title')}</Text>
+                    <Text style={styles.historyToggleText}>
+                      {showHistory ? t('family.history_hide') : t('family.history_show')}
+                    </Text>
+                  </Pressable>
+                  {showHistory && (
+                    loadingHistory ? (
+                      <View style={styles.loadingWrap}>
+                        <ActivityIndicator color={styles.addBtnText.color} />
+                      </View>
+                    ) : inviteHistory.length === 0 ? (
+                      <Text style={styles.historyEmptyText}>{t('family.history_empty')}</Text>
+                    ) : (
+                      inviteHistory.map((invite) => (
+                        <View key={invite.id} style={styles.pendingAdminRow}>
+                          <Text style={styles.pendingAdminText}>
+                            {new Date(invite.createdAt).toLocaleDateString()}
+                          </Text>
+                          <Text style={[styles.historyStatusText, styles[`historyStatus_${invite.status}` as const]]}>
+                            {t(`family.status_${invite.status.toLowerCase()}`)}
+                          </Text>
                         </View>
-                      ) : inviteHistory.length === 0 ? (
-                        <Text style={styles.historyEmptyText}>{t('family.history_empty')}</Text>
-                      ) : (
-                        inviteHistory.map((invite) => (
-                          <View key={invite.id} style={styles.pendingAdminRow}>
-                            <Text style={styles.pendingAdminText}>
-                              {t(`family.role_${invite.role.toLowerCase()}`)} · {new Date(invite.createdAt).toLocaleDateString()}
-                            </Text>
-                            <Text style={[styles.historyStatusText, styles[`historyStatus_${invite.status}` as const]]}>
-                              {t(`family.status_${invite.status.toLowerCase()}`)}
-                            </Text>
-                          </View>
-                        ))
-                      )
-                    )}
-                  </View>
-                )}
+                      ))
+                    )
+                  )}
+                </View>
 
                 {myMembership.member && myMembership.role !== 'OWNER' && (
                   <Pressable style={styles.modalLeaveBtn} onPress={handleLeaveFamily}>
@@ -709,19 +627,6 @@ export default function FamilyScreen({ navigation }: Props) {
           placeholder={t('family.placeholder_phone')}
           placeholderTextColor={styles.placeholder.color}
         />
-        <Text style={styles.label}>{t('family.label_role')}</Text>
-        <View style={styles.chipRow}>
-          {ASSIGNABLE_ROLES.map((role) => (
-            <Pressable
-              key={role}
-              style={[styles.chip, inviteRole === role && styles.chipActive]}
-              onPress={() => setInviteRole(role)}>
-              <Text style={[styles.chipText, inviteRole === role && styles.chipTextActive]}>
-                {t(`family.role_${role.toLowerCase()}`)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
         <Text style={styles.label}>{t('family.label_relation')}</Text>
         <Text style={styles.helperText}>{t('family.relation_helper')}</Text>
         <View style={styles.chipRow}>
@@ -802,61 +707,6 @@ export default function FamilyScreen({ navigation }: Props) {
         <Button title={t('family.add_dependent_btn')} onPress={handleAddManaged} loading={addingManaged} style={styles.modalCta} />
       </BottomSheet>
 
-      <BottomSheet visible={!!editingMember} onClose={() => setEditingMember(null)} title={t('family.sheet_title_edit')}>
-        <Text style={styles.label}>{editingMember?.name}</Text>
-        <View style={styles.chipRow}>
-          {ASSIGNABLE_ROLES.map((role) => (
-            <Pressable
-              key={role}
-              style={[styles.chip, editRole === role && styles.chipActive]}
-              onPress={() => setEditRole(role)}>
-              <Text style={[styles.chipText, editRole === role && styles.chipTextActive]}>
-                {t(`family.role_${role.toLowerCase()}`)}
-              </Text>
-            </Pressable>
-          ))}
-        </View>
-        {editingMember?.relationshipId && editRelation && editReciprocalRelation && (
-          <>
-            <Text style={styles.label}>{t('family.label_relation')}</Text>
-            <Text style={styles.helperText}>
-              {t('family.relation_correction_helper', { name: editingMember.relatedToName ?? '' })}
-            </Text>
-            <View style={styles.chipRow}>
-              {relationOptions.map(({ value }) => (
-                <Pressable
-                  key={value}
-                  style={[styles.chip, editRelation === value && styles.chipActive]}
-                  onPress={() => setEditRelation(value)}>
-                  <Text style={[styles.chipText, editRelation === value && styles.chipTextActive]}>
-                    {t(`family.relation_${value.toLowerCase()}`)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-            <Text style={styles.label}>{t('family.label_reciprocal_relation')}</Text>
-            <View style={styles.chipRow}>
-              {relationOptions.map(({ value }) => (
-                <Pressable
-                  key={value}
-                  style={[styles.chip, editReciprocalRelation === value && styles.chipActive]}
-                  onPress={() => setEditReciprocalRelation(value)}>
-                  <Text style={[styles.chipText, editReciprocalRelation === value && styles.chipTextActive]}>
-                    {t(`family.relation_${value.toLowerCase()}`)}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-          </>
-        )}
-        <Button title={t('family.save_changes')} onPress={handleSaveMemberRole} loading={savingMember} style={styles.modalCta} />
-        {editingMember && (
-          <Pressable style={styles.modalRemoveBtn} onPress={() => handleRemoveMember(editingMember)}>
-            <Text style={styles.modalRemoveText}>🗑️ {t('family.remove_member')}</Text>
-          </Pressable>
-        )}
-      </BottomSheet>
-
       <BottomSheet visible={!!viewingMember} onClose={() => setViewingMember(null)} title={t('family.sheet_title_view')}>
         {viewingMember && (
           <>
@@ -883,6 +733,13 @@ export default function FamilyScreen({ navigation }: Props) {
                   {t(`family.relation_${getDisplayRelation(viewingMember)!.toLowerCase()}`)}
                 </Text>
               </>
+            )}
+            {/* Only the creator can remove someone else, and never the creator's own
+                row — matches the backend's removeMember rule exactly. */}
+            {myMembership.isCreator && viewingMember.role !== 'OWNER' && (
+              <Pressable style={styles.modalRemoveBtn} onPress={() => handleRemoveMember(viewingMember)}>
+                <Text style={styles.modalRemoveText}>🗑️ {t('family.remove_member')}</Text>
+              </Pressable>
             )}
           </>
         )}
@@ -992,20 +849,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     fontSize: 11,
     color: colors.textMuted,
     marginTop: 2,
-  },
-  readonlyBanner: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
-    marginBottom: spacing.lg,
-  },
-  readonlyText: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.textMuted,
-    textAlign: 'center',
   },
   heroCard: {
     backgroundColor: colors.primary,

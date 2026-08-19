@@ -1,9 +1,11 @@
 // Matches `FamilyMemberResponse`/`FamilyResponse`/`FamilyInviteResponse` from
 // `Saheli Backend — Auth, Profile & Family.postman_collection.json`'s Family folder —
-// real backend shapes, not a local model. `OWNER` is permanent (assigned once at family
-// creation, never reassignable through the API); `ADMIN` can invite/remove/change
-// roles/manage dependents; `MEMBER` cannot.
-export type FamilyRole = 'OWNER' | 'ADMIN' | 'MEMBER';
+// real backend shapes, not a local model. `OWNER` is the family creator: permanent,
+// assigned once at family creation, never reassignable through the API, and the only
+// one who can remove another member. Everyone else is `MEMBER` — any member can invite
+// new people, add a managed (dependent) member, and leave the family themselves, but
+// cannot remove anyone else. There is no admin/viewer tier.
+export type FamilyRole = 'OWNER' | 'MEMBER';
 
 export type InviteStatus = 'PENDING' | 'ACCEPTED' | 'DECLINED' | 'CANCELLED';
 
@@ -116,7 +118,3 @@ export interface FamilyRelationship {
   relation: FamilyRelation;
   reciprocalRelation: FamilyRelation;
 }
-
-// Assignable at invite time or role-change time — OWNER is never one of these, per the
-// backend's "Ownership cannot be assigned this way" guardrail.
-export const ASSIGNABLE_ROLES: Exclude<FamilyRole, 'OWNER'>[] = ['ADMIN', 'MEMBER'];

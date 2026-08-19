@@ -2,7 +2,7 @@
   "info": {
     "_postman_id": "53029024-7099-4133-90dd-0e094bfeca63",
     "name": "Saheli Backend — Auth, Profile & Family",
-    "description": "Authentication (phone + OTP) and Profile CRUD for the Saheli Spring Boot backend.\n\n**Flow to run in order (Auth folder):**\n1. Register User — creates an unverified User row and issues an OTP\n2. Verify OTP (Register) — verifies the OTP, marks the user verified, returns access + refresh JWT\n3. Login User — for an already-verified phone, issues a fresh OTP\n4. Verify OTP (Login) — same endpoint as verify, returns fresh tokens\n5. Refresh Token — exchanges a refresh token for a new access + refresh pair\n6. Logout — blacklists the current access/refresh token (run last; invalidates `{{accessToken}}`/`{{refreshToken}}` for real, so re-run Verify OTP before continuing with Profile/Family)\n\nAll tokens/ids are captured automatically into collection variables by each request's Tests script, so requests can be run top-to-bottom with the Collection Runner.\n\n**Profile folder** requires `accessToken` to be set (run the Auth flow first). Auth is inherited at the collection level as a Bearer token using `{{accessToken}}`; the four Auth requests explicitly opt out of it since `/api/auth/**` is public. It also covers account soft-delete: **Request Account Deletion** (`PUT /api/profile/deletion/request`) and **Revoke Account Deletion** (`PUT /api/profile/deletion/revoke`) — deletion is a 30-day-grace-period soft-delete (`User.deletionRequestedAt`), hard-deleted later by `ProfileDeletionScheduler`; there is no immediate hard-delete endpoint.\n\nOTP demo mode is on by default in local dev (`OTP_DEMO_MODE=true`) — every OTP is `123456` and is echoed back in the response as `devOtp`, which the Register/Login requests capture into `{{otp}}` automatically.\n\n**Family folder** requires `accessToken` to be set (run the Auth flow first) and covers create/list/get, invite-consent membership, role updates, and member/managed-member removal (`/api/families/**`). Some requests (List My Pending Invites, Accept Invite, Decline Invite) must run as the *invited* user rather than the inviter — they override auth with the `invitedUserAccessToken` collection variable; run the Auth flow a second time for `invitedPhone` to populate it.",
+    "description": "Authentication (phone + OTP) and Profile CRUD for the Saheli Spring Boot backend.\n\n**Flow to run in order (Auth folder):**\n1. Register User — creates an unverified User row and issues an OTP\n2. Verify OTP (Register) — verifies the OTP, marks the user verified, returns access + refresh JWT\n3. Login User — for an already-verified phone, issues a fresh OTP\n4. Verify OTP (Login) — same endpoint as verify, returns fresh tokens\n5. Refresh Token — exchanges a refresh token for a new access + refresh pair\n\nAll tokens/ids are captured automatically into collection variables by each request's Tests script, so requests can be run top-to-bottom with the Collection Runner.\n\n**Profile folder** requires `accessToken` to be set (run the Auth flow first). Auth is inherited at the collection level as a Bearer token using `{{accessToken}}`; the four Auth requests explicitly opt out of it since `/api/auth/**` is public.\n\nOTP demo mode is on by default in local dev (`OTP_DEMO_MODE=true`) — every OTP is `123456` and is echoed back in the response as `devOtp`, which the Register/Login requests capture into `{{otp}}` automatically.\n\n**Family folder** requires `accessToken` to be set (run the Auth flow first) and covers create/list/get, invite-consent membership, role updates, and member/managed-member removal (`/api/families/**`). Some requests (List My Pending Invites, Accept Invite, Decline Invite) must run as the *invited* user rather than the inviter — they override auth with the `invitedUserAccessToken` collection variable; run the Auth flow a second time for `invitedPhone` to populate it.",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
     "_exporter_id": "51164236",
     "_collection_link": "https://go.postman.co/collection/51164236-53029024-7099-4133-90dd-0e094bfeca63?source=collection_link"
@@ -764,100 +764,9 @@
               "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"Invalid refresh token\",\n    \"path\": \"/api/auth/refresh\",\n    \"details\": []\n}"
             }
           ]
-        },
-        {
-          "name": "Logout",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"refreshToken\": \"{{refreshToken}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/auth/logout",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "auth",
-                "logout"
-              ]
-            },
-            "description": "Blacklists (in Redis, via `TokenBlacklistService`) the access token taken from the `Authorization` header and, if present in the body, the `refreshToken` too — both become unusable immediately even though neither has naturally expired yet. The body is optional; omit `refreshToken` (or send `{}`) to blacklist only the access token.\n\n`/api/auth/logout` sits under the public `/api/auth/**` path in `SecurityConfig` (no `authenticated()` check, not resolved via `@CurrentUser`), but `AuthController.logout` still reads whatever `Authorization: Bearer <token>` header is sent manually — send the Bearer token in Postman for the access-token blacklist to actually happen.\n\n**Note:** running this for real invalidates `{{accessToken}}`/`{{refreshToken}}` — re-run Verify OTP before continuing with the Profile/Family folders."
-          },
-          "response": [
-            {
-              "name": "200 OK — logged out",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"refreshToken\": \"{{supabase_service_role_api_key_0lxd}}...\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/auth/logout",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "auth",
-                    "logout"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "text",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "text/plain;charset=UTF-8"
-                }
-              ],
-              "cookie": [],
-              "body": "Logged out successfully"
-            }
-          ]
         }
       ],
-      "description": "Phone + OTP authentication. All endpoints under `/api/auth/**` are public (no Bearer token required — see `SecurityConfig.PUBLIC_PATHS`); Logout is the exception that still expects a Bearer access token in practice so it has something to blacklist."
+      "description": "Phone + OTP authentication. All endpoints under `/api/auth/**` are public (no Bearer token required — see `SecurityConfig.PUBLIC_PATHS`)."
     },
     {
       "name": "Profile",
@@ -1540,243 +1449,9 @@
               "body": ""
             }
           ]
-        },
-        {
-          "name": "Request Account Deletion",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "PUT",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/profile/deletion/request",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "profile",
-                "deletion",
-                "request"
-              ]
-            },
-            "description": "Soft-deletes the authenticated user's account by stamping `deletionRequestedAt` on the `User` row (`ProfileService.deleteProfile`). The account is not hard-deleted yet — `scheduler/ProfileDeletionScheduler` cascades a real hard-delete 30 days after this timestamp. Logging in again during the grace period surfaces the pending deletion via `OtpResponse.deletionPopup` (see the Login request in the Authentication folder). Fails with 400 if a deletion request is already pending. Requires a `USER`-typed Bearer access token."
-          },
-          "response": [
-            {
-              "name": "200 OK — deletion requested",
-              "originalRequest": {
-                "method": "PUT",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/profile/deletion/request",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "profile",
-                    "deletion",
-                    "request"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "text",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "text/plain;charset=UTF-8"
-                }
-              ],
-              "cookie": [],
-              "body": "Deletion request sent.Account deletion can still be stopped within 30 days of request"
-            },
-            {
-              "name": "400 Bad Request — deletion already requested",
-              "originalRequest": {
-                "method": "PUT",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/profile/deletion/request",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "profile",
-                    "deletion",
-                    "request"
-                  ]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Deletion Request already being sent\",\n    \"path\": \"/api/profile/deletion/request\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "403 Forbidden — missing or invalid access token",
-              "originalRequest": {
-                "method": "PUT",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/profile/deletion/request",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "profile",
-                    "deletion",
-                    "request"
-                  ]
-                }
-              },
-              "status": "Forbidden",
-              "code": 403,
-              "_postman_previewlanguage": "text",
-              "header": [],
-              "cookie": [],
-              "body": ""
-            }
-          ]
-        },
-        {
-          "name": "Revoke Account Deletion",
-          "request": {
-            "auth": {
-              "type": "bearer",
-              "bearer": [
-                {
-                  "key": "token",
-                  "value": "{{accessToken}}",
-                  "type": "string"
-                }
-              ]
-            },
-            "method": "PUT",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/profile/deletion/revoke",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "profile",
-                "deletion",
-                "revoke"
-              ]
-            },
-            "description": "Cancels a pending account deletion by clearing `deletionRequestedAt` on the `User` row (`ProfileService.revokeDeletionRequest`), stopping `scheduler/ProfileDeletionScheduler` from hard-deleting the account. Fails with 400 if no deletion was ever requested. Requires a `USER`-typed Bearer access token. Run **Request Account Deletion** first to have something to revoke."
-          },
-          "response": [
-            {
-              "name": "200 OK — deletion revoked",
-              "originalRequest": {
-                "method": "PUT",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/profile/deletion/revoke",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "profile",
-                    "deletion",
-                    "revoke"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "text",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "text/plain;charset=UTF-8"
-                }
-              ],
-              "cookie": [],
-              "body": "Deletion request being revoked successfully"
-            },
-            {
-              "name": "400 Bad Request — no deletion request pending",
-              "originalRequest": {
-                "method": "PUT",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/profile/deletion/revoke",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "profile",
-                    "deletion",
-                    "revoke"
-                  ]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-06T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Deletion request was never being initiated\",\n    \"path\": \"/api/profile/deletion/revoke\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "403 Forbidden — missing or invalid access token",
-              "originalRequest": {
-                "method": "PUT",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/profile/deletion/revoke",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "profile",
-                    "deletion",
-                    "revoke"
-                  ]
-                }
-              },
-              "status": "Forbidden",
-              "code": 403,
-              "_postman_previewlanguage": "text",
-              "header": [],
-              "cookie": [],
-              "body": ""
-            }
-          ]
         }
       ],
-      "description": "Post-registration onboarding CRUD, plus soft-delete account lifecycle (`deletion/request`, `deletion/revoke`). All endpoints require a `USER`-typed Bearer access token (`authenticated()` in `SecurityConfig`, resolved via `@CurrentUser`)."
+      "description": "Post-registration onboarding CRUD. All endpoints require a `USER`-typed Bearer access token (`authenticated()` in `SecurityConfig`, resolved via `@CurrentUser`)."
     },
     {
       "name": "Family",
@@ -1861,7 +1536,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null,\n            \"relationshipId\": null,\n            \"relatedToUserId\": null,\n            \"relatedToName\": null,\n            \"relation\": null,\n            \"reciprocalRelation\": null\n        }\n    ]\n}"
+              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        }\n    ]\n}"
             },
             {
               "name": "400 Bad Request — blank name",
@@ -1981,7 +1656,7 @@
                 }
               ],
               "cookie": [],
-              "body": "[\n    {\n        \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"name\": \"Sharma Family\",\n        \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n        \"members\": [\n            {\n                \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n                \"name\": \"Aarti Sharma\",\n                \"role\": \"OWNER\",\n                \"managed\": false,\n                \"managedMemberId\": null,\n                \"relationshipId\": null,\n                \"relatedToUserId\": null,\n                \"relatedToName\": null,\n                \"relation\": null,\n                \"reciprocalRelation\": null\n            }\n        ]\n    }\n]"
+              "body": "[\n    {\n        \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"name\": \"Sharma Family\",\n        \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n        \"members\": [\n            {\n                \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n                \"name\": \"Aarti Sharma\",\n                \"role\": \"OWNER\",\n                \"managed\": false,\n                \"managedMemberId\": null\n            }\n        ]\n    }\n]"
             },
             {
               "name": "403 Forbidden - No accesstoken provided List My Families",
@@ -2107,7 +1782,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null,\n            \"relationshipId\": null,\n            \"relatedToUserId\": null,\n            \"relatedToName\": null,\n            \"relation\": null,\n            \"reciprocalRelation\": null\n        }\n    ]\n}"
+              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        }\n    ]\n}"
             },
             {
               "name": "401 Unauthorized — caller is not a member of this family",
@@ -2170,56 +1845,6 @@
           ]
         },
         {
-          "name": "List Relation Options",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/families/relations",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "families",
-                "relations"
-              ]
-            },
-            "description": "Static lookup of every valid FamilyRelation value with its suggestedReciprocals - no family context needed. Use this to populate the relation picker on Invite Member and the reciprocalRelation picker on Accept Invite instead of hardcoding the enum (see docs/DECISIONS.md D-014)."
-          },
-          "response": [
-            {
-              "name": "200 OK — relation options",
-              "originalRequest": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/relations",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "relations"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "[\n    {\n        \"value\": \"MOTHER\",\n        \"suggestedReciprocals\": [\"SON\", \"DAUGHTER\"]\n    },\n    {\n        \"value\": \"FATHER\",\n        \"suggestedReciprocals\": [\"SON\", \"DAUGHTER\"]\n    },\n    {\n        \"value\": \"SON\",\n        \"suggestedReciprocals\": [\"MOTHER\", \"FATHER\"]\n    },\n    {\n        \"value\": \"DAUGHTER\",\n        \"suggestedReciprocals\": [\"MOTHER\", \"FATHER\"]\n    },\n    {\n        \"value\": \"HUSBAND\",\n        \"suggestedReciprocals\": [\"WIFE\"]\n    },\n    {\n        \"value\": \"WIFE\",\n        \"suggestedReciprocals\": [\"HUSBAND\"]\n    },\n    {\n        \"value\": \"BROTHER\",\n        \"suggestedReciprocals\": [\"BROTHER\", \"SISTER\"]\n    },\n    {\n        \"value\": \"SISTER\",\n        \"suggestedReciprocals\": [\"BROTHER\", \"SISTER\"]\n    },\n    {\n        \"value\": \"GRANDFATHER\",\n        \"suggestedReciprocals\": [\"GRANDSON\", \"GRANDDAUGHTER\"]\n    },\n    {\n        \"value\": \"GRANDMOTHER\",\n        \"suggestedReciprocals\": [\"GRANDSON\", \"GRANDDAUGHTER\"]\n    },\n    {\n        \"value\": \"GRANDSON\",\n        \"suggestedReciprocals\": [\"GRANDFATHER\", \"GRANDMOTHER\"]\n    },\n    {\n        \"value\": \"GRANDDAUGHTER\",\n        \"suggestedReciprocals\": [\"GRANDFATHER\", \"GRANDMOTHER\"]\n    },\n    {\n        \"value\": \"UNCLE\",\n        \"suggestedReciprocals\": [\"NEPHEW\", \"NIECE\"]\n    },\n    {\n        \"value\": \"AUNT\",\n        \"suggestedReciprocals\": [\"NEPHEW\", \"NIECE\"]\n    },\n    {\n        \"value\": \"NEPHEW\",\n        \"suggestedReciprocals\": [\"UNCLE\", \"AUNT\"]\n    },\n    {\n        \"value\": \"NIECE\",\n        \"suggestedReciprocals\": [\"UNCLE\", \"AUNT\"]\n    },\n    {\n        \"value\": \"COUSIN\",\n        \"suggestedReciprocals\": [\"COUSIN\"]\n    },\n    {\n        \"value\": \"FRIEND\",\n        \"suggestedReciprocals\": [\"FRIEND\"]\n    },\n    {\n        \"value\": \"OTHER\",\n        \"suggestedReciprocals\": [\"OTHER\"]\n    }\n]"
-            }
-          ]
-        },
-        {
           "name": "Invite Member",
           "event": [
             {
@@ -2252,7 +1877,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"phone\": \"{{invitedPhone}}\",\n    \"role\": \"MEMBER\",\n    \"relation\": \"MOTHER\"\n}"
+              "raw": "{\n    \"phone\": \"{{invitedPhone}}\",\n    \"relation\": \"MOTHER\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -2266,7 +1891,7 @@
                 "members"
               ]
             },
-            "description": "Creates a PENDING FamilyInvite for an already-registered user by phone — does not attach them as a member yet (superseded the old immediate-attach behavior, see docs/DECISIONS.md D-012). The target accepts/declines via the Accept/Decline Invite requests below, run as that user. Requires OWNER/ADMIN on the family (requireAdminAccess). role cannot be OWNER. relation is the invited person's relation to the caller (e.g. inviting your mother: relation MOTHER) — see docs/DECISIONS.md D-014; the invitee sets the reciprocal relation themselves when accepting.\n\n{{invitedPhone}} must already be a verified registered user — run the Auth folder's Register to Verify OTP flow for that phone first (in a second Postman run, or temporarily swap {{phone}})."
+            "description": "Creates a PENDING FamilyInvite for an already-registered user by phone — does not attach them as a member yet (superseded the old immediate-attach behavior, see docs/DECISIONS.md D-012). The target accepts/declines via the Accept/Decline Invite requests below, run as that user. Any member of the family can invite (docs/DECISIONS.md D-039, 2026-08-18) — there is no admin-only gate any more, and the invited member is always created as MEMBER (there is no role field on this request; OWNER is permanent and assigned only at family creation). relation is required — the invitee's relation to the caller, e.g. inviting your mother: relation: \"MOTHER\".\n\n{{invitedPhone}} must already be a verified registered user — run the Auth folder's Register to Verify OTP flow for that phone first (in a second Postman run, or temporarily swap {{phone}})."
           },
           "response": [
             {
@@ -2281,7 +1906,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\",\n    \"relation\": \"MOTHER\"\n}"
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"relation\": \"MOTHER\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -2306,7 +1931,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n    \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"familyName\": \"Sharma Family\",\n    \"invitedByName\": \"Aarti Sharma\",\n    \"role\": \"MEMBER\",\n    \"relation\": \"MOTHER\",\n    \"suggestedReciprocalRelations\": [\"SON\", \"DAUGHTER\"],\n    \"status\": \"PENDING\",\n    \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n}"
+              "body": "{\n    \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n    \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"familyName\": \"Sharma Family\",\n    \"invitedByName\": \"Aarti Sharma\",\n    \"role\": \"MEMBER\",\n    \"status\": \"PENDING\",\n    \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n}"
             },
             {
               "name": "400 Bad Request — no registered user with that phone",
@@ -2320,7 +1945,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9000000001\",\n    \"role\": \"MEMBER\",\n    \"relation\": \"MOTHER\"\n}"
+                  "raw": "{\n    \"phone\": \"9000000001\",\n    \"relation\": \"MOTHER\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -2359,7 +1984,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\",\n    \"relation\": \"MOTHER\"\n}"
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"relation\": \"MOTHER\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -2398,7 +2023,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\",\n    \"relation\": \"MOTHER\"\n}"
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"relation\": \"MOTHER\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -2424,84 +2049,6 @@
               ],
               "cookie": [],
               "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"User already has a pending invite to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "400 Bad Request — role OWNER is not assignable",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"OWNER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members"
-                  ]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Ownership cannot be assigned this way\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\",\n    \"relation\": \"MOTHER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
             }
           ]
         },
@@ -2561,7 +2108,7 @@
                 }
               ],
               "cookie": [],
-              "body": "[\n    {\n        \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n        \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"familyName\": \"Sharma Family\",\n        \"invitedByName\": \"Aarti Sharma\",\n        \"role\": \"MEMBER\",\n        \"relation\": \"MOTHER\",\n        \"suggestedReciprocalRelations\": [\"SON\", \"DAUGHTER\"],\n        \"status\": \"PENDING\",\n        \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n    }\n]"
+              "body": "[\n    {\n        \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n        \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"familyName\": \"Sharma Family\",\n        \"invitedByName\": \"Aarti Sharma\",\n        \"role\": \"MEMBER\",\n        \"status\": \"PENDING\",\n        \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n    }\n]"
             },
             {
               "name": "403 Forbidden - No accessToken provided for the invited member List My Pending Invites",
@@ -2673,16 +2220,7 @@
               ]
             },
             "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"reciprocalRelation\": \"SON\"\n}"
-            },
+            "header": [],
             "url": {
               "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
               "host": [
@@ -2696,23 +2234,14 @@
                 "accept"
               ]
             },
-            "description": "Accepts a PENDING invite addressed to the caller: creates the FamilyMember with the invite's role and relation, marks the invite ACCEPTED. Run as the invited user ({{invitedUserAccessToken}}, see List My Pending Invites). reciprocalRelation is the inviter's relation to the caller (e.g. accepting a MOTHER invite: reciprocalRelation SON or DAUGHTER) - see the invite's suggestedReciprocalRelations for candidates. Capacity is re-checked here, not just at invite time."
+            "description": "Accepts a PENDING invite addressed to the caller: creates the FamilyMember with the invite's role, marks the invite ACCEPTED. Run as the invited user ({{invitedUserAccessToken}}, see List My Pending Invites). Capacity is re-checked here, not just at invite time."
           },
           "response": [
             {
               "name": "200 OK — invite accepted, now a member",
               "originalRequest": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"reciprocalRelation\": \"SON\"\n}"
-                },
+                "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
                   "host": [
@@ -2737,22 +2266,13 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null,\n            \"relationshipId\": null,\n            \"relatedToUserId\": null,\n            \"relatedToName\": null,\n            \"relation\": null,\n            \"reciprocalRelation\": null\n        },\n        {\n            \"id\": \"d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n            \"name\": \"Rahul Sharma\",\n            \"role\": \"MEMBER\",\n            \"managed\": false,\n            \"managedMemberId\": null,\n            \"relationshipId\": \"a7b8c9d0-e1f2-4345-a678-9abcdef01234\",\n            \"relatedToUserId\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"relatedToName\": \"Aarti Sharma\",\n            \"relation\": \"SON\",\n            \"reciprocalRelation\": \"MOTHER\"\n        }\n    ]\n}"
+              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        },\n        {\n            \"id\": \"d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n            \"name\": \"Rahul Sharma\",\n            \"role\": \"MEMBER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        }\n    ]\n}"
             },
             {
               "name": "400 Bad Request — invite no longer pending",
               "originalRequest": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"reciprocalRelation\": \"SON\"\n}"
-                },
+                "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
                   "host": [
@@ -2783,16 +2303,7 @@
               "name": "400 Bad Request — family is full",
               "originalRequest": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"reciprocalRelation\": \"SON\"\n}"
-                },
+                "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
                   "host": [
@@ -2823,16 +2334,7 @@
               "name": "404 Not Found — invite does not exist or belongs to someone else",
               "originalRequest": {
                 "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"reciprocalRelation\": \"SON\"\n}"
-                },
+                "header": [],
                 "url": {
                   "raw": "{{baseUrl}}/api/families/invites/{{inviteId}}/accept",
                   "host": [
@@ -2968,7 +2470,7 @@
                 "invites"
               ]
             },
-            "description": "Every PENDING invite outstanding for this family. Requires OWNER/ADMIN (requireAdminAccess) — run with the inviter's token."
+            "description": "Every PENDING invite outstanding for this family. Any member can read (docs/DECISIONS.md D-039, 2026-08-18 — previously required OWNER/ADMIN)."
           },
           "response": [
             {
@@ -2999,37 +2501,7 @@
                 }
               ],
               "cookie": [],
-              "body": "[\n    {\n        \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n        \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"familyName\": \"Sharma Family\",\n        \"invitedByName\": \"Aarti Sharma\",\n        \"role\": \"MEMBER\",\n        \"relation\": \"MOTHER\",\n        \"suggestedReciprocalRelations\": [\"SON\", \"DAUGHTER\"],\n        \"status\": \"PENDING\",\n        \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n    }\n]"
-            },
-            {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
-              "originalRequest": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/invites",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "invites"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/invites\",\n    \"details\": []\n}"
+              "body": "[\n    {\n        \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n        \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"familyName\": \"Sharma Family\",\n        \"invitedByName\": \"Aarti Sharma\",\n        \"role\": \"MEMBER\",\n        \"status\": \"PENDING\",\n        \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n    }\n]"
             }
           ]
         },
@@ -3051,7 +2523,7 @@
                 "{{inviteId}}"
               ]
             },
-            "description": "Cancels a still-PENDING invite before the target responds to it. Requires OWNER/ADMIN. Run this only if you did not already Accept/Decline the same {{inviteId}} above."
+            "description": "Cancels a still-PENDING invite before the target responds to it. Any member can cancel (docs/DECISIONS.md D-039, 2026-08-18 — previously required OWNER/ADMIN). Run this only if you did not already Accept/Decline the same {{inviteId}} above."
           },
           "response": [
             {
@@ -3145,543 +2617,6 @@
           ]
         },
         {
-          "name": "List Relationships",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test(\"Status code is 200\", function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "",
-                  "if (pm.response.code === 200) {",
-                  "    const json = pm.response.json();",
-                  "    if (json.length > 0) {",
-                  "        pm.collectionVariables.set(\"relationshipId\", json[json.length - 1].id);",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/families/{{familyId}}/relationships",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "families",
-                "{{familyId}}",
-                "relationships"
-              ]
-            },
-            "description": "Lists every FamilyRelationship in the family - one per User-backed non-owner FamilyMember, created on invite accept (see docs/DECISIONS.md D-014). Each row has its own id, separate from the FamilyMember/FamilyInvite it came from, so it can be looked up/corrected without touching membership. Any member can read (requireRole)."
-          },
-          "response": [
-            {
-              "name": "200 OK — relationships in this family",
-              "originalRequest": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/relationships",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "relationships"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "[\n    {\n        \"id\": \"a7b8c9d0-e1f2-4345-a678-9abcdef01234\",\n        \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"familyMemberId\": \"d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n        \"memberName\": \"Rahul Sharma\",\n        \"relatedToUserId\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n        \"relatedToName\": \"Aarti Sharma\",\n        \"relation\": \"SON\",\n        \"reciprocalRelation\": \"MOTHER\"\n    }\n]"
-            },
-            {
-              "name": "401 Unauthorized — caller is not a member of this family",
-              "originalRequest": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/relationships",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "relationships"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/relationships\",\n    \"details\": []\n}"
-            }
-          ]
-        },
-        {
-          "name": "Get Relationship",
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/families/{{familyId}}/relationships/{{relationshipId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "families",
-                "{{familyId}}",
-                "relationships",
-                "{{relationshipId}}"
-              ]
-            },
-            "description": "Fetches a single FamilyRelationship by id (captured from List Relationships, or from relationshipId on a FamilyMemberResponse). Any member can read (requireRole)."
-          },
-          "response": [
-            {
-              "name": "200 OK — relationship",
-              "originalRequest": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/relationships/{{relationshipId}}",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "relationships",
-                    "{{relationshipId}}"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"id\": \"a7b8c9d0-e1f2-4345-a678-9abcdef01234\",\n    \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"familyMemberId\": \"d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n    \"memberName\": \"Rahul Sharma\",\n    \"relatedToUserId\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n    \"relatedToName\": \"Aarti Sharma\",\n    \"relation\": \"SON\",\n    \"reciprocalRelation\": \"MOTHER\"\n}"
-            },
-            {
-              "name": "404 Not Found — relationship does not exist for this family",
-              "originalRequest": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/relationships/{{relationshipId}}",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "relationships",
-                    "{{relationshipId}}"
-                  ]
-                }
-              },
-              "status": "Not Found",
-              "code": 404,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Relationship not found\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/relationships/a7b8c9d0-e1f2-4345-a678-9abcdef01234\",\n    \"details\": []\n}"
-            }
-          ]
-        },
-        {
-          "name": "Update Relationship (admin)",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"relation\": \"SON\",\n    \"reciprocalRelation\": \"FATHER\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/families/{{familyId}}/relationships/{{relationshipId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "families",
-                "{{familyId}}",
-                "relationships",
-                "{{relationshipId}}"
-              ]
-            },
-            "description": "Corrects a relationship after the fact - e.g. the invitee picked the wrong reciprocal at accept time. Requires OWNER/ADMIN (requireAdminAccess). This is the reason the relationship has its own id (docs/DECISIONS.md D-014) instead of being plain columns on FamilyMember: it can be revised here without touching membership."
-          },
-          "response": [
-            {
-              "name": "200 OK — relationship updated",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"relation\": \"SON\",\n    \"reciprocalRelation\": \"FATHER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/relationships/{{relationshipId}}",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "relationships",
-                    "{{relationshipId}}"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"id\": \"a7b8c9d0-e1f2-4345-a678-9abcdef01234\",\n    \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"familyMemberId\": \"d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n    \"memberName\": \"Rahul Sharma\",\n    \"relatedToUserId\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n    \"relatedToName\": \"Aarti Sharma\",\n    \"relation\": \"SON\",\n    \"reciprocalRelation\": \"FATHER\"\n}"
-            },
-            {
-              "name": "401 Unauthorized — caller does not have admin access",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"relation\": \"SON\",\n    \"reciprocalRelation\": \"FATHER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/relationships/{{relationshipId}}",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "relationships",
-                    "{{relationshipId}}"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/relationships/a7b8c9d0-e1f2-4345-a678-9abcdef01234\",\n    \"details\": []\n}"
-            }
-          ]
-        },
-        {
-          "name": "Update Member Role",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"role\": \"ADMIN\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "families",
-                "{{familyId}}",
-                "members",
-                "{{familyMemberId}}",
-                "role"
-              ]
-            },
-            "description": "Changes a member's role. Requires OWNER/ADMIN (requireAdminAccess). role cannot be OWNER, and a member whose current role is OWNER cannot be changed at all — ownership is permanent and non-transferable through this endpoint (see docs/DECISIONS.md D-013)."
-          },
-          "response": [
-            {
-              "name": "200 OK — role updated",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null,\n            \"relationshipId\": null,\n            \"relatedToUserId\": null,\n            \"relatedToName\": null,\n            \"relation\": null,\n            \"reciprocalRelation\": null\n        },\n        {\n            \"id\": \"d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n            \"name\": \"Rahul Sharma\",\n            \"role\": \"ADMIN\",\n            \"managed\": false,\n            \"managedMemberId\": null,\n            \"relationshipId\": \"a7b8c9d0-e1f2-4345-a678-9abcdef01234\",\n            \"relatedToUserId\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"relatedToName\": \"Aarti Sharma\",\n            \"relation\": \"SON\",\n            \"reciprocalRelation\": \"MOTHER\"\n        }\n    ]\n}"
-            },
-            {
-              "name": "400 Bad Request — cannot change the owner's role",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"MEMBER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Cannot change the family owner's role\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/b2c3d4e5-f6a7-4890-b123-456789abcdef/role\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "400 Bad Request — role OWNER is not assignable",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"OWNER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Ownership cannot be assigned this way\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01/role\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "404 Not Found — family member does not exist",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "Not Found",
-              "code": 404,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family member not found\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01/role\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01/role\",\n    \"details\": []\n}"
-            }
-          ]
-        },
-        {
           "name": "Remove Member",
           "request": {
             "method": "DELETE",
@@ -3699,7 +2634,7 @@
                 "{{familyMemberId}}"
               ]
             },
-            "description": "Removes a member (unlinks the FamilyMember row; works for either a User-backed or ManagedMember-backed row, but does not touch the underlying ManagedMember record — see Remove Managed Member for that). Requires OWNER/ADMIN. The OWNER can never be removed."
+            "description": "Removes a member (unlinks the FamilyMember row; works for either a User-backed or ManagedMember-backed row, but does not touch the underlying ManagedMember record — see Remove Managed Member for that). Since docs/DECISIONS.md D-039 (2026-08-18): the caller must either be the family creator (OWNER) removing someone else, or be removing themselves (self-service leave) — a non-creator member targeting anyone but their own row gets 401 \"Only the family creator can remove other members\". The OWNER can never be removed, including by themselves."
           },
           "response": [
             {
@@ -3757,7 +2692,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Cannot remove the family owner\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n    \"details\": []\n}"
+              "body": "{\n    \"timestamp\": \"2026-08-18T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Cannot remove the family creator\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n    \"details\": []\n}"
             },
             {
               "name": "404 Not Found — family member does not exist",
@@ -3837,7 +2772,7 @@
                 "managed-members"
               ]
             },
-            "description": "Creates a ManagedMember (a dependent with no login of their own — e.g. an elderly parent or child) owned by the caller, and attaches them to the family with role MEMBER immediately (no invite/consent step — a ManagedMember cannot consent for themselves). Requires OWNER/ADMIN."
+            "description": "Creates a ManagedMember (a dependent with no login of their own — e.g. an elderly parent or child) owned by the caller, and attaches them to the family with role MEMBER immediately (no invite/consent step — a ManagedMember cannot consent for themselves). Any member can add one (docs/DECISIONS.md D-039, 2026-08-18 — previously required OWNER/ADMIN); removing one is still creator-only, see Remove Managed Member."
           },
           "response": [
             {
@@ -3877,7 +2812,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null,\n            \"relationshipId\": null,\n            \"relatedToUserId\": null,\n            \"relatedToName\": null,\n            \"relation\": null,\n            \"reciprocalRelation\": null\n        },\n        {\n            \"id\": \"e5f6a7b8-c9d0-4123-e456-789abcdef012\",\n            \"name\": \"Grandma Sharma\",\n            \"role\": \"MEMBER\",\n            \"managed\": true,\n            \"managedMemberId\": \"f6a7b8c9-d0e1-4234-f567-89abcdef0123\",\n            \"relationshipId\": null,\n            \"relatedToUserId\": null,\n            \"relatedToName\": null,\n            \"relation\": null,\n            \"reciprocalRelation\": null\n        }\n    ]\n}"
+              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        },\n        {\n            \"id\": \"e5f6a7b8-c9d0-4123-e456-789abcdef012\",\n            \"name\": \"Grandma Sharma\",\n            \"role\": \"MEMBER\",\n            \"managed\": true,\n            \"managedMemberId\": \"f6a7b8c9-d0e1-4234-f567-89abcdef0123\"\n        }\n    ]\n}"
             },
             {
               "name": "400 Bad Request — family is full",
@@ -3917,45 +2852,6 @@
               ],
               "cookie": [],
               "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Family already has the maximum of 5 members\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"name\": \"Grandma Sharma\",\n    \"relationship\": \"Mother\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "managed-members"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members\",\n    \"details\": []\n}"
             }
           ]
         },
@@ -3977,7 +2873,7 @@
                 "{{managedMemberId}}"
               ]
             },
-            "description": "Fully retires a dependent: deletes the FamilyMember link and sets ManagedMember.active = false. Takes the managedMemberId (from FamilyMemberResponse.managedMemberId), not the familyMemberId — distinct from Remove Member, which only unlinks. Requires OWNER/ADMIN."
+            "description": "Fully retires a dependent: deletes the FamilyMember link and sets ManagedMember.active = false. Takes the managedMemberId (from FamilyMemberResponse.managedMemberId), not the familyMemberId — distinct from Remove Member, which only unlinks. Creator-only (docs/DECISIONS.md D-039, 2026-08-18) — any member can add a managed member, but only the family creator (OWNER) can remove one."
           },
           "response": [
             {
@@ -4038,7 +2934,7 @@
               "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Managed member not found in this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members/f6a7b8c9-d0e1-4234-f567-89abcdef0123\",\n    \"details\": []\n}"
             },
             {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
+              "name": "401 Unauthorized — caller is not the family creator",
               "originalRequest": {
                 "method": "DELETE",
                 "header": [],
@@ -4066,7 +2962,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members/f6a7b8c9-d0e1-4234-f567-89abcdef0123\",\n    \"details\": []\n}"
+              "body": "{\n    \"timestamp\": \"2026-08-18T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"Only the family creator can perform this action\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members/f6a7b8c9-d0e1-4234-f567-89abcdef0123\",\n    \"details\": []\n}"
             }
           ]
         },
@@ -4158,7 +3054,7 @@
                 }
               ],
               "cookie": [],
-              "body": "[\n    {\n        \"id\": \"2534dfb5-5baa-4f0c-910f-b33ad4c5e9b0\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"relation\": \"MOTHER\",\n        \"suggestedReciprocalRelations\": [\"SON\", \"DAUGHTER\"],\n        \"status\": \"ACCEPTED\",\n        \"createdAt\": \"2026-08-10T08:20:41.973081Z\"\n    },\n    {\n        \"id\": \"273b83a7-551c-4de1-bd58-4c53311c9591\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"relation\": \"MOTHER\",\n        \"suggestedReciprocalRelations\": [\"SON\", \"DAUGHTER\"],\n        \"status\": \"ACCEPTED\",\n        \"createdAt\": \"2026-08-10T10:18:00.657295Z\"\n    },\n    {\n        \"id\": \"2d3fe2b9-7c6d-4de0-b6dd-3b2f94639283\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"relation\": \"MOTHER\",\n        \"suggestedReciprocalRelations\": [\"SON\", \"DAUGHTER\"],\n        \"status\": \"CANCELLED\",\n        \"createdAt\": \"2026-08-10T10:18:50.807555Z\"\n    },\n    {\n        \"id\": \"766557b0-e493-4164-acf5-f7ca89f65897\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"relation\": \"MOTHER\",\n        \"suggestedReciprocalRelations\": [\"SON\", \"DAUGHTER\"],\n        \"status\": \"DECLINED\",\n        \"createdAt\": \"2026-08-10T10:18:26.296505Z\"\n    },\n    {\n        \"id\": \"92257e86-67ff-4668-8d3f-812737aafe80\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"relation\": \"MOTHER\",\n        \"suggestedReciprocalRelations\": [\"SON\", \"DAUGHTER\"],\n        \"status\": \"DECLINED\",\n        \"createdAt\": \"2026-08-10T10:18:32.920140Z\"\n    }\n]"
+              "body": "[\n    {\n        \"id\": \"2534dfb5-5baa-4f0c-910f-b33ad4c5e9b0\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"ACCEPTED\",\n        \"createdAt\": \"2026-08-10T08:20:41.973081Z\"\n    },\n    {\n        \"id\": \"273b83a7-551c-4de1-bd58-4c53311c9591\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"ACCEPTED\",\n        \"createdAt\": \"2026-08-10T10:18:00.657295Z\"\n    },\n    {\n        \"id\": \"2d3fe2b9-7c6d-4de0-b6dd-3b2f94639283\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"CANCELLED\",\n        \"createdAt\": \"2026-08-10T10:18:50.807555Z\"\n    },\n    {\n        \"id\": \"766557b0-e493-4164-acf5-f7ca89f65897\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"DECLINED\",\n        \"createdAt\": \"2026-08-10T10:18:26.296505Z\"\n    },\n    {\n        \"id\": \"92257e86-67ff-4668-8d3f-812737aafe80\",\n        \"familyId\": \"6de0d911-f3e7-412e-9f25-5fde52bed8fd\",\n        \"familyName\": \"Chowdhury's\",\n        \"invitedByName\": \"Ayush Chowdhury\",\n        \"role\": \"MEMBER\",\n        \"status\": \"DECLINED\",\n        \"createdAt\": \"2026-08-10T10:18:32.920140Z\"\n    }\n]"
             },
             {
               "name": "401-ERROR-LIstFamilyHistroyWith wrongFamilyId",
@@ -4246,7 +3142,7 @@
           ]
         }
       ],
-      "description": "Family multi-tenancy: create/list/get, invite-consent membership (invite then accept/decline/cancel), role updates, and member/managed-member removal. All endpoints require a USER-typed Bearer access token; every write goes through FamilyAccessService (requireAdminAccess for membership changes, requireRole for reads). Accept/Decline/List-My-Invites requests run as the invited user via {{invitedUserAccessToken}}, overriding the collection default — see each request's description."
+      "description": "Family multi-tenancy: create/list/get, invite-consent membership (invite then accept/decline), and member/managed-member removal. All endpoints require a USER-typed Bearer access token. Role model simplified 2026-08-18 (docs/DECISIONS.md D-039): only OWNER (the family creator, permanent) and MEMBER exist — every write goes through FamilyAccessService, with requireRole (any member) covering invites, managed-member add, and reads, and requireCreatorAccess (OWNER only) covering member/managed-member removal — removeMember additionally allows a non-creator member to remove *themselves* (self-service leave). Accept/Decline/List-My-Invites requests run as the invited user via {{invitedUserAccessToken}}, overriding the collection default — see each request's description."
     },
     {
       "name": "Medchest",
@@ -5190,7 +4086,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n  \"name\": \"Paracetamol\",\r\n  \"dosage\": \"500mg\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"stockQuantity\": 10,\r\n  \"lowStockThreshold\": 6\r\n}",
+              "raw": "{\r\n  \"name\": \"Tab. Omega-3\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"dosage\" : \"1 capsule\"\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -5719,11 +4615,12 @@
                 "{{familyProfileId}}",
                 "documents"
               ]
-            }
+            },
+            "description": "Runs the uploaded file through an AI extraction step and auto-creates Medicine rows from whatever it reads, before saving the document itself. As of docs/DECISIONS.md D-039 (2026-08-18) the response's ocrStatus genuinely reflects the outcome — PROCESSED on a successful extraction, FAILED on any parsing error (bad image, invalid AI JSON, etc.) — instead of always being PENDING as the 200 example below (captured 2026-08-11, predates this fix) shows. The response also gained extractedMedicineNames: string[] — the names of any medicines just auto-created from this specific upload (empty if none, e.g. on FAILED or if every extracted name collided with an existing medicine, which since D-039 is skipped rather than aborting the whole upload). Full current shape: {id, originalFilename, documentType, uploadedAt, ocrStatus, documentPath, extractedMedicineNames}."
           },
           "response": [
             {
-              "name": "200 OK-MedicalDocumentsUpload",
+              "name": "200 OK-MedicalDocumentsUpload (2026-08-11 capture, predates D-039 — ocrStatus/extractedMedicineNames now differ, see request description)",
               "originalRequest": {
                 "method": "POST",
                 "header": [],
@@ -6631,6 +5528,452 @@
               "body": "[\n    {\n        \"id\": \"156a31e8-f8e2-42d1-ab05-4acc8c744ff2\",\n        \"relationshipType\": \"SELF\",\n        \"createdAt\": \"2026-08-13T06:02:55.606591Z\",\n        \"updatedAt\": \"2026-08-13T06:02:55.606591Z\"\n    },\n    {\n        \"id\": \"ca96abab-2990-4e2c-b314-03609e9c4a52\",\n        \"relationshipType\": \"KID\",\n        \"createdAt\": \"2026-08-13T06:02:55.606591Z\",\n        \"updatedAt\": \"2026-08-13T06:02:55.606591Z\"\n    },\n    {\n        \"id\": \"d3fa58b3-4bef-4975-902c-ba9e32965120\",\n        \"relationshipType\": \"ELDER\",\n        \"createdAt\": \"2026-08-13T06:02:55.606591Z\",\n        \"updatedAt\": \"2026-08-13T06:02:55.606591Z\"\n    },\n    {\n        \"id\": \"68a11c54-82f3-4bbf-9839-766e2ef9eeb8\",\n        \"relationshipType\": \"OTHER\",\n        \"createdAt\": \"2026-08-13T06:02:55.606591Z\",\n        \"updatedAt\": \"2026-08-13T06:02:55.606591Z\"\n    }\n]"
             }
           ]
+        },
+        {
+          "name": "Delete medicine",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "localhost:8080/api/medicine/eec84ba4-799e-4cd1-a594-f796630ed09b",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "medicine",
+                "eec84ba4-799e-4cd1-a594-f796630ed09b"
+              ]
+            },
+            "description": "Note the singular `medicine` in the path (every other medicine route is plural `medicines`) — a real inconsistency in the backend's own routing, left as-is. Until docs/DECISIONS.md D-039 (2026-08-18) this endpoint had NO access control at all — any authenticated user could delete any medicine in the system by id, cross-family. It now requires the caller to be a member of the medicine's family (any member, not just the creator), via the same requireWriteAccess check every other write on this domain uses — a caller who isn't a member of that family now gets 401 \"You do not have write access to this family\" instead of silently succeeding. It also now looks the medicine up the same way every other method in MedicineService does (a 404 \"Medicine not found\" on a bad id), replacing the ad hoc existsById/deleteById pair it used before — see the 400 example below, captured before this fix, which is superseded by that change (a bad id now 404s, not 400)."
+          },
+          "response": [
+            {
+              "name": "400 Bad Request - Medicine id does not exist (pre-D-039 capture, superseded — see request description)",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/medicine/feef5209-17e6-4374-b863-c56c2174068e",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "medicine",
+                    "feef5209-17e6-4374-b863-c56c2174068e"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:40:18 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-17T10:40:18.660650600Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Medicine doesnot exists\",\n    \"path\": \"/api/medicine/feef5209-17e6-4374-b863-c56c2174068e\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "200 OK-Delete medicine",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/medicine/3549b48f-783a-4a26-8353-937f9befb07a",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "medicine",
+                    "3549b48f-783a-4a26-8353-937f9befb07a"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain;charset=UTF-8"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "20"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:41:50 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "Deleted Successfully"
+            }
+          ]
+        },
+        {
+          "name": "List Profiles",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": [
+            {
+              "name": "200 OK- List profiles",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/families/{{familyId}}/profiles",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:32:52 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"e468b074-c3bd-4371-ae97-4ceb25adcd21\",\n        \"familyMemberId\": null,\n        \"name\": \"GrandMa Sharma\",\n        \"category\": \"KID\",\n        \"dateOfBirth\": \"2026-08-11\"\n    }\n]"
+            },
+            {
+              "name": "403 Forbidden -No auth token given",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/families/{{familyId}}/profiles",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "0"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:33:30 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": null
+            },
+            {
+              "name": "401 Unauthorized- Wrong family id given",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/families/{{familyId}}/profiles",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:34:07 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-17T10:34:07.242732500Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/e10adce-49ea-489c-8ac1-aefa4bcbc275/profiles\",\n    \"details\": []\n}"
+            }
+          ]
         }
       ]
     }
@@ -6710,10 +6053,6 @@
     },
     {
       "key": "inviteId",
-      "value": ""
-    },
-    {
-      "key": "relationshipId",
       "value": ""
     },
     {
