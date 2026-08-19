@@ -31,7 +31,14 @@ import {
   type DocTemplateType,
 } from '../features/money/document_hub';
 import PantryScreen from '../features/money/smart_pantry/PantryScreen';
-import WardrobeScreen from '../features/money/style_wardrobe/WardrobeScreen';
+import {
+  WardrobeDashboardScreen,
+  AddEditClothingScreen,
+  ClothingDetailsScreen,
+  StyleMirrorScreen,
+  OutfitDetailsScreen,
+  type OutfitRecommendation,
+} from '../features/style_pantry';
 import VoiceScreen from '../features/money/voice_assistant/VoiceScreen';
 import VoiceSettingsScreen from '../features/money/voice_assistant/VoiceSettingsScreen';
 import type { ThemeTokens } from '../theme';
@@ -72,6 +79,11 @@ export type RootStackParamList = {
   ExpirationAlerts: undefined;
   Pantry: undefined;
   Wardrobe: undefined;
+  StylePantryDashboard: undefined;
+  AddEditClothing: { itemId?: string } | undefined;
+  ClothingDetails: { itemId: string };
+  StyleMirror: undefined;
+  OutfitDetails: { outfit: OutfitRecommendation };
   Voice: undefined;
   VoiceSettings: undefined;
 };
@@ -133,7 +145,12 @@ const AppLayout = () => {
           <Stack.Screen name="DocTemplateForm" component={DocTemplateFormScreen} />
           <Stack.Screen name="ExpirationAlerts" component={ExpirationAlertsScreen} />
           <Stack.Screen name="Pantry" component={PantryScreen} />
-          <Stack.Screen name="Wardrobe" component={WardrobeScreen} />
+          <Stack.Screen name="Wardrobe" component={WardrobeDashboardScreen} />
+          <Stack.Screen name="StylePantryDashboard" component={WardrobeDashboardScreen} />
+          <Stack.Screen name="AddEditClothing" component={AddEditClothingScreen} />
+          <Stack.Screen name="ClothingDetails" component={ClothingDetailsScreen} />
+          <Stack.Screen name="StyleMirror" component={StyleMirrorScreen} />
+          <Stack.Screen name="OutfitDetails" component={OutfitDetailsScreen} />
           <Stack.Screen name="Voice" component={VoiceScreen} />
           <Stack.Screen name="VoiceSettings" component={VoiceSettingsScreen} />
         </Stack.Navigator>
