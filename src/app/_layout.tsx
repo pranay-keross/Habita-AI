@@ -32,7 +32,7 @@ import {
   StyleMirrorScreen,
   OutfitDetailsScreen,
   type OutfitRecommendation,
-} from '../features/style_pantry';
+} from '../features/money/style_pantry';
 import VoiceScreen from '../features/money/voice_assistant/VoiceScreen';
 import VoiceSettingsScreen from '../features/money/voice_assistant/VoiceSettingsScreen';
 import type { ThemeTokens } from '../theme';

@@ -9,17 +9,17 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
-import type { RootStackParamList } from '../../../app/_layout';
-import type { ThemeTokens } from '../../../theme';
-import useThemedStyles from '../../../hooks/useThemedStyles';
+import type { RootStackParamList } from '../../../../app/_layout';
+import type { ThemeTokens } from '../../../../theme';
+import useThemedStyles from '../../../../hooks/useThemedStyles';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import CheckCircle2 from 'lucide-react-native/icons/circle-check';
 import Bookmark from 'lucide-react-native/icons/bookmark';
 import Shirt from 'lucide-react-native/icons/shirt';
-import Button from '../../../components/Button';
+import Button from '../../../../components/Button';
 import { recordWearOutfit, saveOutfit } from '../stylePantryStore';
 import type { OutfitRecommendation } from '../types';
-import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { subscribeToLanguageChanges, t } from '../../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'OutfitDetails'>;
 

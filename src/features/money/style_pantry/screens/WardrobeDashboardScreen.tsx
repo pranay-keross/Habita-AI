@@ -10,9 +10,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
-import type { RootStackParamList } from '../../../app/_layout';
-import type { ThemeTokens } from '../../../theme';
-import useThemedStyles from '../../../hooks/useThemedStyles';
+import type { RootStackParamList } from '../../../../app/_layout';
+import type { ThemeTokens } from '../../../../theme';
+import useThemedStyles from '../../../../hooks/useThemedStyles';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Search from 'lucide-react-native/icons/search';
 import Plus from 'lucide-react-native/icons/plus';
@@ -21,7 +21,7 @@ import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import Shirt from 'lucide-react-native/icons/shirt';
 import { loadClothingItems } from '../stylePantryStore';
 import type { ClothingCategory, ClothingItem } from '../types';
-import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { subscribeToLanguageChanges, t } from '../../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'StylePantryDashboard' | 'Wardrobe'>;
 

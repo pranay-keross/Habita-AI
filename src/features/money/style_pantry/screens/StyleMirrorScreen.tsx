@@ -9,9 +9,9 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
-import type { RootStackParamList } from '../../../app/_layout';
-import type { ThemeTokens } from '../../../theme';
-import useThemedStyles from '../../../hooks/useThemedStyles';
+import type { RootStackParamList } from '../../../../app/_layout';
+import type { ThemeTokens } from '../../../../theme';
+import useThemedStyles from '../../../../hooks/useThemedStyles';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import Calendar from 'lucide-react-native/icons/calendar';
@@ -19,7 +19,7 @@ import Sun from 'lucide-react-native/icons/sun';
 import RefreshCw from 'lucide-react-native/icons/refresh-cw';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CheckCircle2 from 'lucide-react-native/icons/circle-check';
-import Button from '../../../components/Button';
+import Button from '../../../../components/Button';
 import {
   loadClothingItems,
   MOCK_WEATHER,
@@ -27,7 +27,7 @@ import {
   generateAIOutfit,
 } from '../stylePantryStore';
 import type { CalendarEvent, ClothingItem, OutfitRecommendation } from '../types';
-import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { subscribeToLanguageChanges, t } from '../../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'StyleMirror'>;
 

@@ -10,15 +10,15 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
-import type { RootStackParamList } from '../../../app/_layout';
-import type { ThemeTokens } from '../../../theme';
-import useThemedStyles from '../../../hooks/useThemedStyles';
+import type { RootStackParamList } from '../../../../app/_layout';
+import type { ThemeTokens } from '../../../../theme';
+import useThemedStyles from '../../../../hooks/useThemedStyles';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Camera from 'lucide-react-native/icons/camera';
-import Button from '../../../components/Button';
+import Button from '../../../../components/Button';
 import { addClothingItem, updateClothingItem, loadClothingItems } from '../stylePantryStore';
 import type { ClothingCategory, ClothingSeason } from '../types';
-import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { subscribeToLanguageChanges, t } from '../../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'AddEditClothing'>;
 
