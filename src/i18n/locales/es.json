@@ -681,6 +681,20 @@
     "worn_alert_title": "Outfit Marked Worn!",
     "worn_alert_msg": "Updated wear history count for all items in this outfit.",
     "outfit_saved_title": "Outfit Saved!",
-    "outfit_saved_msg": "Outfit added to your saved style collection."
+    "outfit_saved_msg": "Outfit added to your saved style collection.""ocr_status_label": "Estado",
+    "ocr_status_pending": "Leyendo…",
+    "ocr_status_processed": "Procesado",
+    "ocr_status_failed": "No se pudo leer",
+    "prescription_processed_title": "Receta Leída",
+    "prescription_processed_msg": "Tu receta se subió correctamente. Las medicinas que se pudieron leer se añadieron a tu lista.",
+    "prescription_empty_msg": "Tu receta se subió, pero no pudimos encontrar ninguna medicina en ella.",
+    "prescription_failed_title": "No se Pudo Leer la Receta",
+    "prescription_failed_msg": "No pudimos leer este documento — puede estar borroso o en un formato no compatible. Aún puedes añadir medicinas manualmente.",
+    "confirm_quantity_title": "Confirmar Cantidad",
+    "confirm_quantity_progress": "{{current}} de {{total}}",
+    "confirm_quantity_intro": "Añadimos {{name}} de tu receta. ¿Cuánto tienes disponible?",
+    "confirm_quantity_save": "Guardar y Continuar",
+    "confirm_quantity_skip": "Omitir por Ahora",
+    "confirm_quantity_invalid_msg": "Por favor introduce una cantidad válida."
   }
 }

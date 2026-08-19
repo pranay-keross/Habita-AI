@@ -682,6 +682,20 @@
     "worn_alert_title": "आज पहना गया!",
     "worn_alert_msg": "सभी कपड़ों के लिए पहनने का इतिहास अपडेट किया गया।",
     "outfit_saved_title": "पोशाक सहेजी गई!",
-    "outfit_saved_msg": "पोशाक आपकी संग्रह में सहेजी गई।"
+    "outfit_saved_msg": "पोशाक आपकी संग्रह में सहेजी गई।""ocr_status_label": "स्थिति",
+    "ocr_status_pending": "पढ़ा जा रहा है…",
+    "ocr_status_processed": "प्रोसेस हो गया",
+    "ocr_status_failed": "पढ़ा नहीं जा सका",
+    "prescription_processed_title": "प्रिस्क्रिप्शन पढ़ लिया गया",
+    "prescription_processed_msg": "आपका प्रिस्क्रिप्शन अपलोड हो गया। इसमें से जो भी दवाएं पढ़ी जा सकीं, वे आपकी सूची में जोड़ दी गई हैं।",
+    "prescription_empty_msg": "आपका प्रिस्क्रिप्शन अपलोड हो गया, लेकिन हमें इसमें कोई दवा नहीं मिली।",
+    "prescription_failed_title": "प्रिस्क्रिप्शन नहीं पढ़ा जा सका",
+    "prescription_failed_msg": "हम इस दस्तावेज़ को नहीं पढ़ पाए — यह धुंधला हो सकता है या असमर्थित प्रारूप में हो सकता है। आप फिर भी दवाएं मैन्युअल रूप से जोड़ सकते हैं।",
+    "confirm_quantity_title": "मात्रा की पुष्टि करें",
+    "confirm_quantity_progress": "{{total}} में से {{current}}",
+    "confirm_quantity_intro": "हमने आपके प्रिस्क्रिप्शन से {{name}} जोड़ा है। आपके पास कितनी मात्रा है?",
+    "confirm_quantity_save": "सहेजें और जारी रखें",
+    "confirm_quantity_skip": "अभी के लिए छोड़ें",
+    "confirm_quantity_invalid_msg": "कृपया एक मान्य मात्रा दर्ज करें।"
   }
 }

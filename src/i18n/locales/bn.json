@@ -681,6 +681,20 @@
     "worn_alert_title": "Outfit Marked Worn!",
     "worn_alert_msg": "Updated wear history count for all items in this outfit.",
     "outfit_saved_title": "Outfit Saved!",
-    "outfit_saved_msg": "Outfit added to your saved style collection."
+    "outfit_saved_msg": "Outfit added to your saved style collection.""ocr_status_label": "অবস্থা",
+    "ocr_status_pending": "পড়া হচ্ছে…",
+    "ocr_status_processed": "প্রক্রিয়া করা হয়েছে",
+    "ocr_status_failed": "পড়া যায়নি",
+    "prescription_processed_title": "প্রেসক্রিপশন পড়া হয়েছে",
+    "prescription_processed_msg": "আপনার প্রেসক্রিপশন আপলোড হয়েছে। এতে যে ওষুধগুলো পড়া গেছে, সেগুলো আপনার তালিকায় যোগ করা হয়েছে।",
+    "prescription_empty_msg": "আপনার প্রেসক্রিপশন আপলোড হয়েছে, কিন্তু এতে আমরা কোনো ওষুধ খুঁজে পাইনি।",
+    "prescription_failed_title": "প্রেসক্রিপশন পড়া যায়নি",
+    "prescription_failed_msg": "আমরা এই নথিটি পড়তে পারিনি — এটি ঝাপসা হতে পারে বা অসমর্থিত ফরম্যাটে থাকতে পারে। আপনি এখনও ম্যানুয়ালি ওষুধ যোগ করতে পারেন।",
+    "confirm_quantity_title": "পরিমাণ নিশ্চিত করুন",
+    "confirm_quantity_progress": "{{total}} এর মধ্যে {{current}}",
+    "confirm_quantity_intro": "আমরা আপনার প্রেসক্রিপশন থেকে {{name}} যোগ করেছি। আপনার কাছে কত পরিমাণ আছে?",
+    "confirm_quantity_save": "সংরক্ষণ করুন এবং চালিয়ে যান",
+    "confirm_quantity_skip": "আপাতত এড়িয়ে যান",
+    "confirm_quantity_invalid_msg": "অনুগ্রহ করে একটি বৈধ পরিমাণ লিখুন।"
   }
 }
