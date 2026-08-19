@@ -1,0 +1,494 @@
+import React, { useEffect, useMemo, useState } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  ActivityIndicator,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { StackScreenProps } from '@react-navigation/stack';
+import type { RootStackParamList } from '../../../../app/_layout';
+import type { ThemeTokens } from '../../../../theme';
+import useThemedStyles from '../../../../hooks/useThemedStyles';
+import ArrowLeft from 'lucide-react-native/icons/arrow-left';
+import Search from 'lucide-react-native/icons/search';
+import Plus from 'lucide-react-native/icons/plus';
+import AlertTriangle from 'lucide-react-native/icons/triangle-alert';
+import FileText from 'lucide-react-native/icons/file-text';
+import Globe from 'lucide-react-native/icons/globe';
+import CreditCard from 'lucide-react-native/icons/credit-card';
+import ShieldCheck from 'lucide-react-native/icons/shield-check';
+import ChevronRight from 'lucide-react-native/icons/chevron-right';
+import Clock from 'lucide-react-native/icons/clock';
+import { loadDocuments, getDocStatus } from '../docStore';
+import type { DocCategory, DocHubEntry } from '../types';
+
+type Props = StackScreenProps<RootStackParamList, 'DocHub'>;
+
+const CATEGORIES: { key: DocCategory | 'all'; label: string; icon: string }[] = [
+  { key: 'all', label: 'All Docs', icon: '📂' },
+  { key: 'passport', label: 'Passports', icon: '📘' },
+  { key: 'visa', label: 'Visas', icon: '🛂' },
+  { key: 'license', label: 'Licenses', icon: '🪪' },
+  { key: 'insurance', label: 'Insurance', icon: '🏥' },
+  { key: 'warranty', label: 'Warranties', icon: '🏷️' },
+  { key: 'property', label: 'Property', icon: '🏠' },
+  { key: 'tax', label: 'Tax', icon: '🧾' },
+];
+
+export default function DocHubScreen({ navigation }: Props) {
+  const styles = useThemedStyles(makeStyles);
+  const insets = useSafeAreaInsets();
+
+  const [loading, setLoading] = useState(true);
+  const [docs, setDocs] = useState<DocHubEntry[]>([]);
+  const [selectedCategory, setSelectedCategory] = useState<DocCategory | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const fetchDocs = async () => {
+    setLoading(true);
+    const list = await loadDocuments();
+    setDocs(list);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      fetchDocs();
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  const alertSummary = useMemo(() => {
+    let expiredCount = 0;
+    let expiringCount = 0;
+
+    docs.forEach((d) => {
+      const { status } = getDocStatus(d.expiryDate);
+      if (status === 'expired') expiredCount++;
+      if (status === 'expiring') expiringCount++;
+    });
+
+    return { expiredCount, expiringCount, totalAlerts: expiredCount + expiringCount };
+  }, [docs]);
+
+  const filteredDocs = useMemo(() => {
+    return docs.filter((doc) => {
+      const matchesCategory =
+        selectedCategory === 'all' || doc.category === selectedCategory;
+      const matchesSearch =
+        doc.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        doc.memberName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (doc.docNumber && doc.docNumber.toLowerCase().includes(searchQuery.toLowerCase()));
+
+      return matchesCategory && matchesSearch;
+    });
+  }, [docs, selectedCategory, searchQuery]);
+
+  const getCategoryIcon = (category: DocCategory) => {
+    switch (category) {
+      case 'passport':
+        return <FileText size={18} color="#004F63" />;
+      case 'visa':
+        return <Globe size={18} color="#9333EA" />;
+      case 'license':
+        return <CreditCard size={18} color="#D97706" />;
+      case 'insurance':
+        return <ShieldCheck size={18} color="#16A34A" />;
+      default:
+        return <FileText size={18} color="#475569" />;
+    }
+  };
+
+  return (
+    <View style={styles.root}>
+      {/* Header Bar */}
+      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
+          <ArrowLeft size={20} color={styles.headerIcon.color} />
+        </Pressable>
+        <Text style={styles.headerTitle}>Document Hub</Text>
+        <Pressable
+          onPress={() => navigation.navigate('AddDoc')}
+          style={styles.addNavBtn}>
+          <Plus size={20} color="#FFFFFF" />
+        </Pressable>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+        {/* Search Bar */}
+        <View style={styles.searchBarRow}>
+          <Search size={18} color={styles.placeholder.color} style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder="Search passport, visa, owner..."
+            placeholderTextColor={styles.placeholder.color}
+          />
+        </View>
+
+        {/* Expiration Alert Banner */}
+        {alertSummary.totalAlerts > 0 && (
+          <Pressable
+            style={styles.alertBanner}
+            onPress={() => navigation.navigate('ExpirationAlerts')}>
+            <View style={styles.alertBannerLeft}>
+              <View style={styles.alertIconCircle}>
+                <AlertTriangle size={20} color="#EA580C" />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.alertTitle}>Document Expiration Warnings</Text>
+                <Text style={styles.alertSub}>
+                  {alertSummary.expiredCount > 0
+                    ? `${alertSummary.expiredCount} Expired · ${alertSummary.expiringCount} Expiring Soon`
+                    : `${alertSummary.expiringCount} Documents Expiring Soon`}
+                </Text>
+              </View>
+            </View>
+            <ChevronRight size={18} color="#EA580C" />
+          </Pressable>
+        )}
+
+        {/* Category Horizontal Filter Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesContainer}>
+          {CATEGORIES.map((cat) => (
+            <Pressable
+              key={cat.key}
+              style={[
+                styles.categoryChip,
+                selectedCategory === cat.key && styles.categoryChipActive,
+              ]}
+              onPress={() => setSelectedCategory(cat.key)}>
+              <Text style={styles.chipEmoji}>{cat.icon}</Text>
+              <Text
+                style={[
+                  styles.chipText,
+                  selectedCategory === cat.key && styles.chipTextActive,
+                ]}>
+                {cat.label}
+              </Text>
+            </Pressable>
+          ))}
+        </ScrollView>
+
+        {/* Document Repository List Header */}
+        <View style={styles.listHeaderRow}>
+          <Text style={styles.sectionTitle}>
+            Document Repository ({filteredDocs.length})
+          </Text>
+        </View>
+
+        {loading ? (
+          <ActivityIndicator color="#004F63" style={{ marginTop: 24 }} />
+        ) : filteredDocs.length === 0 ? (
+          <View style={styles.emptyStateCard}>
+            <FileText size={36} color={styles.placeholder.color} />
+            <Text style={styles.emptyTitle}>No Documents Found</Text>
+            <Text style={styles.emptySub}>
+              {searchQuery ? 'Try another search term' : 'Tap + to upload your first document.'}
+            </Text>
+          </View>
+        ) : (
+          filteredDocs.map((doc) => {
+            const { status, daysLeft } = getDocStatus(doc.expiryDate);
+            return (
+              <Pressable
+                key={doc.id}
+                style={styles.docCard}
+                onPress={() => navigation.navigate('DocDetails', { docId: doc.id })}>
+                <View style={styles.docCardHeader}>
+                  <View style={styles.docIconBadge}>{getCategoryIcon(doc.category)}</View>
+                  <View style={styles.docMainInfo}>
+                    <Text style={styles.docTitle} numberOfLines={1}>
+                      {doc.title}
+                    </Text>
+                    <Text style={styles.docMemberName}>Owner: {doc.memberName}</Text>
+                  </View>
+
+                  {/* Status Badge */}
+                  {status === 'expired' && (
+                    <View style={[styles.statusBadge, styles.badgeExpired]}>
+                      <Text style={[styles.statusBadgeText, styles.textExpired]}>Expired</Text>
+                    </View>
+                  )}
+                  {status === 'expiring' && (
+                    <View style={[styles.statusBadge, styles.badgeExpiring]}>
+                      <Text style={[styles.statusBadgeText, styles.textExpiring]}>
+                        {daysLeft}d left
+                      </Text>
+                    </View>
+                  )}
+                  {status === 'valid' && (
+                    <View style={[styles.statusBadge, styles.badgeValid]}>
+                      <Text style={[styles.statusBadgeText, styles.textValid]}>Valid</Text>
+                    </View>
+                  )}
+                </View>
+
+                {/* Footer details */}
+                <View style={styles.docCardFooter}>
+                  {doc.docNumber ? (
+                    <Text style={styles.docNumberText}>No: {doc.docNumber}</Text>
+                  ) : (
+                    <Text style={styles.docNumberText}>Category: {doc.category}</Text>
+                  )}
+                  <View style={styles.expiryRow}>
+                    <Clock size={12} color={styles.placeholder.color} />
+                    <Text style={styles.expiryDateText}>Expires: {doc.expiryDate}</Text>
+                  </View>
+                </View>
+              </Pressable>
+            );
+          })
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.sm,
+      backgroundColor: colors.background,
+    },
+    headerBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...shadow.soft,
+    },
+    headerIcon: {
+      color: colors.textPrimary,
+    },
+    headerTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 18,
+      color: colors.textPrimary,
+    },
+    addNavBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#004F63',
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadow.soft,
+    },
+    content: {
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.xxl,
+    },
+    searchBarRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 10,
+      marginTop: spacing.md,
+      marginBottom: spacing.md,
+      ...shadow.soft,
+    },
+    searchInput: {
+      flex: 1,
+      fontFamily: fonts.sans,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    placeholder: {
+      color: colors.textMuted,
+    },
+    alertBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      backgroundColor: '#FFEDD5',
+      borderWidth: 1,
+      borderColor: '#FED7AA',
+      borderRadius: 16,
+      padding: 14,
+      marginBottom: spacing.md,
+    },
+    alertBannerLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      flex: 1,
+    },
+    alertIconCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: '#FFFFFF',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    alertTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 14,
+      color: '#C2410C',
+    },
+    alertSub: {
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      color: '#EA580C',
+      marginTop: 2,
+    },
+    categoriesContainer: {
+      gap: 8,
+      marginBottom: spacing.lg,
+    },
+    categoryChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 16,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    categoryChipActive: {
+      backgroundColor: '#004F63',
+      borderColor: '#004F63',
+    },
+    chipEmoji: {
+      fontSize: 14,
+    },
+    chipText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.textPrimary,
+    },
+    chipTextActive: {
+      color: '#FFFFFF',
+      fontFamily: fonts.sansBold,
+    },
+    listHeaderRow: {
+      marginBottom: spacing.sm,
+    },
+    sectionTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 16,
+      color: colors.textPrimary,
+    },
+    docCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.sm,
+      ...shadow.soft,
+    },
+    docCardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      marginBottom: 10,
+    },
+    docIconBadge: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: '#E3F2F5',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    docMainInfo: {
+      flex: 1,
+    },
+    docTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 15,
+      color: colors.textPrimary,
+    },
+    docMemberName: {
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    statusBadge: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+    },
+    badgeExpired: { backgroundColor: '#FEE2E2' },
+    badgeExpiring: { backgroundColor: '#FFEDD5' },
+    badgeValid: { backgroundColor: '#DCFCE7' },
+    statusBadgeText: { fontFamily: fonts.sansBold, fontSize: 11 },
+    textExpired: { color: '#EF4444' },
+    textExpiring: { color: '#EA580C' },
+    textValid: { color: '#16A34A' },
+    docCardFooter: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+      paddingTop: 8,
+    },
+    docNumberText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+    expiryRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    expiryDateText: {
+      fontFamily: fonts.sans,
+      fontSize: 11.5,
+      color: colors.textMuted,
+    },
+    emptyStateCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.xxl,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.md,
+    },
+    emptyTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 16,
+      color: colors.textPrimary,
+      marginTop: 12,
+    },
+    emptySub: {
+      fontFamily: fonts.sans,
+      fontSize: 13,
+      color: colors.textSecondary,
+      marginTop: 4,
+      textAlign: 'center',
+    },
+  });
