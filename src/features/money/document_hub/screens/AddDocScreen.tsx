@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -19,12 +19,21 @@ import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import FilePlus from 'lucide-react-native/icons/file-plus';
 import { DOC_TEMPLATES, type DocTemplateType } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'AddDoc'>;
 
 export default function AddDocScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const [, setLocaleVersion] = useState(0);
+
+  useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
+    return () => {
+      unsubLang();
+    };
+  }, []);
 
   const getTemplateIcon = (type: DocTemplateType, color: string) => {
     switch (type) {
@@ -46,18 +55,18 @@ export default function AddDocScreen({ navigation }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>Add Document</Text>
+        <Text style={styles.headerTitle}>{t('doc_hub.add_doc_title')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Subtitle */}
         <Text style={styles.sectionSubtitle}>
-          Choose a pre-built document template or create a custom entry.
+          {t('doc_hub.add_doc_sub')}
         </Text>
 
         {/* Templates List */}
-        <Text style={styles.sectionTitle}>Pre-Built Templates</Text>
+        <Text style={styles.sectionTitle}>{t('doc_hub.prebuilt_templates')}</Text>
         <View style={styles.templatesWrap}>
           {DOC_TEMPLATES.map((tmpl) => (
             <Pressable
@@ -70,8 +79,12 @@ export default function AddDocScreen({ navigation }: Props) {
                 {getTemplateIcon(tmpl.type, tmpl.accentColor)}
               </View>
               <View style={styles.templateTextWrap}>
-                <Text style={styles.templateTitle}>{tmpl.title}</Text>
-                <Text style={styles.templateDesc}>{tmpl.description}</Text>
+                <Text style={styles.templateTitle}>
+                  {t(`doc_hub.tmpl_${tmpl.type}_title`, { defaultValue: tmpl.title })}
+                </Text>
+                <Text style={styles.templateDesc}>
+                  {t(`doc_hub.tmpl_${tmpl.type}_desc`, { defaultValue: tmpl.description })}
+                </Text>
               </View>
               <ChevronRight size={18} color="#004F63" />
             </Pressable>
@@ -79,7 +92,7 @@ export default function AddDocScreen({ navigation }: Props) {
         </View>
 
         {/* Custom Upload Option */}
-        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>Custom Document</Text>
+        <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('doc_hub.custom_doc')}</Text>
         <Pressable
           style={styles.customCard}
           onPress={() =>
@@ -89,9 +102,9 @@ export default function AddDocScreen({ navigation }: Props) {
             <FilePlus size={22} color="#004F63" />
           </View>
           <View style={styles.templateTextWrap}>
-            <Text style={styles.templateTitle}>Custom Document Entry</Text>
+            <Text style={styles.templateTitle}>{t('doc_hub.custom_doc_title')}</Text>
             <Text style={styles.templateDesc}>
-              Upload any bill, tax paper, property deed, or home warranty contract.
+              {t('doc_hub.custom_doc_sub')}
             </Text>
           </View>
           <ChevronRight size={18} color="#004F63" />

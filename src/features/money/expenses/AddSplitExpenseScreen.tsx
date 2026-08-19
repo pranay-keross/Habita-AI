@@ -21,6 +21,7 @@ import DollarSign from 'lucide-react-native/icons/dollar-sign';
 import Check from 'lucide-react-native/icons/check';
 import { addExpenseToGroup, getGroupById } from '../expenseStore';
 import type { Currency, ExpenseGroup } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'AddSplitExpense'>;
 
@@ -38,6 +39,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { groupId } = route.params;
+  const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<ExpenseGroup | undefined>();
@@ -54,6 +56,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
   const [shares, setShares] = useState<Record<string, string>>({});
 
   useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     const fetchGroup = async () => {
       setLoading(true);
       const g = await getGroupById(groupId);
@@ -72,6 +75,9 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
       setLoading(false);
     };
     fetchGroup();
+    return () => {
+      unsubLang();
+    };
   }, [groupId]);
 
   const handleSave = async () => {
@@ -153,7 +159,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>Add Expense</Text>
+        <Text style={styles.headerTitle}>{t('expenses.add_expense_header')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -165,7 +171,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
 
         {/* Amount Input */}
         <View style={styles.amountCard}>
-          <Text style={styles.amountLabel}>Expense Amount</Text>
+          <Text style={styles.amountLabel}>{t('expenses.amount_label')}</Text>
           <View style={styles.amountInputRow}>
             <Text style={styles.currencySymbolText}>
               {CURRENCIES.find((c) => c.code === currency)?.symbol}
@@ -203,19 +209,19 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
         </View>
 
         {/* Title Input */}
-        <Text style={styles.sectionTitle}>Expense Description</Text>
+        <Text style={styles.sectionTitle}>{t('expenses.expense_title_label')}</Text>
         <View style={styles.card}>
           <TextInput
             style={styles.textInput}
             value={title}
             onChangeText={setTitle}
-            placeholder="e.g. Dinner at Thalassa, Uber to airport"
+            placeholder={t('expenses.expense_title_placeholder')}
             placeholderTextColor={styles.placeholder.color}
           />
         </View>
 
         {/* Paid By Selector */}
-        <Text style={styles.sectionTitle}>Paid By</Text>
+        <Text style={styles.sectionTitle}>{t('expenses.paid_by_label')}</Text>
         <View style={styles.card}>
           {group.members.map((member) => (
             <Pressable
@@ -238,7 +244,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
         </View>
 
         {/* Split Mode Selector */}
-        <Text style={styles.sectionTitle}>Split Mode</Text>
+        <Text style={styles.sectionTitle}>{t('expenses.split_mode_label')}</Text>
         <View style={styles.segmentedRow}>
           {(['equal', 'percentage', 'shares'] as SplitMode[]).map((mode) => (
             <Pressable
@@ -253,7 +259,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
                   styles.splitModeText,
                   splitMode === mode && styles.splitModeTextActive,
                 ]}>
-                {mode.toUpperCase()}
+                {mode === 'equal' ? t('expenses.mode_equal') : mode === 'percentage' ? t('expenses.mode_percentage') : t('expenses.mode_shares')}
               </Text>
             </Pressable>
           ))}
@@ -298,7 +304,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
 
         {/* Save Action */}
         <Button
-          title="Save Split Expense"
+          title={t('expenses.save_expense_btn')}
           onPress={handleSave}
           loading={saving}
           style={{ marginTop: 24 }}

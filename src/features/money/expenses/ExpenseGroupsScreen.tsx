@@ -34,6 +34,7 @@ import {
   loadSettlements,
 } from '../expenseStore';
 import type { Expense, ExpenseGroup, Settlement } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'ExpenseGroups'>;
 
@@ -42,6 +43,7 @@ const EMOJI_OPTIONS = ['🏠', '🏖️', '🍿', '🚗', '🎓', '✈️', '�
 export default function ExpenseGroupsScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [groups, setGroups] = useState<ExpenseGroup[]>([]);
@@ -66,10 +68,14 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
   };
 
   useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     const unsubscribe = navigation.addListener('focus', () => {
       fetchGroups();
     });
-    return unsubscribe;
+    return () => {
+      unsubLang();
+      unsubscribe();
+    };
   }, [navigation]);
 
   const handleAddMember = () => {
@@ -80,7 +86,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
 
   const handleCreateGroup = async () => {
     if (!newGroupName.trim()) {
-      Alert.alert('Missing Group Name', 'Please enter a group name.');
+      Alert.alert(t('expenses.missing_group_name_title'), t('expenses.missing_group_name_msg'));
       return;
     }
     setCreating(true);
@@ -117,20 +123,20 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <ArrowLeft size={18} color="#1E293B" />
         </Pressable>
-        <Text style={styles.headerTitle}>Expense Groups</Text>
+        <Text style={styles.headerTitle}>{t('expenses.groups_header')}</Text>
         <Pressable
           onPress={() => setShowCreateModal(true)}
           style={styles.createGroupPill}>
-          <Text style={styles.createGroupPillText}>+ Group</Text>
+          <Text style={styles.createGroupPillText}>{t('expenses.create_group_btn')}</Text>
         </Pressable>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Split & Track Expenses Dark Teal Hero Banner */}
         <View style={styles.heroBanner}>
-          <Text style={styles.heroTitle}>Split & Track Expenses</Text>
+          <Text style={styles.heroTitle}>{t('expenses.hero_title')}</Text>
           <Text style={styles.heroSubtitle}>
-            Manage group balances, split bills equally or custom, and settle up easily.
+            {t('expenses.hero_subtitle')}
           </Text>
 
           {/* 3 Stat Pills */}
@@ -139,21 +145,21 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               <Text style={styles.heroStatVal}>
                 ₹{(expenses.reduce((sum, e) => sum + (e.baseAmountINR || e.amount || 0), 0) || 70900).toLocaleString('en-IN')}
               </Text>
-              <Text style={styles.heroStatLbl}>Total Spent</Text>
+              <Text style={styles.heroStatLbl}>{t('expenses.total_spent')}</Text>
             </View>
 
             <View style={styles.heroStatPill}>
               <Text style={[styles.heroStatVal, { color: '#34D399' }]}>
                 ₹{(totals.youAreOwed || 33900).toLocaleString('en-IN')}
               </Text>
-              <Text style={styles.heroStatLbl}>You Get Back</Text>
+              <Text style={styles.heroStatLbl}>{t('expenses.you_get_back')}</Text>
             </View>
 
             <View style={styles.heroStatPill}>
               <Text style={[styles.heroStatVal, { color: '#FFFFFF' }]}>
                 ₹{(totals.youOwe || 0).toLocaleString('en-IN')}
               </Text>
-              <Text style={styles.heroStatLbl}>You Owe</Text>
+              <Text style={styles.heroStatLbl}>{t('expenses.you_owe')}</Text>
             </View>
           </View>
         </View>
@@ -161,8 +167,8 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
         {/* Household Operating Hub Container Box */}
         <View style={styles.operatingHubContainer}>
           <View style={styles.operatingHubHeader}>
-            <Text style={styles.operatingHubTitle}>Smart Home & Life Hub</Text>
-            <Text style={styles.operatingHubSubTitle}>4 Active AI Modules</Text>
+            <Text style={styles.operatingHubTitle}>{t('expenses.operating_hub_title')}</Text>
+            <Text style={styles.operatingHubSubTitle}>{t('expenses.operating_hub_sub')}</Text>
           </View>
 
           <View style={styles.operatingHubDivider} />
@@ -177,11 +183,11 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
                   <FileText size={20} color="#004F63" />
                 </View>
                 <View style={styles.moduleStatusTag}>
-                  <Text style={styles.moduleStatusTagText}>12 Vaulted</Text>
+                  <Text style={styles.moduleStatusTagText}>{t('expenses.vaulted_count')}</Text>
                 </View>
               </View>
-              <Text style={styles.moduleBoxTitle}>Document Hub</Text>
-              <Text style={styles.moduleBoxSub}>Vault for passports, visas & warranties</Text>
+              <Text style={styles.moduleBoxTitle}>{t('expenses.doc_hub_title')}</Text>
+              <Text style={styles.moduleBoxSub}>{t('expenses.doc_hub_sub')}</Text>
             </Pressable>
 
             {/* Box 2: Smart Pantry */}
@@ -193,11 +199,11 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
                   <ShoppingCart size={20} color="#004F63" />
                 </View>
                 <View style={styles.moduleStatusTag}>
-                  <Text style={styles.moduleStatusTagText}>Radar Active</Text>
+                  <Text style={styles.moduleStatusTagText}>{t('expenses.radar_active')}</Text>
                 </View>
               </View>
-              <Text style={styles.moduleBoxTitle}>Smart Pantry</Text>
-              <Text style={styles.moduleBoxSub}>Stock count, expiry & allergen warning</Text>
+              <Text style={styles.moduleBoxTitle}>{t('expenses.pantry_title')}</Text>
+              <Text style={styles.moduleBoxSub}>{t('expenses.pantry_sub')}</Text>
             </Pressable>
 
             {/* Box 3: Voice Command Engine */}
@@ -209,11 +215,11 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
                   <Mic size={20} color="#004F63" />
                 </View>
                 <View style={styles.moduleStatusTag}>
-                  <Text style={styles.moduleStatusTagText}>AI Co-Pilot</Text>
+                  <Text style={styles.moduleStatusTagText}>{t('expenses.ai_copilot')}</Text>
                 </View>
               </View>
-              <Text style={styles.moduleBoxTitle}>Voice Command Engine</Text>
-              <Text style={styles.moduleBoxSub}>Spoken intent & hands-free actions</Text>
+              <Text style={styles.moduleBoxTitle}>{t('expenses.voice_engine_title')}</Text>
+              <Text style={styles.moduleBoxSub}>{t('expenses.voice_engine_sub')}</Text>
             </Pressable>
 
             {/* Box 4: Style Mirror */}
@@ -225,17 +231,17 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
                   <Shirt size={20} color="#004F63" />
                 </View>
                 <View style={styles.moduleStatusTag}>
-                  <Text style={styles.moduleStatusTagText}>Weather Fit</Text>
+                  <Text style={styles.moduleStatusTagText}>{t('expenses.weather_fit')}</Text>
                 </View>
               </View>
-              <Text style={styles.moduleBoxTitle}>Style Mirror</Text>
-              <Text style={styles.moduleBoxSub}>Climate-matched outfit recommender</Text>
+              <Text style={styles.moduleBoxTitle}>{t('expenses.style_mirror_title')}</Text>
+              <Text style={styles.moduleBoxSub}>{t('expenses.style_mirror_sub')}</Text>
             </Pressable>
           </View>
         </View>
 
         {/* Groups List */}
-        <Text style={styles.sectionTitle}>Your Groups ({groups.length})</Text>
+        <Text style={styles.sectionTitle}>{t('expenses.your_groups', { count: groups.length })}</Text>
 
         {loading ? (
           <ActivityIndicator color="#004F63" style={{ marginTop: 24 }} />
@@ -260,7 +266,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
                     <View style={styles.membersRow}>
                       <Users size={13} color={styles.placeholder.color} />
                       <Text style={styles.membersCount}>
-                        {group.members.length} members ({group.defaultCurrency || 'INR'})
+                        {t('expenses.members_count', { count: group.members.length, currency: group.defaultCurrency || 'INR' })}
                       </Text>
                     </View>
                   </View>
@@ -270,14 +276,14 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
                 {/* Group Balance Footer */}
                 <View style={styles.groupFooter}>
                   <Text style={styles.expenseCountText}>
-                    {groupExps.length} expenses logged
+                    {t('expenses.expenses_logged', { count: groupExps.length })}
                   </Text>
                   {myNet > 0 ? (
-                    <Text style={styles.groupNetOwed}>you get back ₹{myNet.toLocaleString('en-IN')}</Text>
+                    <Text style={styles.groupNetOwed}>{t('expenses.you_get_back_amount', { amount: myNet.toLocaleString('en-IN') })}</Text>
                   ) : myNet < 0 ? (
-                    <Text style={styles.groupNetOwe}>you owe ₹{Math.abs(myNet).toLocaleString('en-IN')}</Text>
+                    <Text style={styles.groupNetOwe}>{t('expenses.you_owe_amount', { amount: Math.abs(myNet).toLocaleString('en-IN') })}</Text>
                   ) : (
-                    <Text style={styles.groupNetSettled}>settled up</Text>
+                    <Text style={styles.groupNetSettled}>{t('expenses.settled_up')}</Text>
                   )}
                 </View>
               </Pressable>
@@ -290,9 +296,9 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
       <BottomSheet
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        title="Create Expense Group">
+        title={t('expenses.create_group_title')}>
         <View style={styles.modalContent}>
-          <Text style={styles.inputLabel}>Group Name</Text>
+          <Text style={styles.inputLabel}>{t('expenses.group_name_label')}</Text>
           <TextInput
             style={styles.textInput}
             value={newGroupName}
@@ -301,7 +307,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
             placeholderTextColor={styles.placeholder.color}
           />
 
-          <Text style={styles.inputLabel}>Group Icon</Text>
+          <Text style={styles.inputLabel}>{t('expenses.group_icon_label')}</Text>
           <View style={styles.emojiRow}>
             {EMOJI_OPTIONS.map((emoji) => (
               <Pressable
@@ -316,7 +322,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
             ))}
           </View>
 
-          <Text style={styles.inputLabel}>Members ({members.length})</Text>
+          <Text style={styles.inputLabel}>{t('expenses.members_label', { count: members.length })}</Text>
           <View style={styles.memberChipsRow}>
             {members.map((m, i) => (
               <View key={i} style={styles.memberChip}>
@@ -330,7 +336,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               style={[styles.textInput, { flex: 1, marginBottom: 0 }]}
               value={newMemberName}
               onChangeText={setNewMemberName}
-              placeholder="Add member name..."
+              placeholder={t('expenses.add_member_placeholder')}
               placeholderTextColor={styles.placeholder.color}
             />
             <Pressable style={styles.addMemberBtn} onPress={handleAddMember}>
@@ -339,7 +345,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
           </View>
 
           <Button
-            title="Create Group"
+            title={t('expenses.create_group_submit')}
             onPress={handleCreateGroup}
             loading={creating}
             style={{ marginTop: 20 }}

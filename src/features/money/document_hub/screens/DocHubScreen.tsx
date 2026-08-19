@@ -25,23 +25,25 @@ import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import Clock from 'lucide-react-native/icons/clock';
 import { loadDocuments, getDocStatus } from '../docStore';
 import type { DocCategory, DocHubEntry } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'DocHub'>;
 
-const CATEGORIES: { key: DocCategory | 'all'; label: string; icon: string }[] = [
-  { key: 'all', label: 'All Docs', icon: '📂' },
-  { key: 'passport', label: 'Passports', icon: '📘' },
-  { key: 'visa', label: 'Visas', icon: '🛂' },
-  { key: 'license', label: 'Licenses', icon: '🪪' },
-  { key: 'insurance', label: 'Insurance', icon: '🏥' },
-  { key: 'warranty', label: 'Warranties', icon: '🏷️' },
-  { key: 'property', label: 'Property', icon: '🏠' },
-  { key: 'tax', label: 'Tax', icon: '🧾' },
+const CATEGORIES: { key: DocCategory | 'all'; labelKey: string; label: string; icon: string }[] = [
+  { key: 'all', labelKey: 'doc_hub.cat_all', label: 'All Docs', icon: '📂' },
+  { key: 'passport', labelKey: 'doc_hub.cat_passport', label: 'Passports', icon: '📘' },
+  { key: 'visa', labelKey: 'doc_hub.cat_visa', label: 'Visas', icon: '🛂' },
+  { key: 'license', labelKey: 'doc_hub.cat_license', label: 'Licenses', icon: '🪪' },
+  { key: 'insurance', labelKey: 'doc_hub.cat_insurance', label: 'Insurance', icon: '🏥' },
+  { key: 'warranty', labelKey: 'doc_hub.cat_warranty', label: 'Warranties', icon: '🏷️' },
+  { key: 'property', labelKey: 'doc_hub.cat_property', label: 'Property', icon: '🏠' },
+  { key: 'tax', labelKey: 'doc_hub.cat_tax', label: 'Tax', icon: '🧾' },
 ];
 
 export default function DocHubScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [docs, setDocs] = useState<DocHubEntry[]>([]);
@@ -56,10 +58,14 @@ export default function DocHubScreen({ navigation }: Props) {
   };
 
   useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     const unsubscribe = navigation.addListener('focus', () => {
       fetchDocs();
     });
-    return unsubscribe;
+    return () => {
+      unsubLang();
+      unsubscribe();
+    };
   }, [navigation]);
 
   const alertSummary = useMemo(() => {
@@ -110,7 +116,7 @@ export default function DocHubScreen({ navigation }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>Document Hub</Text>
+        <Text style={styles.headerTitle}>{t('doc_hub.hub_title')}</Text>
         <Pressable
           onPress={() => navigation.navigate('AddDoc')}
           style={styles.addNavBtn}>
@@ -126,7 +132,7 @@ export default function DocHubScreen({ navigation }: Props) {
             style={styles.searchInput}
             value={searchQuery}
             onChangeText={setSearchQuery}
-            placeholder="Search passport, visa, owner..."
+            placeholder={t('doc_hub.search_placeholder')}
             placeholderTextColor={styles.placeholder.color}
           />
         </View>
@@ -141,11 +147,11 @@ export default function DocHubScreen({ navigation }: Props) {
                 <AlertTriangle size={20} color="#EA580C" />
               </View>
               <View style={{ flex: 1 }}>
-                <Text style={styles.alertTitle}>Document Expiration Warnings</Text>
+                <Text style={styles.alertTitle}>{t('doc_hub.exp_warnings')}</Text>
                 <Text style={styles.alertSub}>
                   {alertSummary.expiredCount > 0
-                    ? `${alertSummary.expiredCount} Expired · ${alertSummary.expiringCount} Expiring Soon`
-                    : `${alertSummary.expiringCount} Documents Expiring Soon`}
+                    ? t('doc_hub.expired_expiring_sub', { expired: alertSummary.expiredCount, expiring: alertSummary.expiringCount })
+                    : t('doc_hub.expiring_soon_sub', { count: alertSummary.expiringCount })}
                 </Text>
               </View>
             </View>
@@ -172,7 +178,7 @@ export default function DocHubScreen({ navigation }: Props) {
                   styles.chipText,
                   selectedCategory === cat.key && styles.chipTextActive,
                 ]}>
-                {cat.label}
+                {t(cat.labelKey)}
               </Text>
             </Pressable>
           ))}
@@ -181,7 +187,7 @@ export default function DocHubScreen({ navigation }: Props) {
         {/* Document Repository List Header */}
         <View style={styles.listHeaderRow}>
           <Text style={styles.sectionTitle}>
-            Document Repository ({filteredDocs.length})
+            {t('doc_hub.repo_title', { count: filteredDocs.length })}
           </Text>
         </View>
 
@@ -190,9 +196,9 @@ export default function DocHubScreen({ navigation }: Props) {
         ) : filteredDocs.length === 0 ? (
           <View style={styles.emptyStateCard}>
             <FileText size={36} color={styles.placeholder.color} />
-            <Text style={styles.emptyTitle}>No Documents Found</Text>
+            <Text style={styles.emptyTitle}>{t('doc_hub.no_docs_title')}</Text>
             <Text style={styles.emptySub}>
-              {searchQuery ? 'Try another search term' : 'Tap + to upload your first document.'}
+              {searchQuery ? t('doc_hub.search_try_another') : t('doc_hub.tap_add_doc')}
             </Text>
           </View>
         ) : (
@@ -209,25 +215,25 @@ export default function DocHubScreen({ navigation }: Props) {
                     <Text style={styles.docTitle} numberOfLines={1}>
                       {doc.title}
                     </Text>
-                    <Text style={styles.docMemberName}>Owner: {doc.memberName}</Text>
+                    <Text style={styles.docMemberName}>{t('doc_hub.owner_label', { name: doc.memberName })}</Text>
                   </View>
 
                   {/* Status Badge */}
                   {status === 'expired' && (
                     <View style={[styles.statusBadge, styles.badgeExpired]}>
-                      <Text style={[styles.statusBadgeText, styles.textExpired]}>Expired</Text>
+                      <Text style={[styles.statusBadgeText, styles.textExpired]}>{t('doc_hub.status_expired')}</Text>
                     </View>
                   )}
                   {status === 'expiring' && (
                     <View style={[styles.statusBadge, styles.badgeExpiring]}>
                       <Text style={[styles.statusBadgeText, styles.textExpiring]}>
-                        {daysLeft}d left
+                        {t('doc_hub.status_days_left', { count: daysLeft })}
                       </Text>
                     </View>
                   )}
                   {status === 'valid' && (
                     <View style={[styles.statusBadge, styles.badgeValid]}>
-                      <Text style={[styles.statusBadgeText, styles.textValid]}>Valid</Text>
+                      <Text style={[styles.statusBadgeText, styles.textValid]}>{t('doc_hub.status_valid')}</Text>
                     </View>
                   )}
                 </View>
@@ -235,13 +241,13 @@ export default function DocHubScreen({ navigation }: Props) {
                 {/* Footer details */}
                 <View style={styles.docCardFooter}>
                   {doc.docNumber ? (
-                    <Text style={styles.docNumberText}>No: {doc.docNumber}</Text>
+                    <Text style={styles.docNumberText}>{t('doc_hub.no_label', { num: doc.docNumber })}</Text>
                   ) : (
-                    <Text style={styles.docNumberText}>Category: {doc.category}</Text>
+                    <Text style={styles.docNumberText}>{t('doc_hub.cat_label', { cat: doc.category })}</Text>
                   )}
                   <View style={styles.expiryRow}>
                     <Clock size={12} color={styles.placeholder.color} />
-                    <Text style={styles.expiryDateText}>Expires: {doc.expiryDate}</Text>
+                    <Text style={styles.expiryDateText}>{t('doc_hub.expires_label', { date: doc.expiryDate })}</Text>
                   </View>
                 </View>
               </Pressable>

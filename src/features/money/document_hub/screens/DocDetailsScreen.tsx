@@ -25,6 +25,7 @@ import Clock from 'lucide-react-native/icons/clock';
 import File from 'lucide-react-native/icons/file';
 import { getDocById, getDocStatus, deleteDocument } from '../docStore';
 import type { DocHubEntry } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'DocDetails'>;
 
@@ -32,6 +33,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { docId } = route.params;
+  const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [doc, setDoc] = useState<DocHubEntry | undefined>();
@@ -45,21 +47,25 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
   };
 
   useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     fetchDetail();
+    return () => {
+      unsubLang();
+    };
   }, [docId]);
 
   const handleDelete = () => {
     Alert.alert(
-      'Delete Document',
-      `Are you sure you want to remove "${doc?.title}" from your repository?`,
+      t('doc_hub.delete_doc_title'),
+      t('doc_hub.delete_doc_confirm', { title: doc?.title || 'Document' }),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('doc_hub.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('doc_hub.delete'),
           style: 'destructive',
           onPress: async () => {
             await deleteDocument(docId);
-            Alert.alert('Deleted', 'Document has been removed.');
+            Alert.alert(t('doc_hub.delete_doc_title'), t('doc_hub.deleted_alert'));
             navigation.goBack();
           },
         },
@@ -78,9 +84,9 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
   if (!doc) {
     return (
       <View style={[styles.root, styles.center]}>
-        <Text style={styles.errorText}>Document Not Found</Text>
+        <Text style={styles.errorText}>{t('doc_hub.not_found')}</Text>
         <Pressable style={styles.backLinkBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backLinkText}>Go Back</Text>
+          <Text style={styles.backLinkText}>{t('doc_hub.go_back')}</Text>
         </Pressable>
       </View>
     );
@@ -102,7 +108,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>Document Details</Text>
+        <Text style={styles.headerTitle}>{t('doc_hub.details_title')}</Text>
         <Pressable onPress={handleDelete} style={styles.deleteHeaderBtn}>
           <Trash2 size={18} color="#EF4444" />
         </Pressable>
@@ -122,21 +128,21 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
             {status === 'expired' && (
               <View style={[styles.statusBadge, styles.badgeExpired]}>
                 <Text style={[styles.statusBadgeText, styles.textExpired]}>
-                  Expired ({Math.abs(daysLeft)} days ago)
+                  {t('doc_hub.expired_days_ago', { count: Math.abs(daysLeft) })}
                 </Text>
               </View>
             )}
             {status === 'expiring' && (
               <View style={[styles.statusBadge, styles.badgeExpiring]}>
                 <Text style={[styles.statusBadgeText, styles.textExpiring]}>
-                  Expiring Soon ({daysLeft} days remaining)
+                  {t('doc_hub.expiring_remaining', { count: daysLeft })}
                 </Text>
               </View>
             )}
             {status === 'valid' && (
               <View style={[styles.statusBadge, styles.badgeValid]}>
                 <Text style={[styles.statusBadgeText, styles.textValid]}>
-                  Valid & Active
+                  {t('doc_hub.valid_active')}
                 </Text>
               </View>
             )}
@@ -144,11 +150,11 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
         </View>
 
         {/* Secure Document Number Card */}
-        <Text style={styles.sectionTitle}>Document Number & Access</Text>
+        <Text style={styles.sectionTitle}>{t('doc_hub.doc_num_access')}</Text>
         <View style={styles.card}>
           <View style={styles.secureRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.cardLabel}>Document / Policy ID</Text>
+              <Text style={styles.cardLabel}>{t('doc_hub.doc_policy_id')}</Text>
               <Text style={styles.secureDocNumber}>{maskedDocNumber(doc.docNumber)}</Text>
             </View>
             {doc.docNumber && (
@@ -166,11 +172,11 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
         </View>
 
         {/* Info Table Card */}
-        <Text style={styles.sectionTitle}>Key Metadata</Text>
+        <Text style={styles.sectionTitle}>{t('doc_hub.key_metadata')}</Text>
         <View style={styles.card}>
           <View style={styles.metaRow}>
             <User size={16} color={styles.placeholder.color} />
-            <Text style={styles.metaKey}>Document Owner</Text>
+            <Text style={styles.metaKey}>{t('doc_hub.doc_owner')}</Text>
             <Text style={styles.metaVal}>{doc.memberName}</Text>
           </View>
 
@@ -178,15 +184,15 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
 
           <View style={styles.metaRow}>
             <Calendar size={16} color={styles.placeholder.color} />
-            <Text style={styles.metaKey}>Issue Date</Text>
-            <Text style={styles.metaVal}>{doc.issueDate || 'Not specified'}</Text>
+            <Text style={styles.metaKey}>{t('doc_hub.issue_date')}</Text>
+            <Text style={styles.metaVal}>{doc.issueDate || t('doc_hub.not_specified')}</Text>
           </View>
 
           <View style={styles.divider} />
 
           <View style={styles.metaRow}>
             <Clock size={16} color={styles.placeholder.color} />
-            <Text style={styles.metaKey}>Expiration Date</Text>
+            <Text style={styles.metaKey}>{t('doc_hub.expiration_date')}</Text>
             <Text style={styles.metaValBold}>
               {doc.expiryDate}
             </Text>
@@ -197,7 +203,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
               <View style={styles.divider} />
               <View style={styles.metaRow}>
                 <ShieldCheck size={16} color={styles.placeholder.color} />
-                <Text style={styles.metaKey}>Country</Text>
+                <Text style={styles.metaKey}>{t('doc_hub.country')}</Text>
                 <Text style={styles.metaVal}>{doc.country}</Text>
               </View>
             </>
@@ -208,7 +214,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
               <View style={styles.divider} />
               <View style={styles.metaRow}>
                 <ShieldCheck size={16} color={styles.placeholder.color} />
-                <Text style={styles.metaKey}>Issuing Authority</Text>
+                <Text style={styles.metaKey}>{t('doc_hub.issuing_authority')}</Text>
                 <Text style={styles.metaVal}>{doc.issuingAuthority}</Text>
               </View>
             </>
@@ -219,7 +225,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
               <View style={styles.divider} />
               <View style={styles.metaRow}>
                 <User size={16} color={styles.placeholder.color} />
-                <Text style={styles.metaKey}>Covered Members</Text>
+                <Text style={styles.metaKey}>{t('doc_hub.covered_members')}</Text>
                 <Text style={styles.metaVal}>{doc.coveredMembers}</Text>
               </View>
             </>
@@ -229,7 +235,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
         {/* Notes Card */}
         {doc.notes && (
           <>
-            <Text style={styles.sectionTitle}>Notes & Instructions</Text>
+            <Text style={styles.sectionTitle}>{t('doc_hub.notes_instructions')}</Text>
             <View style={styles.card}>
               <Text style={styles.notesText}>{doc.notes}</Text>
             </View>
@@ -237,7 +243,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
         )}
 
         {/* Attachment View Card */}
-        <Text style={styles.sectionTitle}>Document Attachment</Text>
+        <Text style={styles.sectionTitle}>{t('doc_hub.doc_attachment')}</Text>
         <View style={styles.card}>
           <View style={styles.attachmentRow}>
             <File size={20} color="#004F63" />
@@ -245,7 +251,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
               <Text style={styles.attachmentTitle}>
                 {doc.fileName || `${doc.title}.pdf`}
               </Text>
-              <Text style={styles.attachmentSub}>Stored in local encrypted vault</Text>
+              <Text style={styles.attachmentSub}>{t('doc_hub.local_vault_sub')}</Text>
             </View>
           </View>
         </View>

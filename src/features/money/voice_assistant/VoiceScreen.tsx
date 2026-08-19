@@ -31,6 +31,8 @@ import User from 'lucide-react-native/icons/user';
 import CircleX from 'lucide-react-native/icons/circle-x';
 import { loadVoiceHistory, saveVoiceHistory } from './voiceStore';
 import type { VoiceIntent } from './types';
+import { VOICE_COLORS } from './constants/colors';
+import { subscribeToLanguageChanges, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'Voice'>;
 type ScreenState = 'default' | 'listening' | 'confirm' | 'history';
@@ -50,6 +52,7 @@ const SUGGESTIONS: SuggestionChip[] = [
 
 interface QuickAskCategory {
   id: string;
+  titleKey: string;
   title: string;
   bgColor: string;
   iconColor: string;
@@ -57,12 +60,12 @@ interface QuickAskCategory {
 }
 
 const WHAT_YOU_CAN_ASK: QuickAskCategory[] = [
-  { id: 'c1', title: 'Groups', bgColor: '#E3F2F5', iconColor: '#004F63', icon: Users },
-  { id: 'c2', title: 'Expenses', bgColor: '#DCFCE7', iconColor: '#16A34A', icon: FilePlus },
-  { id: 'c3', title: 'Spending', bgColor: '#F3E8FF', iconColor: '#9333EA', icon: ChartPie },
-  { id: 'c4', title: 'Bills', bgColor: '#FFEDD5', iconColor: '#EA580C', icon: Bell },
-  { id: 'c5', title: 'Inventory', bgColor: '#EFF6FF', iconColor: '#2563EB', icon: Package },
-  { id: 'c6', title: 'Contacts', bgColor: '#FEF3C7', iconColor: '#D97706', icon: User },
+  { id: 'c1', titleKey: 'voice_assistant.cat_groups', title: 'Groups', bgColor: '#E3F2F5', iconColor: '#004F63', icon: Users },
+  { id: 'c2', titleKey: 'voice_assistant.cat_expenses', title: 'Expenses', bgColor: '#DCFCE7', iconColor: '#16A34A', icon: FilePlus },
+  { id: 'c3', titleKey: 'voice_assistant.cat_spending', title: 'Spending', bgColor: '#F3E8FF', iconColor: '#9333EA', icon: ChartPie },
+  { id: 'c4', titleKey: 'voice_assistant.cat_bills', title: 'Bills', bgColor: '#FFEDD5', iconColor: '#EA580C', icon: Bell },
+  { id: 'c5', titleKey: 'voice_assistant.cat_inventory', title: 'Inventory', bgColor: '#EFF6FF', iconColor: '#2563EB', icon: Package },
+  { id: 'c6', titleKey: 'voice_assistant.cat_contacts', title: 'Contacts', bgColor: '#FEF3C7', iconColor: '#D97706', icon: User },
 ];
 
 interface CommandHistoryItem {
@@ -142,6 +145,14 @@ const HISTORY_DATA: CommandHistoryItem[] = [
 export default function VoiceScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const [, setLocaleVersion] = useState(0);
+
+  useEffect(() => {
+    const unsubscribe = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
+    return () => {
+      unsubscribe();
+    };
+  }, []);
 
   const [screenState, setScreenState] = useState<ScreenState>('default');
   const [activeQuery, setActiveQuery] = useState('Show my balance in Home Rent & Bills');
@@ -225,10 +236,10 @@ export default function VoiceScreen({ navigation }: Props) {
         </Pressable>
         <Text style={styles.headerTitle}>
           {screenState === 'confirm'
-            ? 'Confirm Action'
+            ? t('voice_assistant.confirm_command')
             : screenState === 'history'
-            ? 'Command History'
-            : 'Voice Command'}
+            ? t('voice_assistant.history_title')
+            : t('voice_assistant.header_title')}
         </Text>
         <Pressable
           onPress={() => navigation.navigate('VoiceSettings')}
@@ -246,26 +257,26 @@ export default function VoiceScreen({ navigation }: Props) {
           <View style={styles.defaultHeroCard}>
             <View style={styles.defaultHeroLeft}>
               <View style={styles.heroMicIconCircle}>
-                <Mic size={22} color="#FFFFFF" />
+                <Mic size={22} color={VOICE_COLORS.textOnPrimary} />
               </View>
             </View>
             <View style={styles.defaultHeroRight}>
-              <Text style={styles.defaultHeroHelp}>How can I help?</Text>
+              <Text style={styles.defaultHeroHelp}>{t('voice_assistant.header_title')}</Text>
               <Text style={styles.defaultHeroTitle}>
                 Ask about expenses, groups, bills, inventory, or reminders.
               </Text>
               <Pressable
                 style={styles.heroTapPillBtn}
                 onPress={() => handleStartListening()}>
-                <Text style={styles.heroTapPillText}>Tap to speak</Text>
+                <Text style={styles.heroTapPillText}>{t('voice_assistant.tap_to_speak')}</Text>
               </Pressable>
             </View>
           </View>
 
           {/* Try saying */}
           <View style={styles.sectionHeader}>
-            <Sparkles size={18} color="#004F63" />
-            <Text style={styles.sectionTitleSparkle}>Try saying</Text>
+            <Sparkles size={18} color={VOICE_COLORS.primary} />
+            <Text style={styles.sectionTitleSparkle}>{t('voice_assistant.try_saying')}</Text>
           </View>
           <ScrollView
             horizontal
@@ -277,9 +288,9 @@ export default function VoiceScreen({ navigation }: Props) {
                 style={styles.suggestionChip}
                 onPress={() => handleStartListening(chip.text)}>
                 <View style={styles.chipIconBadge}>
-                  {chip.iconType === 'rupee' && <IndianRupee size={14} color="#0284C7" />}
-                  {chip.iconType === 'package' && <Package size={14} color="#0284C7" />}
-                  {chip.iconType === 'bell' && <Bell size={14} color="#0284C7" />}
+                  {chip.iconType === 'rupee' && <IndianRupee size={14} color={VOICE_COLORS.accentBlue} />}
+                  {chip.iconType === 'package' && <Package size={14} color={VOICE_COLORS.accentBlue} />}
+                  {chip.iconType === 'bell' && <Bell size={14} color={VOICE_COLORS.accentBlue} />}
                 </View>
                 <Text style={styles.chipText}>"{chip.text}"</Text>
               </Pressable>
@@ -288,12 +299,12 @@ export default function VoiceScreen({ navigation }: Props) {
 
           {/* Recent Commands */}
           <View style={styles.recentHeaderRow}>
-            <Text style={styles.sectionTitle}>Recent Commands</Text>
+            <Text style={styles.sectionTitle}>{t('voice_assistant.recent_history')}</Text>
             <Pressable
               onPress={() => setScreenState('history')}
               style={styles.viewAllBtn}>
-              <Text style={styles.viewAllText}>View all</Text>
-              <ChevronRight size={14} color="#0284C7" />
+              <Text style={styles.viewAllText}>{t('voice_assistant.all')}</Text>
+              <ChevronRight size={14} color={VOICE_COLORS.accentBlue} />
             </Pressable>
           </View>
 
@@ -320,7 +331,7 @@ export default function VoiceScreen({ navigation }: Props) {
                     </View>
                     <View style={styles.recentRightWrap}>
                       <Text style={styles.recentTime}>{item.time}</Text>
-                      <CircleCheck size={16} color="#22C55E" />
+                      <CircleCheck size={16} color={VOICE_COLORS.successGreen} />
                     </View>
                   </Pressable>
                 </React.Fragment>
@@ -329,19 +340,20 @@ export default function VoiceScreen({ navigation }: Props) {
           </View>
 
           {/* What you can ask */}
-          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>What you can ask</Text>
+          <Text style={[styles.sectionTitle, { marginTop: 24 }]}>{t('voice_assistant.what_you_can_ask')}</Text>
           <View style={styles.categoriesGrid}>
             {WHAT_YOU_CAN_ASK.map((cat) => {
               const IconComponent = cat.icon;
+              const titleText = t(cat.titleKey) || cat.title;
               return (
                 <Pressable
                   key={cat.id}
                   style={styles.categoryCard}
-                  onPress={() => handleStartListening(`Help with ${cat.title}`)}>
+                  onPress={() => handleStartListening(`Help with ${titleText}`)}>
                   <View style={[styles.categoryIconBadge, { backgroundColor: cat.bgColor }]}>
                     <IconComponent size={22} color={cat.iconColor} />
                   </View>
-                  <Text style={styles.categoryTitle}>{cat.title}</Text>
+                  <Text style={styles.categoryTitle}>{titleText}</Text>
                 </Pressable>
               );
             })}
@@ -363,19 +375,19 @@ export default function VoiceScreen({ navigation }: Props) {
               ]}>
               <View style={styles.listeningMicPulseInner}>
                 <View style={styles.listeningMicCore}>
-                  <Mic size={32} color="#FFFFFF" />
+                  <Mic size={32} color={VOICE_COLORS.textOnPrimary} />
                 </View>
               </View>
             </Animated.View>
 
-            <Text style={styles.listeningTitle}>Listening...</Text>
+            <Text style={styles.listeningTitle}>{t('voice_assistant.listening')}</Text>
             <Text style={styles.listeningSub}>
-              Speak naturally. I'll understand your request.
+              {t('voice_assistant.listening_sub')}
             </Text>
           </View>
 
           {/* Live Transcript Card */}
-          <Text style={styles.stateSectionTitle}>Live transcript</Text>
+          <Text style={styles.stateSectionTitle}>{t('voice_assistant.live_transcript')}</Text>
           <View style={styles.liveTranscriptCard}>
             <Text style={styles.transcriptText}>"{activeQuery}"</Text>
             <View style={styles.soundDotsRow}>
@@ -397,7 +409,7 @@ export default function VoiceScreen({ navigation }: Props) {
           </View>
 
           {/* Understanding Request Card */}
-          <Text style={styles.stateSectionTitle}>Understanding your request...</Text>
+          <Text style={styles.stateSectionTitle}>{t('voice_assistant.understanding_request')}</Text>
           <View style={styles.understandingCard}>
             <Text style={styles.understandingIntentHeader}>Groups & Balances:</Text>
             <Text style={styles.understandingIntentSub}>Home Rent & Bills</Text>
@@ -408,13 +420,13 @@ export default function VoiceScreen({ navigation }: Props) {
             <Pressable
               style={styles.cancelOutlineBtn}
               onPress={() => setScreenState('default')}>
-              <Text style={styles.cancelOutlineBtnText}>Cancel</Text>
+              <Text style={styles.cancelOutlineBtnText}>{t('voice_assistant.cancel')}</Text>
             </Pressable>
 
             <Pressable
               style={styles.stopListeningBtn}
               onPress={handleStopListening}>
-              <Text style={styles.stopListeningBtnText}>Stop Listening</Text>
+              <Text style={styles.stopListeningBtnText}>{t('voice_assistant.stop_listening')}</Text>
             </Pressable>
           </View>
         </ScrollView>
@@ -425,12 +437,12 @@ export default function VoiceScreen({ navigation }: Props) {
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.confirmSubtitle}>I understood your request</Text>
+          <Text style={styles.confirmSubtitle}>{t('voice_assistant.understood_request')}</Text>
 
           {/* Understood Intent Card */}
           <View style={styles.understoodCard}>
             <View style={styles.understoodIconBadge}>
-              <Users size={20} color="#004F63" />
+              <Users size={20} color={VOICE_COLORS.primary} />
             </View>
             <View style={styles.understoodTextWrap}>
               <Text style={styles.understoodTitle}>"{activeQuery}"</Text>
@@ -439,25 +451,25 @@ export default function VoiceScreen({ navigation }: Props) {
           </View>
 
           {/* Action Details Table Card */}
-          <Text style={styles.stateSectionTitle}>Action details</Text>
+          <Text style={styles.stateSectionTitle}>{t('voice_assistant.action_details')}</Text>
           <View style={styles.actionDetailsCard}>
             <View style={styles.detailRow}>
-              <Text style={styles.detailKey}>Module</Text>
+              <Text style={styles.detailKey}>{t('voice_assistant.module')}</Text>
               <Text style={styles.detailVal}>Expense Groups</Text>
             </View>
             <View style={styles.detailDivider} />
             <View style={styles.detailRow}>
-              <Text style={styles.detailKey}>Group</Text>
+              <Text style={styles.detailKey}>{t('voice_assistant.group')}</Text>
               <Text style={styles.detailVal}>Home Rent & Bills</Text>
             </View>
             <View style={styles.detailDivider} />
             <View style={styles.detailRow}>
-              <Text style={styles.detailKey}>Balance</Text>
+              <Text style={styles.detailKey}>{t('voice_assistant.balance')}</Text>
               <Text style={styles.detailValHighlight}>
                 ₹17,500
               </Text>
             </View>
-            <Text style={styles.actionReadyText}>Ready to open group details.</Text>
+            <Text style={styles.actionReadyText}>{t('voice_assistant.ready_to_open')}</Text>
           </View>
 
           {/* Bottom Action Buttons */}
@@ -465,7 +477,7 @@ export default function VoiceScreen({ navigation }: Props) {
             <Pressable
               style={styles.cancelOutlineBtn}
               onPress={() => setScreenState('default')}>
-              <Text style={styles.cancelOutlineBtnText}>Cancel</Text>
+              <Text style={styles.cancelOutlineBtnText}>{t('voice_assistant.cancel')}</Text>
             </Pressable>
 
             <Pressable
@@ -473,18 +485,18 @@ export default function VoiceScreen({ navigation }: Props) {
               onPress={() => {
                 navigation.navigate('ExpenseGroups');
               }}>
-              <Text style={styles.stopListeningBtnText}>Open details</Text>
+              <Text style={styles.stopListeningBtnText}>{t('voice_assistant.open_details')}</Text>
             </Pressable>
           </View>
 
           {/* Completed Status Banner at bottom */}
           <View style={styles.completedToastBanner}>
             <View style={styles.completedToastHeader}>
-              <CircleCheck size={18} color="#004F63" />
-              <Text style={styles.completedToastTitle}>Command completed</Text>
+              <CircleCheck size={18} color={VOICE_COLORS.primary} />
+              <Text style={styles.completedToastTitle}>{t('voice_assistant.command_completed')}</Text>
             </View>
             <Text style={styles.completedToastSub}>
-              You can ask another question anytime.
+              {t('voice_assistant.ask_another')}
             </Text>
           </View>
         </ScrollView>
@@ -495,7 +507,7 @@ export default function VoiceScreen({ navigation }: Props) {
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
           showsVerticalScrollIndicator={false}>
-          <Text style={styles.historySubtitle}>All recent voice activity</Text>
+          <Text style={styles.historySubtitle}>{t('voice_assistant.history_sub')}</Text>
 
           {/* Filter Chips Bar */}
           <View style={styles.historyFilterBar}>
@@ -512,7 +524,11 @@ export default function VoiceScreen({ navigation }: Props) {
                     styles.filterPillText,
                     historyFilter === filterKey && styles.filterPillTextActive,
                   ]}>
-                  {filterKey.charAt(0).toUpperCase() + filterKey.slice(1)}
+                  {filterKey === 'all'
+                    ? t('voice_assistant.all')
+                    : filterKey === 'completed'
+                    ? t('voice_assistant.completed')
+                    : t('voice_assistant.failed')}
                 </Text>
               </Pressable>
             ))}
@@ -543,9 +559,9 @@ export default function VoiceScreen({ navigation }: Props) {
                     <View style={styles.recentRightWrap}>
                       <Text style={styles.recentTime}>{item.time}</Text>
                       {item.status === 'completed' ? (
-                        <CircleCheck size={16} color="#22C55E" />
+                        <CircleCheck size={16} color={VOICE_COLORS.successGreen} />
                       ) : (
-                        <CircleX size={16} color="#EF4444" />
+                        <CircleX size={16} color={VOICE_COLORS.dangerRed} />
                       )}
                     </View>
                   </Pressable>
@@ -574,7 +590,7 @@ export default function VoiceScreen({ navigation }: Props) {
             <Pressable
               style={styles.mainMicButton}
               onPress={() => handleStartListening()}>
-              <Mic size={26} color="#FFFFFF" />
+              <Mic size={26} color={VOICE_COLORS.textOnPrimary} />
             </Pressable>
 
             <View style={styles.waveSideGroup}>
@@ -584,7 +600,7 @@ export default function VoiceScreen({ navigation }: Props) {
             </View>
           </View>
 
-          <Text style={styles.tapToSpeakLabel}>Tap to speak</Text>
+          <Text style={styles.tapToSpeakLabel}>{t('voice_assistant.tap_to_speak')}</Text>
         </View>
       )}
     </View>

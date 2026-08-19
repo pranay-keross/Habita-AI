@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import {
   View,
   Text,
@@ -19,6 +19,7 @@ import Upload from 'lucide-react-native/icons/upload';
 import Button from '../../../../components/Button';
 import { addDocument } from '../docStore';
 import { DOC_TEMPLATES, type DocTemplateType, type DocCategory } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'DocTemplateForm'>;
 
@@ -26,6 +27,14 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { templateType } = route.params;
+  const [, setLocaleVersion] = useState(0);
+
+  useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
+    return () => {
+      unsubLang();
+    };
+  }, []);
 
   const templateInfo =
     DOC_TEMPLATES.find((t) => t.type === templateType) || DOC_TEMPLATES[0];
@@ -62,11 +71,11 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert('Missing Field', 'Please enter a title for the document.');
+      Alert.alert(t('doc_hub.missing_field'), t('doc_hub.enter_title_msg'));
       return;
     }
     if (!expiryDate.trim()) {
-      Alert.alert('Missing Expiry Date', 'Please enter the document expiration date (YYYY-MM-DD).');
+      Alert.alert(t('doc_hub.missing_expiry'), t('doc_hub.enter_expiry_msg'));
       return;
     }
 
@@ -86,7 +95,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
     });
     setSaving(false);
 
-    Alert.alert('Saved!', `${title} has been added to your Document Hub.`);
+    Alert.alert(t('doc_hub.saved_alert_title'), t('doc_hub.saved_alert_msg', { title }));
     navigation.popTo('DocHub');
   };
 
@@ -97,7 +106,11 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>{templateInfo.title} Form</Text>
+        <Text style={styles.headerTitle}>
+          {t('doc_hub.form_suffix', {
+            title: t(`doc_hub.tmpl_${templateInfo.type}_title`, { defaultValue: templateInfo.title }),
+          })}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -108,14 +121,18 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             <FileText size={24} color={templateInfo.accentColor} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.formHeroTitle}>{templateInfo.title} Template</Text>
-            <Text style={styles.formHeroSub}>{templateInfo.description}</Text>
+            <Text style={styles.formHeroTitle}>
+              {t(`doc_hub.tmpl_${templateInfo.type}_title`, { defaultValue: templateInfo.title })}
+            </Text>
+            <Text style={styles.formHeroSub}>
+              {t(`doc_hub.tmpl_${templateInfo.type}_desc`, { defaultValue: templateInfo.description })}
+            </Text>
           </View>
         </View>
 
         {/* General Form Fields */}
         <View style={styles.card}>
-          <Text style={styles.inputLabel}>Document Title *</Text>
+          <Text style={styles.inputLabel}>{t('doc_hub.title_label')} *</Text>
           <TextInput
             style={styles.textInput}
             value={title}
@@ -124,7 +141,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             placeholderTextColor={styles.placeholder.color}
           />
 
-          <Text style={styles.inputLabel}>Member / Owner Name *</Text>
+          <Text style={styles.inputLabel}>{t('doc_hub.owner_member_label')} *</Text>
           <TextInput
             style={styles.textInput}
             value={memberName}
@@ -134,19 +151,13 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
           />
 
           <Text style={styles.inputLabel}>
-            {templateType === 'passport'
-              ? 'Passport Number'
-              : templateType === 'visa'
-              ? 'Visa Number / Reference'
-              : templateType === 'license'
-              ? 'License Number'
-              : 'Policy / Group ID Number'}
+            {t('doc_hub.doc_num_label')}
           </Text>
           <TextInput
             style={styles.textInput}
             value={docNumber}
             onChangeText={setDocNumber}
-            placeholder="e.g. Z8942104"
+            placeholder={t('doc_hub.doc_num_placeholder')}
             placeholderTextColor={styles.placeholder.color}
           />
         </View>
@@ -156,7 +167,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
         <View style={styles.card}>
           <View style={styles.dateRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.inputLabel}>Issue Date (YYYY-MM-DD)</Text>
+              <Text style={styles.inputLabel}>{t('doc_hub.issue_date')} (YYYY-MM-DD)</Text>
               <TextInput
                 style={styles.textInput}
                 value={issueDate}
@@ -167,7 +178,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             </View>
 
             <View style={{ flex: 1 }}>
-              <Text style={styles.inputLabel}>Expiry Date * (YYYY-MM-DD)</Text>
+              <Text style={styles.inputLabel}>{t('doc_hub.expiration_date')} * (YYYY-MM-DD)</Text>
               <TextInput
                 style={styles.textInput}
                 value={expiryDate}
@@ -182,7 +193,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
         {/* Template Specific Specialized Fields */}
         <Text style={styles.sectionTitle}>Template Details</Text>
         <View style={styles.card}>
-          <Text style={styles.inputLabel}>Issuing Authority / Provider</Text>
+          <Text style={styles.inputLabel}>{t('doc_hub.issuing_authority')}</Text>
           <TextInput
             style={styles.textInput}
             value={issuingAuthority}
@@ -199,7 +210,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
 
           {templateType === 'insurance' && (
             <>
-              <Text style={styles.inputLabel}>Covered Family Members</Text>
+              <Text style={styles.inputLabel}>{t('doc_hub.covered_members')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={coveredMembers}
@@ -212,7 +223,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
 
           {(templateType === 'passport' || templateType === 'visa') && (
             <>
-              <Text style={styles.inputLabel}>Country of Issue</Text>
+              <Text style={styles.inputLabel}>{t('doc_hub.country')}</Text>
               <TextInput
                 style={styles.textInput}
                 value={country}
@@ -223,34 +234,34 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             </>
           )}
 
-          <Text style={styles.inputLabel}>Additional Notes / Vault Location</Text>
+          <Text style={styles.inputLabel}>{t('doc_hub.notes_label')}</Text>
           <TextInput
             style={[styles.textInput, { height: 70 }]}
             multiline
             value={notes}
             onChangeText={setNotes}
-            placeholder="e.g. Kept in master bedroom safe, renewal reminder set."
+            placeholder={t('doc_hub.notes_placeholder')}
             placeholderTextColor={styles.placeholder.color}
           />
         </View>
 
         {/* Upload Attachment Card */}
-        <Text style={styles.sectionTitle}>Document File Attachment</Text>
+        <Text style={styles.sectionTitle}>{t('doc_hub.doc_attachment')}</Text>
         <Pressable style={styles.uploadCard} onPress={handlePickFile}>
           <Upload size={22} color="#004F63" />
           <View style={{ flex: 1 }}>
             <Text style={styles.uploadTitle}>
-              {fileName ? fileName : 'Upload Document Scan / PDF'}
+              {fileName ? fileName : t('doc_hub.attach_file')}
             </Text>
             <Text style={styles.uploadSub}>
-              {fileName ? 'File selected & ready for vault' : 'Pick PDF or image from your device'}
+              {fileName ? 'File selected & ready for vault' : t('doc_hub.select_file')}
             </Text>
           </View>
         </Pressable>
 
         {/* Save Button */}
         <Button
-          title="Save Document to Hub"
+          title={t('doc_hub.save_doc')}
           onPress={handleSave}
           loading={saving}
           style={styles.saveBtn}

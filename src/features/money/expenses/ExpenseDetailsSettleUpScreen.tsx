@@ -26,6 +26,7 @@ import {
   settlePairwiseDebt,
 } from '../expenseStore';
 import type { Expense, ExpenseGroup } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'ExpenseDetailsSettleUp'>;
 
@@ -41,6 +42,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { groupId, expenseId, settlePayerId, settlePayeeId } = route.params;
+  const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<ExpenseGroup | undefined>();
@@ -51,6 +53,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
   const isSettleMode = !!(settlePayerId && settlePayeeId);
 
   useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     const fetchData = async () => {
       setLoading(true);
       const g = await getGroupById(groupId);
@@ -63,6 +66,9 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
       setLoading(false);
     };
     fetchData();
+    return () => {
+      unsubLang();
+    };
   }, [groupId, expenseId]);
 
   if (loading || !group) {
@@ -98,7 +104,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
         <Text style={styles.headerTitle}>
-          {isSettleMode ? 'Record Settlement' : 'Expense Details'}
+          {isSettleMode ? t('expenses.record_settlement') : t('expenses.expense_details')}
         </Text>
         <View style={{ width: 40 }} />
       </View>
@@ -109,14 +115,13 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
           <View>
             <View style={styles.settleHeroCard}>
               <HandCoins size={36} color="#004F63" />
-              <Text style={styles.settleHeroTitle}>Debt Settlement</Text>
+              <Text style={styles.settleHeroTitle}>{t('expenses.debt_settlement_title')}</Text>
               <Text style={styles.settleHeroSub}>
-                <Text style={styles.boldText}>{payerMember?.name}</Text> is paying{' '}
-                <Text style={styles.boldText}>{payeeMember?.name}</Text>
+                {t('expenses.is_paying_text', { payer: payerMember?.name, payee: payeeMember?.name })}
               </Text>
             </View>
 
-            <Text style={styles.sectionTitle}>Select Payment Method</Text>
+            <Text style={styles.sectionTitle}>{t('expenses.select_payment_method')}</Text>
             <View style={styles.card}>
               {PAYMENT_METHODS.map((pm) => (
                 <Pressable
@@ -140,7 +145,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
             </View>
 
             <Button
-              title="Record Payment & Clear Debt"
+              title={t('expenses.record_payment_btn')}
               onPress={handleConfirmSettleUp}
               loading={settling}
               style={{ marginTop: 24 }}
@@ -167,7 +172,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
               <View style={styles.card}>
                 <View style={styles.metaRow}>
                   <User size={16} color={styles.placeholder.color} />
-                  <Text style={styles.metaKey}>Paid by</Text>
+                  <Text style={styles.metaKey}>{t('expenses.paid_by')}</Text>
                   <Text style={styles.metaVal}>
                     {group.members.find((m) => m.id === expense.paidByMemberId)?.name || 'Member'}
                   </Text>
@@ -175,19 +180,19 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
                 <View style={styles.divider} />
                 <View style={styles.metaRow}>
                   <Calendar size={16} color={styles.placeholder.color} />
-                  <Text style={styles.metaKey}>Date logged</Text>
+                  <Text style={styles.metaKey}>{t('expenses.date_logged')}</Text>
                   <Text style={styles.metaVal}>{expense.date}</Text>
                 </View>
                 <View style={styles.divider} />
                 <View style={styles.metaRow}>
                   <Receipt size={16} color={styles.placeholder.color} />
-                  <Text style={styles.metaKey}>Split mode</Text>
+                  <Text style={styles.metaKey}>{t('expenses.split_mode')}</Text>
                   <Text style={styles.metaVal}>{expense.splitType.toUpperCase()}</Text>
                 </View>
               </View>
 
               {/* Itemized Splits Card */}
-              <Text style={styles.sectionTitle}>Itemized Shares</Text>
+              <Text style={styles.sectionTitle}>{t('expenses.itemized_shares')}</Text>
               <View style={styles.card}>
                 {expense.shares.map((share) => {
                   const member = group.members.find((m) => m.id === share.memberId);
