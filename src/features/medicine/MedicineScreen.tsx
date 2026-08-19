@@ -1,7 +1,6 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
-import { pick, isErrorWithCode, errorCodes, types as documentTypes } from '@react-native-documents/picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../app/_layout';
@@ -12,26 +11,33 @@ import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
 import useAuth from '../../hooks/useAuth';
 import { getMyPrimaryFamily, getMyProfileName, resolveMyMembership } from '../family/api';
+import type { FamilyMember } from '../family/types';
 import {
-  createFamilyProfile,
+  createFamilyProfileForMember,
+  createFamilyProfileOther,
   createMedicine,
+  deleteMedicine as deleteRemoteMedicine,
   listFamilyProfiles,
-  listMedicalDocuments,
   listMedicines,
   logIntake,
+  normalizeStockQuantity,
+  parseAdherenceRate,
   parseMedchestError,
   updateMedicine,
-  uploadMedicalDocument,
+  type FamilyProfile,
+  type FamilyProfileCategory,
   type MedchestErrorKind,
-  type MedicalDocument,
   type RemoteMedicine,
 } from './api';
 import {
   calculateAdherence,
+  guessIsLiquid,
   isTakenToday,
   loadIntakeLog,
+  loadLiquidFlags,
   loadMedicines,
   saveIntakeLog,
+  saveLiquidFlags,
   saveMedicines,
 } from './medicineStore';
 import { SCHEDULE_SLOTS, type IntakeLogEntry, type Medicine, type ScheduleSlot } from './types';
@@ -61,9 +67,16 @@ function timeToSlot(time: string): ScheduleSlot {
   return 'night';
 }
 
-function remoteToLocal(remote: RemoteMedicine): Medicine {
+function remoteToLocal(remote: RemoteMedicine, liquidFlags: Record<string, boolean>): Medicine {
   const slots = Array.from(new Set(remote.scheduleTimes.map(timeToSlot)));
-  return { id: remote.id, name: remote.name, dosage: remote.dosage, schedule: slots, stock: remote.stockQuantity };
+  return {
+    id: remote.id,
+    name: remote.name,
+    dosage: remote.dosage,
+    schedule: slots,
+    stock: normalizeStockQuantity(remote.stockQuantity),
+    isLiquid: liquidFlags[remote.id] ?? guessIsLiquid(remote.dosage),
+  };
 }
 
 function formatDob(date: Date): string {
@@ -77,6 +90,15 @@ function formatDob(date: Date): string {
 // default value; nothing is sent until the user actually picks a date.
 const DEFAULT_DOB = new Date(new Date().getFullYear() - 25, 0, 1);
 const MIN_DOB = new Date(1900, 0, 1);
+
+const ALL_CATEGORIES: FamilyProfileCategory[] = ['SELF', 'KID', 'ELDER', 'OTHER'];
+
+const CATEGORY_ICON: Record<FamilyProfileCategory, string> = {
+  SELF: '🧑',
+  KID: '🧒',
+  ELDER: '👵',
+  OTHER: '👤',
+};
 
 export default function MedicineScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
@@ -97,32 +119,38 @@ export default function MedicineScreen({ navigation }: Props) {
 
   // `null` = local-only (no family, or family lookup failed) — unchanged pre-D-035
   // behavior. Non-null once a family is found: medicines live on the backend, scoped to
-  // this `familyProfileId` (a `category: SELF` `FamilyProfile`, auto-created below if
-  // none exists yet).
+  // `familyProfileId` below — the profile currently selected in the switcher, one of
+  // potentially several a family can now have (docs/DECISIONS.md D-038).
   const [familyId, setFamilyId] = useState<string | null>(null);
+  const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+  const [myFamilyMemberId, setMyFamilyMemberId] = useState<string | null>(null);
+  const [profiles, setProfiles] = useState<FamilyProfile[]>([]);
   const [familyProfileId, setFamilyProfileId] = useState<string | null>(null);
+  const [switchingProfile, setSwitchingProfile] = useState(false);
   // `lowStockThreshold` has no field in this screen's UI at all, but `PUT /medicines/{id}`
   // is a full replace, not a patch — has to be resent on every edit. Carried here,
   // keyed by medicine id, from whatever `listMedicines`/`createMedicine` last returned.
   const [lowStockThresholds, setLowStockThresholds] = useState<Record<string, number>>({});
   const [adherenceRates, setAdherenceRates] = useState<Record<string, number>>({});
 
-  const [showDobSheet, setShowDobSheet] = useState(false);
-  const [dobDate, setDobDate] = useState<Date | null>(null);
-  const [showDatePicker, setShowDatePicker] = useState(false);
-  const [savingDob, setSavingDob] = useState(false);
-
-  // Prescriptions/documents — only reachable once `familyProfileId` exists (same
-  // profile medicines attach to). No local-only equivalent: this app has no local
-  // document storage of its own, so with no family there is nowhere for this to live.
-  const [documents, setDocuments] = useState<MedicalDocument[]>([]);
-  const [uploadingDoc, setUploadingDoc] = useState(false);
+  // "Add Profile" — a two-step sheet: pick who it's for (an existing family
+  // member/dependent, or "Someone Else" with no account), then category + date of birth.
+  const [showAddProfileSheet, setShowAddProfileSheet] = useState(false);
+  const [addProfileStep, setAddProfileStep] = useState<'choose_who' | 'details'>('choose_who');
+  const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
+  const [isOtherMode, setIsOtherMode] = useState(false);
+  const [otherName, setOtherName] = useState('');
+  const [newProfileCategory, setNewProfileCategory] = useState<FamilyProfileCategory | null>(null);
+  const [newProfileDob, setNewProfileDob] = useState<Date | null>(null);
+  const [showNewProfileDatePicker, setShowNewProfileDatePicker] = useState(false);
+  const [creatingProfile, setCreatingProfile] = useState(false);
 
   // Form state
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [schedule, setSchedule] = useState<ScheduleSlot[]>(['morning']);
   const [stock, setStock] = useState('30');
+  const [isLiquid, setIsLiquid] = useState(false);
   const [saving, setSaving] = useState(false);
 
   const errorMessageKey = (kind: MedchestErrorKind): string => {
@@ -141,13 +169,14 @@ export default function MedicineScreen({ navigation }: Props) {
 
   const refreshRemoteMedicines = async (profileId: string, token: string) => {
     const remote = await listMedicines(profileId, token);
-    setMedicines(remote.map(remoteToLocal));
+    const liquidFlags = await loadLiquidFlags();
+    setMedicines(remote.map((m) => remoteToLocal(m, liquidFlags)));
     setLowStockThresholds(Object.fromEntries(remote.map((m) => [m.id, m.lowStockThreshold])));
-    setAdherenceRates(Object.fromEntries(remote.map((m) => [m.id, m.adherenceRate])));
-  };
-
-  const refreshDocuments = async (profileId: string, token: string) => {
-    setDocuments(await listMedicalDocuments(profileId, token));
+    setAdherenceRates(
+      Object.fromEntries(
+        remote.map((m) => [m.id, parseAdherenceRate(m.adherenceRate)]).filter(([, r]) => r !== null),
+      ),
+    );
   };
 
   useEffect(() => {
@@ -162,31 +191,36 @@ export default function MedicineScreen({ navigation }: Props) {
       // M4-T5, updated for the real Family backend: no family at all means no sharing
       // constraint applies (full access, same as before, and stays local-only — there is
       // nowhere on the backend to store a medicine chest without a family). Inside a
-      // family, the backend has no per-module permission matrix (only OWNER/ADMIN/MEMBER
-      // roles) — a plain MEMBER gets read-only access, OWNER/ADMIN get full access.
+      // family, every member — creator or not — gets full add/edit/delete access; there
+      // is no read-only tier on this screen at all.
       const family = await getMyPrimaryFamily(token).catch(() => null);
       if (!family) {
         setFamilyId(null);
         setCanEdit(true);
-        loadMedicines().then(setMedicines);
+        loadMedicines().then((stored) =>
+          setMedicines(stored.map((m) => ({ ...m, isLiquid: m.isLiquid ?? false }))),
+        );
         setLoading(false);
         return;
       }
       const [profileName, userId] = await Promise.all([getMyProfileName(), getUserId()]);
       const membership = resolveMyMembership(family, userId, profileName);
-      setCanEdit(membership.isAdmin);
+      setCanEdit(true);
       setFamilyId(family.id);
+      setFamilyMembers(family.members);
+      setMyFamilyMemberId(membership.member?.id ?? null);
       try {
-        const profiles = await listFamilyProfiles(family.id, token);
-        const selfProfile = profiles.find((p) => p.category === 'SELF') ?? null;
-        if (selfProfile) {
-          setFamilyProfileId(selfProfile.id);
-          await refreshRemoteMedicines(selfProfile.id, token);
-          await refreshDocuments(selfProfile.id, token);
+        const remoteProfiles = await listFamilyProfiles(family.id, token);
+        setProfiles(remoteProfiles);
+        // Prefer a `SELF` profile as the default view, then whatever's first — no
+        // profiles at all (a brand-new family) leaves `familyProfileId` null, and the
+        // empty state below prompts to create the first one via the same "Add Profile"
+        // sheet the switcher's own "+" uses.
+        const defaultProfile = remoteProfiles.find((p) => p.category === 'SELF') ?? remoteProfiles[0] ?? null;
+        if (defaultProfile) {
+          setFamilyProfileId(defaultProfile.id);
+          await refreshRemoteMedicines(defaultProfile.id, token);
         }
-        // No SELF profile yet — leave `familyProfileId` null. The empty state below
-        // prompts for a date of birth (needed to create one, `docs/DECISIONS.md`
-        // D-035) the first time "+ Add" is tapped, rather than up front on every visit.
       } catch (err) {
         showRemoteError(err);
       }
@@ -198,6 +232,37 @@ export default function MedicineScreen({ navigation }: Props) {
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // The Prescriptions screen can auto-create or update medicines (parsing a document,
+  // confirming a quantity) without this screen knowing — refresh whenever it regains
+  // focus, e.g. navigating back from there, so the list/stats aren't stale. Skips the
+  // very first `focus` event, which fires on initial mount alongside (and redundant
+  // with) the load effect above.
+  const skippedInitialFocusRef = useRef(false);
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (!skippedInitialFocusRef.current) {
+        skippedInitialFocusRef.current = true;
+        return;
+      }
+      if (!familyProfileId) {
+        return;
+      }
+      (async () => {
+        const token = await getAccessToken();
+        if (!token) {
+          return;
+        }
+        try {
+          await refreshRemoteMedicines(familyProfileId, token);
+        } catch (err) {
+          showRemoteError(err);
+        }
+      })();
+    });
+    return unsubscribe;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, familyProfileId]);
 
   const adherence = useMemo(() => {
     if (familyId) {
@@ -219,11 +284,10 @@ export default function MedicineScreen({ navigation }: Props) {
   };
 
   const openAddSheet = () => {
+    // Nothing to attach a medicine to yet — the "Profiles" switcher's own empty state
+    // (or its "+" chip) is how a first/another profile gets created now; this button no
+    // longer triggers that flow itself.
     if (familyId && !familyProfileId) {
-      // Nothing to attach a medicine to yet — collect the one-time date of birth
-      // Create Profile needs before opening the medicine form at all.
-      setDobDate(null);
-      setShowDobSheet(true);
       return;
     }
     setEditingId(null);
@@ -231,39 +295,88 @@ export default function MedicineScreen({ navigation }: Props) {
     setDosage('');
     setSchedule(['morning']);
     setStock('30');
+    setIsLiquid(false);
     setShowSheet(true);
   };
 
-  const handleDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    setShowDatePicker(false);
-    if (event.type === 'set' && selectedDate) {
-      setDobDate(selectedDate);
+  const handleSelectProfile = async (profileId: string) => {
+    if (profileId === familyProfileId) {
+      return;
+    }
+    setFamilyProfileId(profileId);
+    setSwitchingProfile(true);
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        await refreshRemoteMedicines(profileId, token);
+      }
+    } catch (err) {
+      showRemoteError(err);
+    } finally {
+      setSwitchingProfile(false);
     }
   };
 
-  const handleConfirmDob = async () => {
-    if (!dobDate) {
-      Alert.alert(t('medicine.incomplete_title'), t('medicine.dob_invalid'));
+  const openAddProfileSheet = () => {
+    setAddProfileStep('choose_who');
+    setSelectedMemberId(null);
+    setIsOtherMode(false);
+    setOtherName('');
+    setNewProfileCategory(null);
+    setNewProfileDob(null);
+    setShowAddProfileSheet(true);
+  };
+
+  const chooseMemberForProfile = (member: FamilyMember) => {
+    setSelectedMemberId(member.id);
+    setIsOtherMode(false);
+    // A reasonable default, not a restriction — still changeable below. Anyone else
+    // (including a managed member/dependent) starts with no category pre-picked, since
+    // nothing about a family member reliably implies KID vs ELDER vs OTHER.
+    setNewProfileCategory(member.id === myFamilyMemberId ? 'SELF' : null);
+    setAddProfileStep('details');
+  };
+
+  const chooseOtherForProfile = () => {
+    setSelectedMemberId(null);
+    setIsOtherMode(true);
+    setNewProfileCategory(null);
+    setAddProfileStep('details');
+  };
+
+  const handleNewProfileDateChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    setShowNewProfileDatePicker(false);
+    if (event.type === 'set' && selectedDate) {
+      setNewProfileDob(selectedDate);
+    }
+  };
+
+  const handleCreateProfile = async () => {
+    if (!newProfileCategory || !newProfileDob || (isOtherMode && !otherName.trim())) {
+      Alert.alert(t('medicine.incomplete_title'), t('medicine.profile_incomplete_msg'));
       return;
     }
     if (!familyId) {
       return;
     }
-    setSavingDob(true);
+    setCreatingProfile(true);
     try {
       const token = await getAccessToken();
       if (!token) {
         return;
       }
-      const profileName = (await getMyProfileName()) || t('medicine.default_profile_name');
-      const profile = await createFamilyProfile(familyId, profileName, 'SELF', formatDob(dobDate), token);
+      const dob = formatDob(newProfileDob);
+      const profile = isOtherMode
+        ? await createFamilyProfileOther(familyId, otherName.trim(), newProfileCategory, dob, token)
+        : await createFamilyProfileForMember(familyId, selectedMemberId as string, newProfileCategory, dob, token);
+      setProfiles(await listFamilyProfiles(familyId, token));
       setFamilyProfileId(profile.id);
-      setShowDobSheet(false);
-      openAddSheet();
+      await refreshRemoteMedicines(profile.id, token);
+      setShowAddProfileSheet(false);
     } catch (err) {
       showRemoteError(err);
     } finally {
-      setSavingDob(false);
+      setCreatingProfile(false);
     }
   };
 
@@ -275,7 +388,8 @@ export default function MedicineScreen({ navigation }: Props) {
     setName(med.name);
     setDosage(med.dosage);
     setSchedule(med.schedule);
-    setStock(String(med.stock));
+    setStock(med.stock !== null ? String(med.stock) : '');
+    setIsLiquid(med.isLiquid);
     setShowSheet(true);
   };
 
@@ -304,11 +418,12 @@ export default function MedicineScreen({ navigation }: Props) {
           stockQuantity: stockNum,
           lowStockThreshold: editingId ? (lowStockThresholds[editingId] ?? 3) : 3,
         };
-        if (editingId) {
-          await updateMedicine(editingId, input, token);
-        } else {
-          await createMedicine(familyProfileId, input, token);
-        }
+        const saved = editingId
+          ? await updateMedicine(editingId, input, token)
+          : await createMedicine(familyProfileId, input, token);
+        const flags = await loadLiquidFlags();
+        flags[saved.id] = isLiquid;
+        await saveLiquidFlags(flags);
         await refreshRemoteMedicines(familyProfileId, token);
         setShowSheet(false);
       } catch (err) {
@@ -322,7 +437,7 @@ export default function MedicineScreen({ navigation }: Props) {
     if (editingId) {
       const updated = medicines.map((m) =>
         m.id === editingId
-          ? { ...m, name: name.trim(), dosage: dosage.trim(), schedule, stock: stockNum }
+          ? { ...m, name: name.trim(), dosage: dosage.trim(), schedule, stock: stockNum, isLiquid }
           : m,
       );
       await persistMedicines(updated);
@@ -333,6 +448,7 @@ export default function MedicineScreen({ navigation }: Props) {
         dosage: dosage.trim(),
         schedule,
         stock: stockNum,
+        isLiquid,
       };
       await persistMedicines([...medicines, newMedicine]);
     }
@@ -344,6 +460,7 @@ export default function MedicineScreen({ navigation }: Props) {
       return;
     }
     const target = medicines.find((m) => m.id === editingId);
+    const idToRemove = editingId;
     Alert.alert(
       t('medicine.remove_confirm_title'),
       t('medicine.remove_confirm_msg', { name: target?.name ?? '' }),
@@ -353,7 +470,21 @@ export default function MedicineScreen({ navigation }: Props) {
           text: t('medicine.remove'),
           style: 'destructive',
           onPress: async () => {
-            await persistMedicines(medicines.filter((m) => m.id !== editingId));
+            if (familyProfileId) {
+              try {
+                const token = await getAccessToken();
+                if (!token) {
+                  return;
+                }
+                await deleteRemoteMedicine(idToRemove, token);
+                await refreshRemoteMedicines(familyProfileId, token);
+              } catch (err) {
+                showRemoteError(err);
+                return;
+              }
+            } else {
+              await persistMedicines(medicines.filter((m) => m.id !== idToRemove));
+            }
             setShowSheet(false);
           },
         },
@@ -385,43 +516,9 @@ export default function MedicineScreen({ navigation }: Props) {
     }
     const entry: IntakeLogEntry = { id: Date.now().toString(), medicineId: med.id, slot, takenAt: Date.now() };
     await persistLog([...log, entry]);
-    await persistMedicines(medicines.map((m) => (m.id === med.id ? { ...m, stock: Math.max(0, m.stock - 1) } : m)));
-  };
-
-  // `documentType` is fixed to "PRESCRIPTION" — the only value that appears anywhere in
-  // the collection's saved examples, so it's the only one this client can be sure the
-  // backend accepts (docs/BACKEND_CONTEXT.md's Medchest subsection). Picks from images,
-  // PDF, or Word docs — the file types the user asked for; `@react-native-documents/picker`
-  // (new dependency, docs/DECISIONS.md) opens the system's own file browser, not the
-  // photo-only picker `react-native-image-picker` already in this app provides.
-  const handlePickDocument = async () => {
-    if (!familyProfileId) {
-      return;
-    }
-    try {
-      const [result] = await pick({
-        type: [documentTypes.pdf, documentTypes.doc, documentTypes.docx, documentTypes.images],
-      });
-      setUploadingDoc(true);
-      const token = await getAccessToken();
-      if (!token) {
-        return;
-      }
-      await uploadMedicalDocument(
-        familyProfileId,
-        { uri: result.uri, name: result.name ?? 'document', type: result.type ?? 'application/octet-stream' },
-        'PRESCRIPTION',
-        token,
-      );
-      await refreshDocuments(familyProfileId, token);
-    } catch (err) {
-      if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) {
-        return;
-      }
-      showRemoteError(err);
-    } finally {
-      setUploadingDoc(false);
-    }
+    await persistMedicines(
+      medicines.map((m) => (m.id === med.id ? { ...m, stock: Math.max(0, (m.stock ?? 0) - 1) } : m)),
+    );
   };
 
   const dosesToday = medicines.reduce((sum, m) => sum + m.schedule.length, 0);
@@ -437,7 +534,7 @@ export default function MedicineScreen({ navigation }: Props) {
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <Text style={styles.headerTitle}>{t('medicine.header_title')}</Text>
-        {canEdit ? (
+        {canEdit && (!familyId || familyProfileId) ? (
           <Pressable onPress={openAddSheet} style={styles.addBtn}>
             <Text style={styles.addBtnText}>{t('medicine.add_btn')}</Text>
           </Pressable>
@@ -476,97 +573,113 @@ export default function MedicineScreen({ navigation }: Props) {
               </View>
             </View>
 
-            {!canEdit && (
-              <View style={styles.readonlyBanner}>
-                <Text style={styles.readonlyText}>{t('medicine.readonly_note')}</Text>
+            {familyId && (
+              <View style={styles.sectionMargin}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>{t('medicine.profiles_title')}</Text>
+                  <Text style={styles.sectionSub}>{t('medicine.profiles_sub')}</Text>
+                </View>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileRow}>
+                  {profiles.map((profile) => {
+                    const active = profile.id === familyProfileId;
+                    return (
+                      <Pressable
+                        key={profile.id}
+                        style={[styles.profileChip, active && styles.profileChipActive]}
+                        onPress={() => handleSelectProfile(profile.id)}>
+                        <Text style={styles.profileChipIcon}>{CATEGORY_ICON[profile.category] ?? '👤'}</Text>
+                        <Text
+                          style={[styles.profileChipText, active && styles.profileChipTextActive]}
+                          numberOfLines={1}>
+                          {profile.name}
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                  <Pressable style={styles.addProfileChip} onPress={openAddProfileSheet}>
+                    <Text style={styles.addProfileChipText}>{t('medicine.add_profile_chip')}</Text>
+                  </Pressable>
+                </ScrollView>
               </View>
             )}
 
-            <View style={styles.sectionHeader}>
-              <Text style={styles.sectionTitle}>{t('medicine.section_title')}</Text>
-              <Text style={styles.sectionSub}>{t('medicine.section_sub')}</Text>
-            </View>
-
-            {medicines.length === 0 ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>{t('medicine.empty_title')}</Text>
-                <Text style={styles.emptySub}>{t('medicine.empty_sub')}</Text>
-              </View>
-            ) : (
-              medicines.map((med) => (
-                <Pressable key={med.id} style={styles.medCard} onPress={() => openEditSheet(med)}>
-                  <View style={styles.medHeaderRow}>
-                    <Text style={styles.medName}>{med.name}</Text>
-                    <Text style={styles.medStock}>{t('medicine.stock_label', { count: med.stock })}</Text>
-                  </View>
-                  <Text style={styles.medDosage}>{med.dosage}</Text>
-                  <View style={styles.slotRow}>
-                    {med.schedule.map((slot) => {
-                      const taken = isTakenToday(log, med.id, slot);
-                      return (
-                        <Pressable
-                          key={slot}
-                          disabled={!canEdit || taken}
-                          style={[styles.slotChip, taken && styles.slotChipTaken]}
-                          onPress={(e) => {
-                            e.stopPropagation();
-                            markTaken(med, slot);
-                          }}>
-                          <Text style={[styles.slotChipText, taken && styles.slotChipTextTaken]}>
-                            {t(`medicine.slot_${slot}`)}
-                            {taken ? ` · ${t('medicine.taken_today')}` : ''}
-                          </Text>
-                        </Pressable>
-                      );
-                    })}
-                  </View>
-                </Pressable>
-              ))
-            )}
-
-            {familyProfileId && (
+            {!familyId || familyProfileId ? (
               <>
                 <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>{t('medicine.documents_title')}</Text>
-                  <Text style={styles.sectionSub}>{t('medicine.documents_sub')}</Text>
+                  <Text style={styles.sectionTitle}>{t('medicine.section_title')}</Text>
+                  <Text style={styles.sectionSub}>{t('medicine.section_sub')}</Text>
                 </View>
 
-                {canEdit && (
-                  <Pressable style={styles.uploadBanner} onPress={handlePickDocument} disabled={uploadingDoc}>
-                    {uploadingDoc ? (
-                      <ActivityIndicator color={styles.addBtnText.color} />
-                    ) : (
-                      <>
-                        <Text style={styles.uploadBannerIcon}>📎</Text>
-                        <View style={styles.uploadBannerContent}>
-                          <Text style={styles.uploadBannerTitle}>{t('medicine.upload_document_btn')}</Text>
-                          <Text style={styles.uploadBannerSub}>{t('medicine.upload_document_sub')}</Text>
-                        </View>
-                        <Text style={styles.uploadBannerArrow}>→</Text>
-                      </>
-                    )}
-                  </Pressable>
-                )}
-
-                {documents.length === 0 ? (
-                  <Text style={styles.documentsEmptyText}>{t('medicine.documents_empty')}</Text>
+                {switchingProfile ? (
+                  <View style={styles.loadingWrap}>
+                    <ActivityIndicator color={styles.addBtnText.color} />
+                  </View>
+                ) : medicines.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyTitle}>{t('medicine.empty_title')}</Text>
+                    <Text style={styles.emptySub}>{t('medicine.empty_sub')}</Text>
+                  </View>
                 ) : (
-                  documents.map((doc) => (
-                    <View key={doc.id} style={styles.documentRow}>
-                      <Text style={styles.documentIcon}>📄</Text>
-                      <View style={styles.documentInfo}>
-                        <Text style={styles.documentName} numberOfLines={1}>
-                          {doc.originalFilename}
-                        </Text>
-                        <Text style={styles.documentMeta}>
-                          {new Date(doc.uploadedAt).toLocaleDateString()} · {t('medicine.ocr_status_label')}:{' '}
-                          {doc.ocrStatus}
-                        </Text>
+                  medicines.map((med) => (
+                    <Pressable key={med.id} style={styles.medCard} onPress={() => openEditSheet(med)}>
+                      <View style={styles.medHeaderRow}>
+                        <Text style={styles.medName}>{med.name}</Text>
+                        {med.stock === null ? (
+                          <View style={styles.medStockMissingBadge}>
+                            <Text style={styles.medStockMissingText}>{t('medicine.stock_missing')}</Text>
+                          </View>
+                        ) : (
+                          <Text style={styles.medStock}>
+                            {t(med.isLiquid ? 'medicine.liquid_stock_label' : 'medicine.stock_label', {
+                              count: med.stock,
+                            })}
+                          </Text>
+                        )}
                       </View>
-                    </View>
+                      <Text style={styles.medDosage}>{med.dosage}</Text>
+                      <View style={styles.slotRow}>
+                        {med.schedule.map((slot) => {
+                          const taken = isTakenToday(log, med.id, slot);
+                          return (
+                            <Pressable
+                              key={slot}
+                              disabled={!canEdit || taken}
+                              style={[styles.slotChip, taken && styles.slotChipTaken]}
+                              onPress={(e) => {
+                                e.stopPropagation();
+                                markTaken(med, slot);
+                              }}>
+                              <Text style={[styles.slotChipText, taken && styles.slotChipTextTaken]}>
+                                {t(`medicine.slot_${slot}`)}
+                                {taken ? ` · ${t('medicine.taken_today')}` : ''}
+                              </Text>
+                            </Pressable>
+                          );
+                        })}
+                      </View>
+                    </Pressable>
                   ))
                 )}
               </>
+            ) : (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>{t('medicine.no_profiles_title')}</Text>
+                <Text style={styles.emptySub}>{t('medicine.no_profiles_sub')}</Text>
+                <Button title={t('medicine.create_profile_btn')} onPress={openAddProfileSheet} style={styles.modalCta} />
+              </View>
+            )}
+
+            {familyProfileId && (
+              <Pressable
+                style={styles.uploadBanner}
+                onPress={() => navigation.navigate('Prescriptions', { familyProfileId })}>
+                <Text style={styles.uploadBannerIcon}>📎</Text>
+                <View style={styles.uploadBannerContent}>
+                  <Text style={styles.uploadBannerTitle}>{t('medicine.view_prescriptions_btn')}</Text>
+                  <Text style={styles.uploadBannerSub}>{t('medicine.documents_sub')}</Text>
+                </View>
+                <Text style={styles.uploadBannerArrow}>→</Text>
+              </Pressable>
             )}
           </>
         )}
@@ -608,13 +721,23 @@ export default function MedicineScreen({ navigation }: Props) {
           ))}
         </View>
 
-        <Text style={styles.label}>{t('medicine.label_stock')}</Text>
+        <Text style={styles.label}>{t('medicine.label_medicine_type')}</Text>
+        <View style={styles.chipRow}>
+          <Pressable style={[styles.chip, !isLiquid && styles.chipActive]} onPress={() => setIsLiquid(false)}>
+            <Text style={[styles.chipText, !isLiquid && styles.chipTextActive]}>{t('medicine.type_solid')}</Text>
+          </Pressable>
+          <Pressable style={[styles.chip, isLiquid && styles.chipActive]} onPress={() => setIsLiquid(true)}>
+            <Text style={[styles.chipText, isLiquid && styles.chipTextActive]}>{t('medicine.type_liquid')}</Text>
+          </Pressable>
+        </View>
+
+        <Text style={styles.label}>{t(isLiquid ? 'medicine.label_liquid_quantity' : 'medicine.label_stock')}</Text>
         <TextInput
           style={styles.input}
           value={stock}
           onChangeText={setStock}
           keyboardType="number-pad"
-          placeholder={t('medicine.placeholder_stock')}
+          placeholder={t(isLiquid ? 'medicine.placeholder_liquid_quantity' : 'medicine.placeholder_stock')}
           placeholderTextColor={styles.placeholder.color}
         />
 
@@ -625,37 +748,108 @@ export default function MedicineScreen({ navigation }: Props) {
           style={styles.modalCta}
         />
 
-        {/* No delete endpoint exists anywhere in the Medchest domain
-            (docs/DECISIONS.md D-032/D-035) — only offered in local-only mode. */}
-        {editingId && !familyId && (
+        {editingId && (
           <Pressable style={styles.modalRemoveBtn} onPress={handleRemove}>
             <Text style={styles.modalRemoveText}>{t('medicine.remove_medicine')}</Text>
           </Pressable>
         )}
       </BottomSheet>
 
-      <BottomSheet visible={showDobSheet} onClose={() => setShowDobSheet(false)} title={t('medicine.dob_prompt_title')}>
-        <View style={styles.sheetInfoBox}>
-          <Text style={styles.sheetInfoIcon}>🩺</Text>
-          <Text style={styles.sheetInfoText}>{t('medicine.dob_prompt_helper')}</Text>
-        </View>
-        <Text style={styles.label}>{t('medicine.label_dob')}</Text>
-        <Pressable style={styles.input} onPress={() => setShowDatePicker(true)}>
-          <Text style={dobDate ? styles.dobValueText : styles.placeholder}>
-            {dobDate ? formatDob(dobDate) : t('medicine.placeholder_dob')}
-          </Text>
-        </Pressable>
-        {showDatePicker && (
-          <DateTimePicker
-            value={dobDate ?? DEFAULT_DOB}
-            mode="date"
-            display="default"
-            maximumDate={new Date()}
-            minimumDate={MIN_DOB}
-            onChange={handleDateChange}
-          />
+      <BottomSheet
+        visible={showAddProfileSheet}
+        onClose={() => setShowAddProfileSheet(false)}
+        title={addProfileStep === 'choose_who' ? t('medicine.sheet_title_choose_who') : t('medicine.sheet_title_profile_details')}>
+        {addProfileStep === 'choose_who' ? (
+          <>
+            <View style={styles.sheetInfoBox}>
+              <Text style={styles.sheetInfoIcon}>🩺</Text>
+              <Text style={styles.sheetInfoText}>{t('medicine.choose_who_helper')}</Text>
+            </View>
+            {familyMembers.map((member) => (
+              <Pressable key={member.id} style={styles.memberRow} onPress={() => chooseMemberForProfile(member)}>
+                <Text style={styles.memberRowIcon}>{member.managed ? '🧓' : '🧑'}</Text>
+                <View style={styles.memberRowInfo}>
+                  <Text style={styles.memberRowName}>{member.name}</Text>
+                  {member.managed && <Text style={styles.memberRowSub}>{t('medicine.dependent_badge')}</Text>}
+                </View>
+                <Text style={styles.memberRowChevron}>›</Text>
+              </Pressable>
+            ))}
+            <Pressable style={styles.memberRow} onPress={chooseOtherForProfile}>
+              <Text style={styles.memberRowIcon}>👤</Text>
+              <View style={styles.memberRowInfo}>
+                <Text style={styles.memberRowName}>{t('medicine.other_option_title')}</Text>
+                <Text style={styles.memberRowSub}>{t('medicine.other_option_sub')}</Text>
+              </View>
+              <Text style={styles.memberRowChevron}>›</Text>
+            </Pressable>
+          </>
+        ) : (
+          <>
+            <Pressable onPress={() => setAddProfileStep('choose_who')}>
+              <Text style={styles.backLink}>{t('medicine.back_btn')}</Text>
+            </Pressable>
+
+            {!isOtherMode && selectedMemberId && (
+              <Text style={styles.forMemberText}>
+                {t('medicine.for_member_label', {
+                  name: familyMembers.find((m) => m.id === selectedMemberId)?.name ?? '',
+                })}
+              </Text>
+            )}
+
+            {isOtherMode && (
+              <>
+                <Text style={styles.label}>{t('medicine.label_full_name')}</Text>
+                <TextInput
+                  style={styles.input}
+                  value={otherName}
+                  onChangeText={setOtherName}
+                  placeholder={t('medicine.placeholder_person_name')}
+                  placeholderTextColor={styles.placeholder.color}
+                />
+              </>
+            )}
+
+            <Text style={styles.label}>{t('medicine.label_category')}</Text>
+            <View style={styles.chipRow}>
+              {ALL_CATEGORIES.map((cat) => (
+                <Pressable
+                  key={cat}
+                  style={[styles.chip, newProfileCategory === cat && styles.chipActive]}
+                  onPress={() => setNewProfileCategory(cat)}>
+                  <Text style={[styles.chipText, newProfileCategory === cat && styles.chipTextActive]}>
+                    {t(`medicine.category_${cat.toLowerCase()}`)}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
+
+            <Text style={styles.label}>{t('medicine.label_dob')}</Text>
+            <Pressable style={styles.input} onPress={() => setShowNewProfileDatePicker(true)}>
+              <Text style={newProfileDob ? styles.dobValueText : styles.placeholder}>
+                {newProfileDob ? formatDob(newProfileDob) : t('medicine.placeholder_dob')}
+              </Text>
+            </Pressable>
+            {showNewProfileDatePicker && (
+              <DateTimePicker
+                value={newProfileDob ?? DEFAULT_DOB}
+                mode="date"
+                display="default"
+                maximumDate={new Date()}
+                minimumDate={MIN_DOB}
+                onChange={handleNewProfileDateChange}
+              />
+            )}
+
+            <Button
+              title={t('medicine.create_profile_btn')}
+              onPress={handleCreateProfile}
+              loading={creatingProfile}
+              style={styles.modalCta}
+            />
+          </>
         )}
-        <Button title={t('medicine.save_dob')} onPress={handleConfirmDob} loading={savingDob} style={styles.modalCta} />
       </BottomSheet>
     </View>
   );
@@ -760,19 +954,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     marginTop: 2,
     textAlign: 'center',
   },
-  readonlyBanner: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    padding: spacing.md,
+  sectionMargin: {
     marginBottom: spacing.lg,
-  },
-  readonlyText: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.textMuted,
-    textAlign: 'center',
   },
   sectionHeader: {
     marginBottom: spacing.md,
@@ -787,6 +970,97 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     fontSize: 12,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  profileRow: {
+    flexDirection: 'row',
+    gap: 8,
+    paddingRight: spacing.lg,
+  },
+  profileChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceElevated,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxWidth: 160,
+  },
+  profileChipActive: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  profileChipIcon: {
+    fontSize: 14,
+    marginRight: 6,
+  },
+  profileChipText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 12,
+    color: colors.textPrimary,
+  },
+  profileChipTextActive: {
+    color: colors.textOnPrimary,
+  },
+  addProfileChip: {
+    backgroundColor: colors.surface,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: radius.pill,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    borderStyle: 'dashed',
+    justifyContent: 'center',
+  },
+  addProfileChipText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 12,
+    color: colors.primary,
+  },
+  memberRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.lg,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  memberRowIcon: {
+    fontSize: 22,
+    marginRight: 10,
+  },
+  memberRowInfo: {
+    flex: 1,
+  },
+  memberRowName: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  memberRowSub: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    color: colors.textMuted,
+    marginTop: 1,
+  },
+  memberRowChevron: {
+    fontSize: 18,
+    color: colors.textMuted,
+  },
+  backLink: {
+    fontFamily: fonts.sansBold,
+    fontSize: 13,
+    color: colors.primary,
+    marginBottom: 8,
+  },
+  forMemberText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 14,
+    color: colors.textPrimary,
+    marginBottom: 4,
   },
   emptyState: {
     backgroundColor: colors.surface,
@@ -843,39 +1117,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     color: colors.primary,
     fontFamily: fonts.sansBold,
   },
-  documentsEmptyText: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  documentRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.lg,
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  documentIcon: {
-    fontSize: 22,
-    marginRight: 10,
-  },
-  documentInfo: {
-    flex: 1,
-  },
-  documentName: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 13,
-    color: colors.textPrimary,
-  },
-  documentMeta: {
-    fontFamily: fonts.sans,
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
   medCard: {
     backgroundColor: colors.surfaceElevated,
     borderRadius: radius.xl,
@@ -899,6 +1140,19 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     fontFamily: fonts.sansMedium,
     fontSize: 12,
     color: colors.textMuted,
+  },
+  medStockMissingBadge: {
+    backgroundColor: colors.dangerSoft,
+    borderWidth: 1,
+    borderColor: colors.dangerBorder,
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+  },
+  medStockMissingText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 11,
+    color: colors.danger,
   },
   medDosage: {
     fontFamily: fonts.sans,

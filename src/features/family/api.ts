@@ -29,13 +29,12 @@ export async function getFamily(familyId: string, token: string): Promise<Family
 export async function inviteMember(
   familyId: string,
   phone: string,
-  role: Exclude<FamilyRole, 'OWNER'>,
   relation: FamilyRelation,
   token: string,
 ): Promise<FamilyInvite> {
   return apiFetch<FamilyInvite>(`/families/${familyId}/members`, {
     method: 'POST',
-    body: { phone, role, relation },
+    body: { phone, relation },
     token,
   });
 }
@@ -84,8 +83,7 @@ export async function cancelInvite(familyId: string, inviteId: string, token: st
 
 // Every invite ever sent for this family, any status (PENDING/ACCEPTED/DECLINED/
 // CANCELLED) — unlike listFamilyPendingInvites above, which the backend filters to
-// PENDING only. Needs OWNER/ADMIN on the caller, same guard as the other admin-only
-// family endpoints.
+// PENDING only. Any member can read.
 export async function listFamilyInviteHistory(familyId: string, token: string): Promise<FamilyInvite[]> {
   return apiFetch<FamilyInvite[]>(`/families/${familyId}/invites/history`, { method: 'GET', token });
 }
@@ -109,7 +107,7 @@ export async function getRelationship(
 }
 
 // Corrects a relationship after the fact — e.g. the invitee picked the wrong reciprocal
-// at accept time. Needs OWNER/ADMIN on the caller.
+// at accept time. Any member can correct it.
 export async function updateRelationship(
   familyId: string,
   relationshipId: string,
@@ -120,19 +118,6 @@ export async function updateRelationship(
   return apiFetch<FamilyRelationship>(`/families/${familyId}/relationships/${relationshipId}`, {
     method: 'PATCH',
     body: { relation, reciprocalRelation },
-    token,
-  });
-}
-
-export async function updateMemberRole(
-  familyId: string,
-  familyMemberId: string,
-  role: Exclude<FamilyRole, 'OWNER'>,
-  token: string,
-): Promise<Family> {
-  return apiFetch<Family>(`/families/${familyId}/members/${familyMemberId}/role`, {
-    method: 'PATCH',
-    body: { role },
     token,
   });
 }
@@ -178,7 +163,7 @@ export interface MyMembership {
   member: FamilyMember | null;
   role: FamilyRole;
   isOwner: boolean;
-  isAdmin: boolean; // OWNER or ADMIN — both can invite/remove/change roles/manage dependents
+  isCreator: boolean; // role === 'OWNER' — the only member who can remove someone else
 }
 
 // `FamilyMemberResponse` carries no `userId` for a non-owner row (a real backend
@@ -186,7 +171,9 @@ export interface MyMembership {
 // answered two ways: an exact match against `Family.ownerUserId` (always reliable), or a
 // best-effort name match against the caller's own profile name (unreliable if two
 // members share a name, or if a member renamed since joining). Unresolved falls back to
-// the least-privileged 'MEMBER' read rather than guessing upward into ADMIN/OWNER.
+// a plain 'MEMBER' read — every member (resolved or not) already has full add/edit
+// access, so an unresolved match only costs the ability to leave/be identified as the
+// creator, not any read/write capability.
 export function resolveMyMembership(
   family: Family,
   userId: string | null,
@@ -194,18 +181,16 @@ export function resolveMyMembership(
 ): MyMembership {
   if (userId && family.ownerUserId === userId) {
     const owner = family.members.find((m) => m.role === 'OWNER') ?? null;
-    return { member: owner, role: 'OWNER', isOwner: true, isAdmin: true };
+    return { member: owner, role: 'OWNER', isOwner: true, isCreator: true };
   }
   // Trimmed + case-insensitive: the exact match this used to require broke easily on
   // nothing more than incidental casing/whitespace drift between the locally-cached
-  // profile name and what the backend stored on the member row — which silently
-  // demoted a real ADMIN/OWNER down to the least-privileged MEMBER read below.
+  // profile name and what the backend stored on the member row.
   const normalizedProfileName = profileName?.trim().toLowerCase() || null;
   const mine = normalizedProfileName
     ? family.members.find((m) => !m.managed && m.name.trim().toLowerCase() === normalizedProfileName) ?? null
     : null;
-  const role = mine?.role ?? 'MEMBER';
-  return { member: mine, role, isOwner: false, isAdmin: role === 'ADMIN' };
+  return { member: mine, role: 'MEMBER', isOwner: false, isCreator: false };
 }
 
 // Reads the locally-cached profile name (same offline-fallback pattern `profile.tsx`
@@ -265,7 +250,9 @@ export function parseFamilyError(err: unknown): FamilyErrorKind {
   }
   if (
     message === 'You are not a member of this family' ||
-    message === 'You do not have admin access to this family'
+    message === 'Only the family creator can perform this action' ||
+    message === 'Only the family creator can remove other members' ||
+    message === 'Cannot remove the family creator'
   ) {
     return 'no_permission';
   }
