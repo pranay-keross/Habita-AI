@@ -10,7 +10,24 @@ import ProfileScreen from './onboarding/profile';
 import DashboardScreen from './dashboard';
 import FamilyScreen from '../features/family/FamilyScreen';
 import MedicineScreen from '../features/medicine/MedicineScreen';
-import PrescriptionsScreen from '../features/medicine/PrescriptionsScreen';
+import {
+  ExpenseGroupsScreen,
+  GroupDetailsScreen,
+  AddSplitExpenseScreen,
+  ExpenseDetailsSettleUpScreen,
+} from '../features/money';
+import {
+  DocHubScreen,
+  DocDetailsScreen,
+  AddDocScreen,
+  DocTemplateFormScreen,
+  ExpirationAlertsScreen,
+  type DocTemplateType,
+} from '../features/money/document_hub';
+import PantryScreen from '../features/money/smart_pantry/PantryScreen';
+import WardrobeScreen from '../features/money/style_wardrobe/WardrobeScreen';
+import VoiceScreen from '../features/money/voice_assistant/VoiceScreen';
+import VoiceSettingsScreen from '../features/money/voice_assistant/VoiceSettingsScreen';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
 import useTheme from '../hooks/useTheme';
@@ -27,7 +44,25 @@ export type RootStackParamList = {
   Dashboard: { profileUpdated?: boolean } | undefined;
   Family: undefined;
   Medicine: undefined;
-  Prescriptions: { familyProfileId: string };
+  ExpenseGroups: undefined;
+  GroupDetails: { groupId: string };
+  AddSplitExpense: { groupId: string; expenseId?: string };
+  ExpenseDetailsSettleUp: {
+    groupId: string;
+    expenseId?: string;
+    settlePayerId?: string;
+    settlePayeeId?: string;
+  };
+  DocHub: undefined;
+  DocDetails: { docId: string };
+  AddDoc: undefined;
+  DocTemplateForm: { templateType: DocTemplateType };
+  ExpirationAlerts: undefined;
+  Pantry: undefined;
+  Staff: undefined;
+  Wardrobe: undefined;
+  Voice: undefined;
+  VoiceSettings: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -67,7 +102,19 @@ const AppLayout = () => {
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="Family" component={FamilyScreen} />
           <Stack.Screen name="Medicine" component={MedicineScreen} />
-          <Stack.Screen name="Prescriptions" component={PrescriptionsScreen} />
+          <Stack.Screen name="ExpenseGroups" component={ExpenseGroupsScreen} />
+          <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
+          <Stack.Screen name="AddSplitExpense" component={AddSplitExpenseScreen} />
+          <Stack.Screen name="ExpenseDetailsSettleUp" component={ExpenseDetailsSettleUpScreen} />
+          <Stack.Screen name="DocHub" component={DocHubScreen} />
+          <Stack.Screen name="DocDetails" component={DocDetailsScreen} />
+          <Stack.Screen name="AddDoc" component={AddDocScreen} />
+          <Stack.Screen name="DocTemplateForm" component={DocTemplateFormScreen} />
+          <Stack.Screen name="ExpirationAlerts" component={ExpirationAlertsScreen} />
+          <Stack.Screen name="Pantry" component={PantryScreen} />
+          <Stack.Screen name="Wardrobe" component={WardrobeScreen} />
+          <Stack.Screen name="Voice" component={VoiceScreen} />
+          <Stack.Screen name="VoiceSettings" component={VoiceSettingsScreen} />
         </Stack.Navigator>
       </NavigationContainer>
     </SafeAreaProvider>

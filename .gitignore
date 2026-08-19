@@ -73,3 +73,12 @@ yarn-error.log
 !.yarn/releases
 !.yarn/sdks
 !.yarn/versions
+
+# IDE / VS Code
+.vscode/
+
+# Tests
+__tests__/
+*.test.ts
+*.test.tsx
+
