@@ -31,7 +31,6 @@ import User from 'lucide-react-native/icons/user';
 import CircleX from 'lucide-react-native/icons/circle-x';
 import { loadVoiceHistory, saveVoiceHistory } from './voiceStore';
 import type { VoiceIntent } from './types';
-import { VOICE_COLORS } from './constants/colors';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'Voice'>;
@@ -41,104 +40,88 @@ type HistoryFilter = 'all' | 'completed' | 'failed';
 interface SuggestionChip {
   id: string;
   iconType: 'rupee' | 'package' | 'bell';
-  text: string;
+  textKey: string;
 }
 
 const SUGGESTIONS: SuggestionChip[] = [
-  { id: 's1', iconType: 'rupee', text: 'Add ₹150 for dinner' },
-  { id: 's2', iconType: 'package', text: 'Show group balance' },
-  { id: 's3', iconType: 'bell', text: 'Remind me to pay electricity bill' },
+  { id: 's1', iconType: 'rupee', textKey: 'voice_assistant.suggestion_1' },
+  { id: 's2', iconType: 'package', textKey: 'voice_assistant.suggestion_2' },
+  { id: 's3', iconType: 'bell', textKey: 'voice_assistant.suggestion_3' },
 ];
 
 interface QuickAskCategory {
   id: string;
   titleKey: string;
   title: string;
-  bgColor: string;
-  iconColor: string;
   icon: React.ComponentType<{ size: number; color: string }>;
 }
 
 const WHAT_YOU_CAN_ASK: QuickAskCategory[] = [
-  { id: 'c1', titleKey: 'voice_assistant.cat_groups', title: 'Groups', bgColor: '#E3F2F5', iconColor: '#004F63', icon: Users },
-  { id: 'c2', titleKey: 'voice_assistant.cat_expenses', title: 'Expenses', bgColor: '#DCFCE7', iconColor: '#16A34A', icon: FilePlus },
-  { id: 'c3', titleKey: 'voice_assistant.cat_spending', title: 'Spending', bgColor: '#F3E8FF', iconColor: '#9333EA', icon: ChartPie },
-  { id: 'c4', titleKey: 'voice_assistant.cat_bills', title: 'Bills', bgColor: '#FFEDD5', iconColor: '#EA580C', icon: Bell },
-  { id: 'c5', titleKey: 'voice_assistant.cat_inventory', title: 'Inventory', bgColor: '#EFF6FF', iconColor: '#2563EB', icon: Package },
-  { id: 'c6', titleKey: 'voice_assistant.cat_contacts', title: 'Contacts', bgColor: '#FEF3C7', iconColor: '#D97706', icon: User },
+  { id: 'c1', titleKey: 'voice_assistant.cat_groups', title: 'Groups', icon: Users },
+  { id: 'c2', titleKey: 'voice_assistant.cat_expenses', title: 'Expenses', icon: FilePlus },
+  { id: 'c3', titleKey: 'voice_assistant.cat_spending', title: 'Spending', icon: ChartPie },
+  { id: 'c4', titleKey: 'voice_assistant.cat_bills', title: 'Bills', icon: Bell },
+  { id: 'c5', titleKey: 'voice_assistant.cat_inventory', title: 'Inventory', icon: Package },
+  { id: 'c6', titleKey: 'voice_assistant.cat_contacts', title: 'Contacts', icon: User },
 ];
 
 interface CommandHistoryItem {
   id: string;
-  transcript: string;
-  module: string;
-  time: string;
+  transcriptKey: string;
+  moduleKey: string;
+  timeStr: string;
   status: 'completed' | 'failed';
   icon: React.ComponentType<{ size: number; color: string }>;
-  bgColor: string;
-  iconColor: string;
 }
 
 const HISTORY_DATA: CommandHistoryItem[] = [
   {
     id: 'h1',
-    transcript: 'Show my group balances',
-    module: 'Expense Groups',
-    time: '10:30 AM',
+    transcriptKey: 'voice_assistant.history_cmd_1',
+    moduleKey: 'voice_assistant.mod_expense_groups',
+    timeStr: '10:30 AM',
     status: 'completed',
     icon: Users,
-    bgColor: '#E3F2F5',
-    iconColor: '#004F63',
   },
   {
     id: 'h2',
-    transcript: 'Add ₹500 for groceries',
-    module: 'Add Expense',
-    time: '10:15 AM',
+    transcriptKey: 'voice_assistant.history_cmd_2',
+    moduleKey: 'voice_assistant.mod_add_expense',
+    timeStr: '10:15 AM',
     status: 'completed',
     icon: Wallet,
-    bgColor: '#DCFCE7',
-    iconColor: '#16A34A',
   },
   {
     id: 'h3',
-    transcript: 'What bills are due this week?',
-    module: 'Bills & Reminders',
-    time: '10:00 AM',
+    transcriptKey: 'voice_assistant.history_cmd_3',
+    moduleKey: 'voice_assistant.mod_bills_reminders',
+    timeStr: '10:00 AM',
     status: 'completed',
     icon: Bell,
-    bgColor: '#FFEDD5',
-    iconColor: '#EA580C',
   },
   {
     id: 'h4',
-    transcript: 'How much did we spend in July?',
-    module: 'Expense Summary',
-    time: 'Yesterday',
+    transcriptKey: 'voice_assistant.history_cmd_4',
+    moduleKey: 'voice_assistant.mod_expense_summary',
+    timeStr: 'Yesterday',
     status: 'completed',
     icon: ChartPie,
-    bgColor: '#F3E8FF',
-    iconColor: '#9333EA',
   },
   {
     id: 'h5',
-    transcript: 'Show low-stock items',
-    module: 'Inventory & Stock',
-    time: 'Yesterday',
+    transcriptKey: 'voice_assistant.history_cmd_5',
+    moduleKey: 'voice_assistant.mod_inventory_stock',
+    timeStr: 'Yesterday',
     status: 'completed',
     icon: Package,
-    bgColor: '#EFF6FF',
-    iconColor: '#2563EB',
   },
   {
     id: 'h6',
-    transcript: 'Sync unrecognized audio input',
-    module: 'System Orchestrator',
-    time: '3 days ago',
+    transcriptKey: 'voice_assistant.history_cmd_6',
+    moduleKey: 'voice_assistant.mod_system_orchestrator',
+    timeStr: '3 days ago',
     status: 'failed',
     icon: Mic,
-    bgColor: '#FEE2E2',
-    iconColor: '#EF4444',
   },
 ];
 
@@ -155,7 +138,7 @@ export default function VoiceScreen({ navigation }: Props) {
   }, []);
 
   const [screenState, setScreenState] = useState<ScreenState>('default');
-  const [activeQuery, setActiveQuery] = useState('Show my balance in Home Rent & Bills');
+  const [activeQuery, setActiveQuery] = useState(t('voice_assistant.history_cmd_1'));
   const [historyFilter, setHistoryFilter] = useState<HistoryFilter>('all');
 
   const [pulseAnim] = useState(new Animated.Value(1));
@@ -198,11 +181,11 @@ export default function VoiceScreen({ navigation }: Props) {
     }
   }, [screenState, pulseAnim, dotAnim]);
 
-  const handleStartListening = (queryText?: string) => {
-    if (queryText) {
-      setActiveQuery(queryText);
+  const handleStartListening = (initialText?: string) => {
+    if (initialText) {
+      setActiveQuery(initialText);
     } else {
-      setActiveQuery('Show my balance in Home Rent & Bills');
+      setActiveQuery(t('voice_assistant.listening_sub'));
     }
     setScreenState('listening');
   };
@@ -212,16 +195,15 @@ export default function VoiceScreen({ navigation }: Props) {
   };
 
   const filteredHistory = HISTORY_DATA.filter((item) => {
-    if (historyFilter === 'completed') return item.status === 'completed';
-    if (historyFilter === 'failed') return item.status === 'failed';
-    return true;
+    if (historyFilter === 'all') return true;
+    return item.status === historyFilter;
   });
 
-  const bottomPadding = Math.max(insets.bottom, 16) + 130;
+  const bottomPadding = Math.max(insets.bottom + 100, 110);
 
   return (
     <View style={styles.root}>
-      {/* Top Header Bar */}
+      {/* Header Bar */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable
           onPress={() => {
@@ -235,11 +217,13 @@ export default function VoiceScreen({ navigation }: Props) {
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
         <Text style={styles.headerTitle}>
-          {screenState === 'confirm'
-            ? t('voice_assistant.confirm_command')
-            : screenState === 'history'
-            ? t('voice_assistant.history_title')
-            : t('voice_assistant.header_title')}
+          {screenState === 'listening'
+            ? t('voice_assistant.listening')
+            : screenState === 'confirm'
+              ? t('voice_assistant.confirm_command')
+              : screenState === 'history'
+                ? t('voice_assistant.history_title')
+                : t('voice_assistant.header_title')}
         </Text>
         <Pressable
           onPress={() => navigation.navigate('VoiceSettings')}
@@ -257,13 +241,13 @@ export default function VoiceScreen({ navigation }: Props) {
           <View style={styles.defaultHeroCard}>
             <View style={styles.defaultHeroLeft}>
               <View style={styles.heroMicIconCircle}>
-                <Mic size={22} color={VOICE_COLORS.textOnPrimary} />
+                <Mic size={22} color={styles.defaultHeroTitle.color} />
               </View>
             </View>
             <View style={styles.defaultHeroRight}>
               <Text style={styles.defaultHeroHelp}>{t('voice_assistant.header_title')}</Text>
               <Text style={styles.defaultHeroTitle}>
-                Ask about expenses, groups, bills, inventory, or reminders.
+                {t('voice_assistant.listening_sub')}
               </Text>
               <Pressable
                 style={styles.heroTapPillBtn}
@@ -275,26 +259,29 @@ export default function VoiceScreen({ navigation }: Props) {
 
           {/* Try saying */}
           <View style={styles.sectionHeader}>
-            <Sparkles size={18} color={VOICE_COLORS.primary} />
+            <Sparkles size={18} color={styles.viewAllText.color} />
             <Text style={styles.sectionTitleSparkle}>{t('voice_assistant.try_saying')}</Text>
           </View>
           <ScrollView
             horizontal
             showsHorizontalScrollIndicator={false}
             contentContainerStyle={styles.suggestionsContainer}>
-            {SUGGESTIONS.map((chip) => (
-              <Pressable
-                key={chip.id}
-                style={styles.suggestionChip}
-                onPress={() => handleStartListening(chip.text)}>
-                <View style={styles.chipIconBadge}>
-                  {chip.iconType === 'rupee' && <IndianRupee size={14} color={VOICE_COLORS.accentBlue} />}
-                  {chip.iconType === 'package' && <Package size={14} color={VOICE_COLORS.accentBlue} />}
-                  {chip.iconType === 'bell' && <Bell size={14} color={VOICE_COLORS.accentBlue} />}
-                </View>
-                <Text style={styles.chipText}>"{chip.text}"</Text>
-              </Pressable>
-            ))}
+            {SUGGESTIONS.map((chip) => {
+              const textVal = t(chip.textKey);
+              return (
+                <Pressable
+                  key={chip.id}
+                  style={styles.suggestionChip}
+                  onPress={() => handleStartListening(textVal)}>
+                  <View style={styles.chipIconBadge}>
+                    {chip.iconType === 'rupee' && <IndianRupee size={14} color={styles.viewAllText.color} />}
+                    {chip.iconType === 'package' && <Package size={14} color={styles.viewAllText.color} />}
+                    {chip.iconType === 'bell' && <Bell size={14} color={styles.viewAllText.color} />}
+                  </View>
+                  <Text style={styles.chipText}>"{textVal}"</Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
 
           {/* Recent Commands */}
@@ -304,34 +291,36 @@ export default function VoiceScreen({ navigation }: Props) {
               onPress={() => setScreenState('history')}
               style={styles.viewAllBtn}>
               <Text style={styles.viewAllText}>{t('voice_assistant.all')}</Text>
-              <ChevronRight size={14} color={VOICE_COLORS.accentBlue} />
+              <ChevronRight size={14} color={styles.viewAllText.color} />
             </Pressable>
           </View>
 
           <View style={styles.recentCardContainer}>
             {HISTORY_DATA.slice(0, 3).map((item, idx) => {
               const IconComp = item.icon;
+              const transcriptText = t(item.transcriptKey);
+              const moduleText = t(item.moduleKey);
               return (
                 <React.Fragment key={item.id}>
                   {idx > 0 && <View style={styles.divider} />}
                   <Pressable
                     style={styles.recentRow}
                     onPress={() => {
-                      setActiveQuery(item.transcript);
+                      setActiveQuery(transcriptText);
                       setScreenState('confirm');
                     }}>
-                    <View style={[styles.recentIconBadge, { backgroundColor: item.bgColor }]}>
-                      <IconComp size={18} color={item.iconColor} />
+                    <View style={styles.recentIconBadge}>
+                      <IconComp size={18} color={styles.viewAllText.color} />
                     </View>
                     <View style={styles.recentTextWrap}>
                       <Text style={styles.recentTitle} numberOfLines={1}>
-                        {item.transcript}
+                        {transcriptText}
                       </Text>
-                      <Text style={styles.recentSubtitle}>{item.module}</Text>
+                      <Text style={styles.recentSubtitle}>{moduleText}</Text>
                     </View>
                     <View style={styles.recentRightWrap}>
-                      <Text style={styles.recentTime}>{item.time}</Text>
-                      <CircleCheck size={16} color={VOICE_COLORS.successGreen} />
+                      <Text style={styles.recentTime}>{item.timeStr}</Text>
+                      <CircleCheck size={16} color={styles.detailValHighlight.color} />
                     </View>
                   </Pressable>
                 </React.Fragment>
@@ -349,9 +338,9 @@ export default function VoiceScreen({ navigation }: Props) {
                 <Pressable
                   key={cat.id}
                   style={styles.categoryCard}
-                  onPress={() => handleStartListening(`Help with ${titleText}`)}>
-                  <View style={[styles.categoryIconBadge, { backgroundColor: cat.bgColor }]}>
-                    <IconComponent size={22} color={cat.iconColor} />
+                  onPress={() => handleStartListening(t('voice_assistant.help_with_topic', { topic: titleText }))}>
+                  <View style={styles.categoryIconBadge}>
+                    <IconComponent size={22} color={styles.viewAllText.color} />
                   </View>
                   <Text style={styles.categoryTitle}>{titleText}</Text>
                 </Pressable>
@@ -375,7 +364,7 @@ export default function VoiceScreen({ navigation }: Props) {
               ]}>
               <View style={styles.listeningMicPulseInner}>
                 <View style={styles.listeningMicCore}>
-                  <Mic size={32} color={VOICE_COLORS.textOnPrimary} />
+                  <Mic size={32} color={styles.defaultHeroTitle.color} />
                 </View>
               </View>
             </Animated.View>
@@ -411,8 +400,8 @@ export default function VoiceScreen({ navigation }: Props) {
           {/* Understanding Request Card */}
           <Text style={styles.stateSectionTitle}>{t('voice_assistant.understanding_request')}</Text>
           <View style={styles.understandingCard}>
-            <Text style={styles.understandingIntentHeader}>Groups & Balances:</Text>
-            <Text style={styles.understandingIntentSub}>Home Rent & Bills</Text>
+            <Text style={styles.understandingIntentHeader}>{t('voice_assistant.intent_groups_balances')}</Text>
+            <Text style={styles.understandingIntentSub}>{t('voice_assistant.home_rent_bills')}</Text>
           </View>
 
           {/* Bottom Control Buttons */}
@@ -442,11 +431,11 @@ export default function VoiceScreen({ navigation }: Props) {
           {/* Understood Intent Card */}
           <View style={styles.understoodCard}>
             <View style={styles.understoodIconBadge}>
-              <Users size={20} color={VOICE_COLORS.primary} />
+              <Users size={20} color={styles.viewAllText.color} />
             </View>
             <View style={styles.understoodTextWrap}>
               <Text style={styles.understoodTitle}>"{activeQuery}"</Text>
-              <Text style={styles.understoodIntentSub}>Intent: View group balance</Text>
+              <Text style={styles.understoodIntentSub}>{t('voice_assistant.intent_view_balance')}</Text>
             </View>
           </View>
 
@@ -455,12 +444,12 @@ export default function VoiceScreen({ navigation }: Props) {
           <View style={styles.actionDetailsCard}>
             <View style={styles.detailRow}>
               <Text style={styles.detailKey}>{t('voice_assistant.module')}</Text>
-              <Text style={styles.detailVal}>Expense Groups</Text>
+              <Text style={styles.detailVal}>{t('voice_assistant.mod_expense_groups')}</Text>
             </View>
             <View style={styles.detailDivider} />
             <View style={styles.detailRow}>
               <Text style={styles.detailKey}>{t('voice_assistant.group')}</Text>
-              <Text style={styles.detailVal}>Home Rent & Bills</Text>
+              <Text style={styles.detailVal}>{t('voice_assistant.home_rent_bills')}</Text>
             </View>
             <View style={styles.detailDivider} />
             <View style={styles.detailRow}>
@@ -492,7 +481,7 @@ export default function VoiceScreen({ navigation }: Props) {
           {/* Completed Status Banner at bottom */}
           <View style={styles.completedToastBanner}>
             <View style={styles.completedToastHeader}>
-              <CircleCheck size={18} color={VOICE_COLORS.primary} />
+              <CircleCheck size={18} color={styles.viewAllText.color} />
               <Text style={styles.completedToastTitle}>{t('voice_assistant.command_completed')}</Text>
             </View>
             <Text style={styles.completedToastSub}>
@@ -527,8 +516,8 @@ export default function VoiceScreen({ navigation }: Props) {
                   {filterKey === 'all'
                     ? t('voice_assistant.all')
                     : filterKey === 'completed'
-                    ? t('voice_assistant.completed')
-                    : t('voice_assistant.failed')}
+                      ? t('voice_assistant.completed')
+                      : t('voice_assistant.failed')}
                 </Text>
               </Pressable>
             ))}
@@ -538,30 +527,32 @@ export default function VoiceScreen({ navigation }: Props) {
           <View style={styles.recentCardContainer}>
             {filteredHistory.map((item, idx) => {
               const IconComp = item.icon;
+              const transcriptText = t(item.transcriptKey);
+              const moduleText = t(item.moduleKey);
               return (
                 <React.Fragment key={item.id}>
                   {idx > 0 && <View style={styles.divider} />}
                   <Pressable
                     style={styles.recentRow}
                     onPress={() => {
-                      setActiveQuery(item.transcript);
+                      setActiveQuery(transcriptText);
                       setScreenState('confirm');
                     }}>
-                    <View style={[styles.recentIconBadge, { backgroundColor: item.bgColor }]}>
-                      <IconComp size={18} color={item.iconColor} />
+                    <View style={styles.recentIconBadge}>
+                      <IconComp size={18} color={styles.viewAllText.color} />
                     </View>
                     <View style={styles.recentTextWrap}>
                       <Text style={styles.recentTitle} numberOfLines={1}>
-                        {item.transcript}
+                        {transcriptText}
                       </Text>
-                      <Text style={styles.recentSubtitle}>{item.module}</Text>
+                      <Text style={styles.recentSubtitle}>{moduleText}</Text>
                     </View>
                     <View style={styles.recentRightWrap}>
-                      <Text style={styles.recentTime}>{item.time}</Text>
+                      <Text style={styles.recentTime}>{item.timeStr}</Text>
                       {item.status === 'completed' ? (
-                        <CircleCheck size={16} color={VOICE_COLORS.successGreen} />
+                        <CircleCheck size={16} color={styles.detailValHighlight.color} />
                       ) : (
-                        <CircleX size={16} color={VOICE_COLORS.dangerRed} />
+                        <CircleX size={16} color={styles.dangerText.color} />
                       )}
                     </View>
                   </Pressable>
@@ -572,7 +563,7 @@ export default function VoiceScreen({ navigation }: Props) {
 
           {/* Footer Note */}
           <Text style={styles.historyFooterNote}>
-            Voice commands are analyzed by LlmClientService and routed to the relevant module.
+            {t('voice_assistant.history_footer_note')}
           </Text>
         </ScrollView>
       )}
@@ -590,7 +581,7 @@ export default function VoiceScreen({ navigation }: Props) {
             <Pressable
               style={styles.mainMicButton}
               onPress={() => handleStartListening()}>
-              <Mic size={26} color={VOICE_COLORS.textOnPrimary} />
+              <Mic size={26} color={styles.defaultHeroTitle.color} />
             </Pressable>
 
             <View style={styles.waveSideGroup}>
@@ -647,7 +638,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
 
     // DEFAULT HERO CARD
     defaultHeroCard: {
-      backgroundColor: '#054E63',
+      backgroundColor: colors.primaryDark,
       borderRadius: 20,
       padding: spacing.lg,
       marginTop: spacing.md,
@@ -675,18 +666,18 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     defaultHeroHelp: {
       fontFamily: fonts.sansMedium,
       fontSize: 14,
-      color: '#38BDF8',
+      color: colors.textOnPrimaryAccent || '#38BDF8',
       marginBottom: 2,
     },
     defaultHeroTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 16,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       lineHeight: 22,
       marginBottom: 10,
     },
     heroTapPillBtn: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: 16,
       paddingHorizontal: 16,
       paddingVertical: 8,
@@ -695,12 +686,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     heroTapPillText: {
       fontFamily: fonts.sansBold,
       fontSize: 12.5,
-      color: '#054E63',
+      color: colors.primary,
     },
 
     // LISTENING STATE HERO
     listeningHeroCard: {
-      backgroundColor: '#054E63',
+      backgroundColor: colors.primaryDark,
       borderRadius: 24,
       paddingVertical: spacing.xxl,
       paddingHorizontal: spacing.lg,
@@ -714,7 +705,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 90,
       height: 90,
       borderRadius: 45,
-      backgroundColor: 'rgba(56, 189, 248, 0.25)',
+      backgroundColor: 'rgba(255, 255, 255, 0.15)',
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.md,
@@ -723,7 +714,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 70,
       height: 70,
       borderRadius: 35,
-      backgroundColor: 'rgba(56, 189, 248, 0.4)',
+      backgroundColor: 'rgba(255, 255, 255, 0.25)',
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -731,20 +722,20 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 54,
       height: 54,
       borderRadius: 27,
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
     },
     listeningTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 22,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       marginBottom: 4,
     },
     listeningSub: {
       fontFamily: fonts.sans,
       fontSize: 13,
-      color: '#E0F2FE',
+      color: colors.textOnPrimaryMuted,
       textAlign: 'center',
     },
 
@@ -778,19 +769,19 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 6,
       height: 6,
       borderRadius: 3,
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
     },
     understandingCard: {
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: 16,
       padding: spacing.md,
       borderWidth: 1,
-      borderColor: '#BAE6FD',
+      borderColor: colors.border,
     },
     understandingIntentHeader: {
       fontFamily: fonts.sansBold,
       fontSize: 14,
-      color: '#0284C7',
+      color: colors.primary,
     },
     understandingIntentSub: {
       fontFamily: fonts.sans,
@@ -819,7 +810,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     stopListeningBtn: {
       flex: 1.5,
-      backgroundColor: '#054E63',
+      backgroundColor: colors.primary,
       borderRadius: 16,
       paddingVertical: 14,
       alignItems: 'center',
@@ -827,7 +818,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     stopListeningBtnText: {
       fontFamily: fonts.sansBold,
       fontSize: 14,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
 
     // CONFIRM STATE
@@ -842,18 +833,20 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: 16,
       padding: spacing.md,
       borderWidth: 1,
-      borderColor: '#BAE6FD',
+      borderColor: colors.border,
       marginBottom: spacing.md,
     },
     understoodIconBadge: {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -868,7 +861,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     understoodIntentSub: {
       fontFamily: fonts.sans,
       fontSize: 12,
-      color: '#0284C7',
+      color: colors.primary,
       marginTop: 2,
     },
     actionDetailsCard: {
@@ -898,7 +891,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     detailValHighlight: {
       fontFamily: fonts.sansBold,
       fontSize: 13,
-      color: '#16A34A',
+      color: colors.forest,
+    },
+    dangerText: {
+      color: colors.danger,
     },
     detailDivider: {
       height: 1,
@@ -911,12 +907,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginTop: 10,
     },
     completedToastBanner: {
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: 16,
       padding: spacing.md,
       marginTop: spacing.xl,
       borderWidth: 1,
-      borderColor: '#BAE6FD',
+      borderColor: colors.border,
     },
     completedToastHeader: {
       flexDirection: 'row',
@@ -927,7 +923,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     completedToastTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 14,
-      color: '#0284C7',
+      color: colors.primary,
     },
     completedToastSub: {
       fontFamily: fonts.sans,
@@ -957,8 +953,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingVertical: 8,
     },
     filterPillActive: {
-      backgroundColor: '#054E63',
-      borderColor: '#054E63',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     filterPillText: {
       fontFamily: fonts.sansMedium,
@@ -966,7 +962,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textPrimary,
     },
     filterPillTextActive: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       fontFamily: fonts.sansBold,
     },
     historyFooterNote: {
@@ -1011,7 +1007,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 26,
       height: 26,
       borderRadius: 13,
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1039,7 +1037,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     viewAllText: {
       fontFamily: fonts.sansMedium,
       fontSize: 13,
-      color: '#0284C7',
+      color: colors.primary,
     },
     recentCardContainer: {
       backgroundColor: colors.surface,
@@ -1060,6 +1058,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 38,
       height: 38,
       borderRadius: 19,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -1113,6 +1114,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 44,
       height: 44,
       borderRadius: 22,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 8,
@@ -1154,14 +1158,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     bottomWaveLine: {
       width: 3,
-      backgroundColor: '#38BDF8',
+      backgroundColor: colors.primary,
       borderRadius: 2,
     },
     mainMicButton: {
       width: 58,
       height: 58,
       borderRadius: 29,
-      backgroundColor: '#054E63',
+      backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadow.medium,
@@ -1169,8 +1173,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     tapToSpeakLabel: {
       fontFamily: fonts.sansBold,
       fontSize: 13,
-      color: '#054E63',
+      color: colors.primary,
       marginTop: 6,
       marginBottom: 4,
     },
   });
+//  });

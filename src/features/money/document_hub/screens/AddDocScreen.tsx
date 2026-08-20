@@ -75,18 +75,18 @@ export default function AddDocScreen({ navigation }: Props) {
               onPress={() =>
                 navigation.navigate('DocTemplateForm', { templateType: tmpl.type })
               }>
-              <View style={[styles.templateIconBadge, { backgroundColor: tmpl.bgColor }]}>
-                {getTemplateIcon(tmpl.type, tmpl.accentColor)}
+              <View style={[styles.templateIconBadge, { backgroundColor: styles.customIconBadge.backgroundColor }]}>
+                {getTemplateIcon(tmpl.type, styles.primaryIcon.color)}
               </View>
               <View style={styles.templateTextWrap}>
                 <Text style={styles.templateTitle}>
-                  {t(`doc_hub.tmpl_${tmpl.type}_title`, { defaultValue: tmpl.title })}
+                  {t(tmpl.titleKey, { defaultValue: tmpl.title })}
                 </Text>
                 <Text style={styles.templateDesc}>
-                  {t(`doc_hub.tmpl_${tmpl.type}_desc`, { defaultValue: tmpl.description })}
+                  {t(tmpl.descriptionKey, { defaultValue: tmpl.description })}
                 </Text>
               </View>
-              <ChevronRight size={18} color="#004F63" />
+              <ChevronRight size={18} color={styles.primaryIcon.color} />
             </Pressable>
           ))}
         </View>
@@ -99,7 +99,7 @@ export default function AddDocScreen({ navigation }: Props) {
             navigation.navigate('DocTemplateForm', { templateType: 'passport' })
           }>
           <View style={styles.customIconBadge}>
-            <FilePlus size={22} color="#004F63" />
+            <FilePlus size={22} color={styles.primaryIcon.color} />
           </View>
           <View style={styles.templateTextWrap}>
             <Text style={styles.templateTitle}>{t('doc_hub.custom_doc_title')}</Text>
@@ -107,7 +107,7 @@ export default function AddDocScreen({ navigation }: Props) {
               {t('doc_hub.custom_doc_sub')}
             </Text>
           </View>
-          <ChevronRight size={18} color="#004F63" />
+          <ChevronRight size={18} color={styles.primaryIcon.color} />
         </Pressable>
       </ScrollView>
     </View>
@@ -141,6 +141,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     headerIcon: {
       color: colors.textPrimary,
+    },
+    primaryIcon: {
+      color: colors.primary,
     },
     headerTitle: {
       fontFamily: fonts.sansBold,
@@ -185,6 +188,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderRadius: 23,
       alignItems: 'center',
       justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     templateTextWrap: {
       flex: 1,
@@ -216,7 +221,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 46,
       height: 46,
       borderRadius: 23,
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },

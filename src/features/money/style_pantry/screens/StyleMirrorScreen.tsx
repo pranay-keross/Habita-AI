@@ -124,7 +124,10 @@ export default function StyleMirrorScreen({ navigation }: Props) {
               ]}
               onPress={() => handleEventSelect(evt)}>
               <View style={styles.eventTimeBadge}>
-                <Calendar size={12} color={selectedEvent.id === evt.id ? '#FFFFFF' : '#004F63'} />
+                <Calendar
+                  size={12}
+                  color={selectedEvent.id === evt.id ? styles.addIcon.color : styles.primaryIcon.color}
+                />
                 <Text
                   style={[
                     styles.eventTimeText,
@@ -154,27 +157,27 @@ export default function StyleMirrorScreen({ navigation }: Props) {
 
         {/* AI Outfit Suggestion Card */}
         <View style={styles.aiHeaderRow}>
-          <Sparkles size={20} color="#7C3AED" />
+          <Sparkles size={20} color={styles.primaryIcon.color} />
           <Text style={styles.aiSectionTitle}>{t('style_pantry.ai_recommendation')}</Text>
         </View>
 
         {loading || generating ? (
           <View style={styles.loadingBox}>
-            <ActivityIndicator size="large" color="#7C3AED" />
-            <Text style={styles.loadingText}>AI is styling your outfit...</Text>
+            <ActivityIndicator size="large" color={styles.primaryIcon.color} />
+            <Text style={styles.loadingText}>{t('style_pantry.ai_styling_text')}</Text>
           </View>
         ) : recommendation ? (
           <View style={styles.recommendationCard}>
             {/* Badges Row */}
             <View style={styles.badgesRow}>
               <View style={styles.matchBadgePurple}>
-                <CheckCircle2 size={12} color="#7C3AED" style={{ marginRight: 4 }} />
+                <CheckCircle2 size={12} color={styles.primaryIcon.color} style={{ marginRight: 4 }} />
                 <Text style={styles.matchBadgeTextPurple}>
                   {recommendation.occasionSuitability}
                 </Text>
               </View>
               <View style={styles.matchBadgeGreen}>
-                <CheckCircle2 size={12} color="#16A34A" style={{ marginRight: 4 }} />
+                <CheckCircle2 size={12} color={styles.forestIcon.color} style={{ marginRight: 4 }} />
                 <Text style={styles.matchBadgeTextGreen}>
                   {recommendation.weatherSuitability}
                 </Text>
@@ -200,7 +203,7 @@ export default function StyleMirrorScreen({ navigation }: Props) {
             {/* Actions */}
             <View style={styles.actionRow}>
               <Pressable style={styles.reGenerateBtn} onPress={handleGenerateAnother}>
-                <RefreshCw size={16} color="#7C3AED" style={{ marginRight: 6 }} />
+                <RefreshCw size={16} color={styles.primaryIcon.color} style={{ marginRight: 6 }} />
                 <Text style={styles.reGenerateText}>{t('style_pantry.generate_another')}</Text>
               </Pressable>
             </View>
@@ -247,6 +250,15 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    primaryIcon: {
+      color: colors.primary,
+    },
+    addIcon: {
+      color: colors.textOnPrimary,
+    },
+    forestIcon: {
+      color: colors.forest,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -257,11 +269,11 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingBottom: spacing.xxl,
     },
     weatherHeroCard: {
-      backgroundColor: '#FEF3C7',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: radius.lg,
       padding: spacing.md,
       borderWidth: 1,
-      borderColor: '#FDE68A',
+      borderColor: colors.border,
       marginBottom: spacing.md,
       ...shadow.soft,
     },
@@ -273,7 +285,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.sm,
@@ -281,12 +295,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     weatherTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 14,
-      color: '#92400E',
+      color: colors.primary,
     },
     weatherSub: {
       fontFamily: fonts.sans,
       fontSize: 13,
-      color: '#B45309',
+      color: colors.textSecondary,
       marginTop: 2,
     },
     sectionTitle: {
@@ -311,8 +325,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       ...shadow.soft,
     },
     eventCardActive: {
-      backgroundColor: '#004F63',
-      borderColor: '#004F63',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     eventTimeBadge: {
       flexDirection: 'row',
@@ -323,10 +337,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     eventTimeText: {
       fontFamily: fonts.sansBold,
       fontSize: 11,
-      color: '#004F63',
+      color: colors.primary,
     },
     eventTimeTextActive: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     eventTitleText: {
       fontFamily: fonts.sansBold,
@@ -335,7 +349,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: spacing.xs,
     },
     eventTitleTextActive: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     eventTypeTag: {
       fontFamily: fonts.sansMedium,
@@ -343,7 +357,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textSecondary,
     },
     eventTypeTagActive: {
-      color: '#E0F2FE',
+      color: colors.textOnPrimaryMuted,
     },
     aiHeaderRow: {
       flexDirection: 'row',
@@ -355,7 +369,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     aiSectionTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 16,
-      color: '#7C3AED',
+      color: colors.textPrimary,
     },
     loadingBox: {
       backgroundColor: colors.surface,
@@ -369,7 +383,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     loadingText: {
       fontFamily: fonts.sansMedium,
       fontSize: 14,
-      color: '#7C3AED',
+      color: colors.primary,
       marginTop: spacing.md,
     },
     recommendationCard: {
@@ -377,7 +391,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderRadius: radius.lg,
       padding: spacing.lg,
       borderWidth: 1,
-      borderColor: '#DDD6FE',
+      borderColor: colors.border,
       ...shadow.soft,
     },
     badgesRow: {
@@ -387,7 +401,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     matchBadgePurple: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#F3E8FF',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: spacing.sm,
       paddingVertical: 4,
       borderRadius: radius.md,
@@ -395,12 +411,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     matchBadgeTextPurple: {
       fontFamily: fonts.sansMedium,
       fontSize: 11,
-      color: '#6D28D9',
+      color: colors.primary,
     },
     matchBadgeGreen: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#DCFCE7',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: spacing.sm,
       paddingVertical: 4,
       borderRadius: radius.md,
@@ -408,7 +426,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     matchBadgeTextGreen: {
       fontFamily: fonts.sansMedium,
       fontSize: 11,
-      color: '#15803D',
+      color: colors.forest,
     },
     outfitTitle: {
       fontFamily: fonts.sansBold,
@@ -431,7 +449,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     itemMiniCard: {
       width: '31%',
-      backgroundColor: '#F8FAFC',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: radius.md,
       padding: spacing.sm,
       alignItems: 'center',
@@ -462,16 +480,18 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: '#F3E8FF',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       borderRadius: radius.md,
       paddingVertical: spacing.sm,
     },
     reGenerateText: {
       fontFamily: fonts.sansBold,
       fontSize: 13,
-      color: '#7C3AED',
+      color: colors.primary,
     },
     viewOutfitBtn: {
-      backgroundColor: '#7C3AED',
+      backgroundColor: colors.primary,
     },
   });

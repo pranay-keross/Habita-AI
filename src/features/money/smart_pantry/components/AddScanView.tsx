@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { AddMode, AllergenTag, CategoryType, PantryItem, StorageLocation } from '../types';
 import { ALLERGEN_DEFINITIONS, BARCODE_CATALOG } from '../data/mockPantryData';
-import { PANTRY_COLORS } from '../constants/colors';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
@@ -13,13 +12,13 @@ interface Props {
   onNavigateDetails: () => void;
 }
 
-const CATEGORIES: { key: CategoryType; label: string; emoji: string }[] = [
-  { key: 'produce', label: 'Produce', emoji: '🥦' },
-  { key: 'dairy', label: 'Dairy', emoji: '🥛' },
-  { key: 'bakery', label: 'Bakery', emoji: '🍞' },
-  { key: 'beverages', label: 'Beverages', emoji: '🧃' },
-  { key: 'meat', label: 'Meat & Seafood', emoji: '🥩' },
-  { key: 'pantry', label: 'Dry Pantry', emoji: '🥫' },
+const CATEGORIES: { key: CategoryType; labelKey: string; label: string; emoji: string }[] = [
+  { key: 'produce', labelKey: 'smart_pantry.cat_produce', label: 'Produce', emoji: '🥦' },
+  { key: 'dairy', labelKey: 'smart_pantry.cat_dairy', label: 'Dairy', emoji: '🥛' },
+  { key: 'bakery', labelKey: 'smart_pantry.cat_bakery', label: 'Bakery', emoji: '🍞' },
+  { key: 'beverages', labelKey: 'smart_pantry.cat_beverages', label: 'Beverages', emoji: '🧃' },
+  { key: 'meat', labelKey: 'smart_pantry.cat_meat', label: 'Meat & Seafood', emoji: '🥩' },
+  { key: 'pantry', labelKey: 'smart_pantry.cat_pantry', label: 'Dry Pantry', emoji: '🥫' },
 ];
 
 const LOCATIONS: StorageLocation[] = ['Fridge', 'Freezer', 'Pantry Shelf'];
@@ -39,6 +38,19 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
   const [saving, setSaving] = useState(false);
   const [scannedBarcode, setScannedBarcode] = useState('');
   const [isScanning, setIsScanning] = useState(false);
+
+  const getLocName = (loc: StorageLocation) => {
+    switch (loc) {
+      case 'Fridge':
+        return t('smart_pantry.loc_fridge');
+      case 'Freezer':
+        return t('smart_pantry.loc_freezer');
+      case 'Pantry Shelf':
+        return t('smart_pantry.loc_pantry_shelf');
+      default:
+        return loc;
+    }
+  };
 
   const handleSaveItem = async () => {
     if (!name.trim()) {
@@ -62,7 +74,7 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
     setSaving(false);
     setName('');
     setScannedBarcode('');
-    Alert.alert('Item Saved! 🥗', `${newItem.name} added to ${newItem.storageLocation}.`);
+    Alert.alert('Item Saved! 🥗', `${newItem.name} added to ${getLocName(newItem.storageLocation)}.`);
     onNavigateDetails();
   };
 
@@ -111,7 +123,6 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
     <View style={styles.container}>
       <Text style={styles.sectionHeading}>{t('smart_pantry.add_title')}</Text>
 
-      {/* Entry Modes */}
       <View style={styles.modeToggleRow}>
         <Pressable
           style={[styles.modeBtn, addMode === 'barcode' && styles.modeBtnActive]}
@@ -144,9 +155,9 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
           <View style={styles.cameraViewfinder}>
             <View style={styles.viewfinderTarget}>
               {isScanning ? (
-                <ActivityIndicator size="large" color={PANTRY_COLORS.safeGreen} />
+                <ActivityIndicator size="large" color={styles.safeIcon.color} />
               ) : (
-                <Text style={{ fontSize: 40 }}>|||||||||||||||</Text>
+                <Text style={{ fontSize: 40, color: styles.safeIcon.color }}>|||||||||||||||</Text>
               )}
             </View>
           </View>
@@ -202,16 +213,16 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
                 style={[styles.catChip, category === cat.key && styles.catChipActive]}
                 onPress={() => setCategory(cat.key)}>
                 <Text style={[styles.catChipText, category === cat.key && styles.catChipTextActive]}>
-                  {cat.emoji} {cat.label}
+                  {cat.emoji} {t(cat.labelKey, { defaultValue: cat.label })}
                 </Text>
               </Pressable>
             ))}
           </ScrollView>
 
-          <View style={{ flexDirection: 'row', gap: 10 }}>
+          <View style={{ flexDirection: 'row', gap: 12 }}>
             <View style={{ flex: 1 }}>
               <Text style={styles.formLabel}>{t('smart_pantry.quantity')}</Text>
-              <TextInput style={styles.formInput} value={quantity} onChangeText={setQuantity} keyboardType="numeric" />
+              <TextInput style={styles.formInput} keyboardType="numeric" value={quantity} onChangeText={setQuantity} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.formLabel}>{t('smart_pantry.unit')}</Text>
@@ -219,30 +230,48 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
             </View>
           </View>
 
-          <View style={{ flexDirection: 'row', gap: 10 }}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.formLabel}>{t('smart_pantry.storage_loc')}</Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 4 }}>
-                {LOCATIONS.map((loc) => (
-                  <Pressable
-                    key={loc}
-                    style={[styles.locChip, storageLocation === loc && styles.locChipActive]}
-                    onPress={() => setStorageLocation(loc)}>
-                    <Text style={[styles.locChipText, storageLocation === loc && styles.locChipTextActive]}>
-                      {loc}
-                    </Text>
-                  </Pressable>
-                ))}
-              </ScrollView>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.formLabel}>{t('smart_pantry.expiry_date')}</Text>
-              <TextInput style={styles.formInput} value={expiryDate} onChangeText={setExpiryDate} />
-            </View>
+          <Text style={styles.formLabel}>{t('smart_pantry.storage_loc')}</Text>
+          <View style={styles.locationRow}>
+            {LOCATIONS.map((loc) => (
+              <Pressable
+                key={loc}
+                style={[styles.locationChip, storageLocation === loc && styles.locationChipActive]}
+                onPress={() => setStorageLocation(loc)}>
+                <Text style={[styles.locationChipText, storageLocation === loc && styles.locationChipTextActive]}>
+                  {getLocName(loc)}
+                </Text>
+              </Pressable>
+            ))}
+          </View>
+
+          <Text style={styles.formLabel}>{t('smart_pantry.expiry_date')}</Text>
+          <TextInput style={styles.formInput} value={expiryDate} onChangeText={setExpiryDate} />
+
+          <Text style={styles.formLabel}>{t('smart_pantry.safety_badges')}</Text>
+          <View style={styles.allergenGrid}>
+            {ALLERGEN_DEFINITIONS.map((def) => {
+              const selected = selectedAllergens.includes(def.tag);
+              return (
+                <Pressable
+                  key={def.tag}
+                  style={[styles.allergenChip, selected && styles.allergenChipActive]}
+                  onPress={() => {
+                    if (selected) {
+                      setSelectedAllergens(selectedAllergens.filter((a) => a !== def.tag));
+                    } else {
+                      setSelectedAllergens([...selectedAllergens, def.tag]);
+                    }
+                  }}>
+                  <Text style={[styles.allergenChipText, selected && styles.allergenChipTextActive]}>
+                    {def.icon} {def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           <Pressable style={styles.submitBtn} onPress={handleSaveItem} disabled={saving}>
-            {saving ? <ActivityIndicator color="#FFFFFF" /> : <Text style={styles.submitBtnText}>{t('smart_pantry.save_to_pantry')}</Text>}
+            {saving ? <ActivityIndicator color={styles.submitBtnText.color} /> : <Text style={styles.submitBtnText}>{t('smart_pantry.save_to_pantry')}</Text>}
           </Pressable>
         </View>
       )}
@@ -256,16 +285,16 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     sectionHeading: { fontFamily: fonts.serif, fontSize: 17, color: colors.textPrimary, marginBottom: 8 },
     modeToggleRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
     modeBtn: { flex: 1, backgroundColor: colors.surface, paddingVertical: 8, borderRadius: radius.md, alignItems: 'center', borderWidth: 1, borderColor: colors.border },
-    modeBtnActive: { backgroundColor: '#004F63', borderColor: '#004F63' },
+    modeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     modeBtnText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary },
-    modeBtnTextActive: { fontFamily: fonts.sansBold, color: '#FFFFFF' },
+    modeBtnTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     scannerBox: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.md, alignItems: 'center' },
     scannerTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textPrimary },
     scannerSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted, marginTop: 2, marginBottom: 12 },
     cameraViewfinder: {
       width: '100%',
       height: 120,
-      backgroundColor: '#0F172A',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: radius.lg,
       alignItems: 'center',
       justifyContent: 'center',
@@ -275,7 +304,7 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
       width: 160,
       height: 70,
       borderWidth: 2,
-      borderColor: '#004F63',
+      borderColor: colors.primary,
       borderRadius: 8,
       borderStyle: 'dashed',
       alignItems: 'center',
@@ -293,13 +322,24 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     formLabel: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary, marginBottom: 4, marginTop: 8 },
     formInput: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 7, fontSize: 13, color: colors.textPrimary, marginBottom: 4 },
     catChip: { backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
-    catChipActive: { backgroundColor: '#004F63', borderColor: '#004F63' },
+    catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     catChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
-    catChipTextActive: { fontFamily: fonts.sansBold, color: '#FFFFFF' },
+    catChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
+    safeIcon: { color: colors.forest },
+    locationRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
+    locationChip: { backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+    locationChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    locationChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
+    locationChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
+    allergenGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 8 },
+    allergenChip: { backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+    allergenChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    allergenChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
+    allergenChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     locChip: { backgroundColor: colors.background, paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border },
-    locChipActive: { backgroundColor: '#004F63', borderColor: '#004F63' },
+    locChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     locChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
-    locChipTextActive: { fontFamily: fonts.sansBold, color: '#FFFFFF' },
-    submitBtn: { backgroundColor: '#004F63', paddingVertical: 10, borderRadius: radius.md, alignItems: 'center', marginTop: 10 },
-    submitBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: '#FFFFFF' },
+    locChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
+    submitBtn: { backgroundColor: colors.primary, paddingVertical: 10, borderRadius: radius.md, alignItems: 'center', marginTop: 10 },
+    submitBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textOnPrimary },
   });

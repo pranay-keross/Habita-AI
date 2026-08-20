@@ -29,7 +29,6 @@ import {
   DEFAULT_VOICE_SETTINGS,
 } from './voiceStore';
 import type { VoiceSettings } from './types';
-import { VOICE_COLORS } from './constants/colors';
 import { subscribeToLanguageChanges, setLanguage, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'VoiceSettings'>;
@@ -96,7 +95,7 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
   if (loading) {
     return (
       <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color={VOICE_COLORS.accentBlue} />
+        <ActivityIndicator size="large" color={styles.primaryIcon.color} />
       </View>
     );
   }
@@ -115,7 +114,7 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Language Selection Section */}
         <View style={styles.sectionHeader}>
-          <Globe size={18} color={VOICE_COLORS.accentBlue} />
+          <Globe size={18} color={styles.primaryIcon.color} />
           <Text style={styles.sectionTitle}>{t('voice_assistant.speech_language')}</Text>
         </View>
 
@@ -129,7 +128,7 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
                 <Text style={styles.flagEmoji}>{lang.flag}</Text>
                 <Text style={styles.langLabel}>{lang.label}</Text>
                 {settings.language === lang.code && (
-                  <Check size={18} color={VOICE_COLORS.accentBlue} />
+                  <Check size={18} color={styles.primaryIcon.color} />
                 )}
               </Pressable>
             </React.Fragment>
@@ -138,7 +137,7 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
 
         {/* Engine Mode Section */}
         <View style={styles.sectionHeader}>
-          <Sparkles size={18} color={VOICE_COLORS.accentBlue} />
+          <Sparkles size={18} color={styles.primaryIcon.color} />
           <Text style={styles.sectionTitle}>{t('voice_assistant.recognition_engine')}</Text>
         </View>
 
@@ -152,7 +151,7 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
                 {t('voice_assistant.cloud_engine_sub')}
               </Text>
             </View>
-            {settings.recognitionMode === 'cloud' && <Check size={18} color={VOICE_COLORS.accentBlue} />}
+            {settings.recognitionMode === 'cloud' && <Check size={18} color={styles.primaryIcon.color} />}
           </Pressable>
 
           <View style={styles.divider} />
@@ -166,13 +165,13 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
                 {t('voice_assistant.offline_engine_sub')}
               </Text>
             </View>
-            {settings.recognitionMode === 'offline' && <Check size={18} color={VOICE_COLORS.accentBlue} />}
+            {settings.recognitionMode === 'offline' && <Check size={18} color={styles.primaryIcon.color} />}
           </Pressable>
         </View>
 
         {/* Audio & Feedback Settings */}
         <View style={styles.sectionHeader}>
-          <Volume2 size={18} color={VOICE_COLORS.accentBlue} />
+          <Volume2 size={18} color={styles.primaryIcon.color} />
           <Text style={styles.sectionTitle}>{t('voice_assistant.audio_controls')}</Text>
         </View>
 
@@ -185,8 +184,8 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
             <Switch
               value={settings.soundFeedback}
               onValueChange={(val) => updateSetting('soundFeedback', val)}
-              trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.soundFeedback ? VOICE_COLORS.accentBlue : '#F1F5F9'}
+              trackColor={{ false: styles.divider.backgroundColor, true: styles.primaryIcon.color }}
+              thumbColor={styles.backBtn.backgroundColor}
             />
           </View>
 
@@ -200,8 +199,8 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
             <Switch
               value={settings.autoSubmit}
               onValueChange={(val) => updateSetting('autoSubmit', val)}
-              trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.autoSubmit ? VOICE_COLORS.accentBlue : '#F1F5F9'}
+              trackColor={{ false: styles.divider.backgroundColor, true: styles.primaryIcon.color }}
+              thumbColor={styles.backBtn.backgroundColor}
             />
           </View>
 
@@ -215,15 +214,15 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
             <Switch
               value={settings.noiseCancellation}
               onValueChange={(val) => updateSetting('noiseCancellation', val)}
-              trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.noiseCancellation ? VOICE_COLORS.accentBlue : '#F1F5F9'}
+              trackColor={{ false: styles.divider.backgroundColor, true: styles.primaryIcon.color }}
+              thumbColor={styles.backBtn.backgroundColor}
             />
           </View>
         </View>
 
         {/* Wake Word Detection */}
         <View style={styles.sectionHeader}>
-          <Mic size={18} color={VOICE_COLORS.accentBlue} />
+          <Mic size={18} color={styles.primaryIcon.color} />
           <Text style={styles.sectionTitle}>{t('voice_assistant.wake_word_title')}</Text>
         </View>
 
@@ -236,15 +235,15 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
             <Switch
               value={settings.wakeWordEnabled}
               onValueChange={(val) => updateSetting('wakeWordEnabled', val)}
-              trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.wakeWordEnabled ? VOICE_COLORS.accentBlue : '#F1F5F9'}
+              trackColor={{ false: styles.divider.backgroundColor, true: styles.primaryIcon.color }}
+              thumbColor={styles.backBtn.backgroundColor}
             />
           </View>
         </View>
 
         {/* Privacy & Logs */}
         <View style={styles.sectionHeader}>
-          <ShieldCheck size={18} color={VOICE_COLORS.accentBlue} />
+          <ShieldCheck size={18} color={styles.primaryIcon.color} />
           <Text style={styles.sectionTitle}>{t('voice_assistant.privacy_history_title')}</Text>
         </View>
 
@@ -257,15 +256,15 @@ export default function VoiceSettingsScreen({ navigation }: Props) {
             <Switch
               value={settings.saveHistory}
               onValueChange={(val) => updateSetting('saveHistory', val)}
-              trackColor={{ false: '#CBD5E1', true: '#7DD3FC' }}
-              thumbColor={settings.saveHistory ? VOICE_COLORS.accentBlue : '#F1F5F9'}
+              trackColor={{ false: styles.divider.backgroundColor, true: styles.primaryIcon.color }}
+              thumbColor={styles.backBtn.backgroundColor}
             />
           </View>
 
           <View style={styles.divider} />
 
           <Pressable style={styles.clearBtnRow} onPress={handleClearHistory}>
-            <Trash2 size={18} color={VOICE_COLORS.dangerRed} />
+            <Trash2 size={18} color={styles.clearBtnText.color} />
             <Text style={styles.clearBtnText}>{t('voice_assistant.clear_history_log')}</Text>
           </Pressable>
         </View>
@@ -305,6 +304,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     headerIcon: {
       color: colors.textPrimary,
+    },
+    primaryIcon: {
+      color: colors.primary,
     },
     headerTitle: {
       fontFamily: fonts.sansBold,
@@ -409,6 +411,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     clearBtnText: {
       fontFamily: fonts.sansBold,
       fontSize: 14,
-      color: '#EF4444',
+      color: colors.danger,
     },
   });

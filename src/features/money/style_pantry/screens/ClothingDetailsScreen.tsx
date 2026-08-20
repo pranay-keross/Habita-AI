@@ -74,7 +74,7 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color="#004F63" />
+        <ActivityIndicator size="large" color={styles.primaryIcon.color} />
       </View>
     );
   }
@@ -82,9 +82,9 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
   if (!item) {
     return (
       <View style={[styles.root, styles.center]}>
-        <Text style={styles.errorText}>Item Not Found</Text>
+        <Text style={styles.errorText}>{t('style_pantry.item_not_found')}</Text>
         <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>Go Back</Text>
+          <Text style={styles.backBtnText}>{t('style_pantry.go_back')}</Text>
         </Pressable>
       </View>
     );
@@ -102,10 +102,10 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
           <Pressable
             onPress={() => navigation.navigate('AddEditClothing', { itemId: item.id })}
             style={styles.headerActionBtn}>
-            <Pencil size={18} color="#004F63" />
+            <Pencil size={18} color={styles.primaryIcon.color} />
           </Pressable>
           <Pressable onPress={handleDelete} style={styles.headerActionBtn}>
-            <Trash2 size={18} color="#EF4444" />
+            <Trash2 size={18} color={styles.dangerIcon.color} />
           </Pressable>
         </View>
       </View>
@@ -123,11 +123,11 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
         </View>
 
         {/* Info Metadata Card */}
-        <Text style={styles.sectionTitle}>Clothing Information</Text>
+        <Text style={styles.sectionTitle}>{t('style_pantry.clothing_info')}</Text>
         <View style={styles.card}>
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('style_pantry.brand_label')}</Text>
-            <Text style={styles.metaVal}>{item.brand || 'Not Specified'}</Text>
+            <Text style={styles.metaVal}>{item.brand || t('style_pantry.not_specified')}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.metaRow}>
@@ -137,7 +137,7 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
           <View style={styles.divider} />
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('style_pantry.material_label')}</Text>
-            <Text style={styles.metaVal}>{item.material || 'Standard Fabric'}</Text>
+            <Text style={styles.metaVal}>{item.material || t('style_pantry.standard_fabric')}</Text>
           </View>
         </View>
 
@@ -149,7 +149,7 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
               <View style={styles.tagsWrap}>
                 {item.tags.map((tag) => (
                   <View key={tag} style={styles.tagBadge}>
-                    <Tag size={12} color="#004F63" style={{ marginRight: 4 }} />
+                    <Tag size={12} color={styles.primaryIcon.color} style={{ marginRight: 4 }} />
                     <Text style={styles.tagBadgeText}>#{tag}</Text>
                   </View>
                 ))}
@@ -169,7 +169,7 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
             <View style={styles.vDivider} />
             <View style={styles.statBox}>
               <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Clock size={16} color="#004F63" />
+                <Clock size={16} color={styles.primaryIcon.color} />
                 <Text style={styles.statDateVal}>
                   {item.lastWornDate || t('style_pantry.not_worn_yet')}
                 </Text>
@@ -234,6 +234,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    primaryIcon: {
+      color: colors.primary,
+    },
+    dangerIcon: {
+      color: colors.danger,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -257,7 +263,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 80,
       height: 80,
       borderRadius: 40,
-      backgroundColor: '#F1F5F9',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.md,
@@ -274,7 +282,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     heroSub: {
       fontFamily: fonts.sansMedium,
       fontSize: 13,
-      color: '#004F63',
+      color: colors.primary,
       marginTop: 4,
     },
     sectionTitle: {
@@ -321,7 +329,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     tagBadge: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: spacing.sm,
       paddingVertical: 4,
       borderRadius: radius.md,
@@ -329,7 +339,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     tagBadgeText: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#004F63',
+      color: colors.primary,
     },
     statsRow: {
       flexDirection: 'row',
@@ -349,7 +359,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     statNumber: {
       fontFamily: fonts.sansBold,
       fontSize: 22,
-      color: '#004F63',
+      color: colors.primary,
     },
     statDateVal: {
       fontFamily: fonts.sansBold,
@@ -383,6 +393,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     aiBtn: {
       marginTop: spacing.sm,
-      backgroundColor: '#7C3AED',
+      backgroundColor: colors.primary,
     },
-  });
+  }); 

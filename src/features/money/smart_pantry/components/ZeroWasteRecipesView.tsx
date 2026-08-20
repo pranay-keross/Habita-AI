@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Alert } from 'react-native';
 import { ZeroWasteRecipe } from '../types';
 import { ALLERGEN_DEFINITIONS, MOCK_ZERO_WASTE_RECIPES } from '../data/mockPantryData';
-import { PANTRY_COLORS } from '../constants/colors';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
@@ -100,18 +99,18 @@ export const ZeroWasteRecipesView: React.FC<Props> = ({ onCookRecipe }) => {
 const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
   StyleSheet.create({
     container: { marginTop: spacing.sm },
-    recipeHeroHeader: { backgroundColor: '#004F63', borderRadius: radius.xl, padding: spacing.md, marginBottom: spacing.md },
-    recipeHeroTitle: { fontFamily: fonts.serif, fontSize: 18, color: '#FFFFFF' },
-    recipeHeroSub: { fontFamily: fonts.sans, fontSize: 12, color: 'rgba(255,255,255,0.85)', marginTop: 2 },
+    recipeHeroHeader: { backgroundColor: colors.primary, borderRadius: radius.xl, padding: spacing.md, marginBottom: spacing.md },
+    recipeHeroTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textOnPrimary },
+    recipeHeroSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textOnPrimaryMuted, marginTop: 2 },
     recipeCard: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.md, marginBottom: spacing.md, ...shadow.soft },
     recipeCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
-    matchBadge: { backgroundColor: '#D1FAE5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
-    matchBadgeText: { fontFamily: fonts.sansBold, fontSize: 10, color: '#065F46' },
+    matchBadge: { backgroundColor: colors.surfaceElevated, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
+    matchBadgeText: { fontFamily: fonts.sansBold, fontSize: 10, color: colors.textSecondary },
     cookTimeText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textMuted },
     recipeTitle: { fontFamily: fonts.serif, fontSize: 16, color: colors.textPrimary },
-    expiringUsedTag: { fontFamily: fonts.sansBold, fontSize: 11, color: '#D97706', marginTop: 4 },
+    expiringUsedTag: { fontFamily: fonts.sansBold, fontSize: 11, color: colors.turmeric, marginTop: 4 },
     viewRecipeRow: { marginTop: 10, paddingTop: 8, borderTopWidth: 1, borderTopColor: colors.border },
-    viewRecipeText: { fontFamily: fonts.sansBold, fontSize: 12, color: '#004F63' },
+    viewRecipeText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.primary },
     modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
     modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg },
     modalHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
@@ -121,6 +120,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     modalSectionLabel: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textSecondary, marginBottom: 6 },
     ingredientBullet: { fontFamily: fonts.sans, fontSize: 13, color: colors.textPrimary, marginBottom: 4 },
     instructionStep: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginBottom: 6 },
-    cookCompleteBtn: { backgroundColor: '#10B981', paddingVertical: 12, borderRadius: radius.md, alignItems: 'center', marginTop: 16 },
-    cookCompleteBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: '#FFFFFF' },
+    cookCompleteBtn: { backgroundColor: colors.primary, paddingVertical: 12, borderRadius: radius.md, alignItems: 'center', marginTop: 16 },
+    cookCompleteBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textOnPrimary },
   });

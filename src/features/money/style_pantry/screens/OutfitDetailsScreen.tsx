@@ -70,7 +70,7 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
         </Pressable>
         <Text style={styles.headerTitle}>{t('style_pantry.outfit_preview_title')}</Text>
         <Pressable onPress={handleSaveOutfit} style={styles.headerBtn}>
-          <Bookmark size={18} color="#7C3AED" />
+          <Bookmark size={18} color={styles.primaryIcon.color} />
         </Pressable>
       </View>
 
@@ -83,11 +83,11 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
 
           <View style={styles.scoresWrap}>
             <View style={styles.scorePillPurple}>
-              <CheckCircle2 size={14} color="#7C3AED" style={{ marginRight: 4 }} />
+              <CheckCircle2 size={14} color={styles.primaryIcon.color} style={{ marginRight: 4 }} />
               <Text style={styles.scoreTextPurple}>{outfit.occasionSuitability}</Text>
             </View>
             <View style={styles.scorePillGreen}>
-              <CheckCircle2 size={14} color="#16A34A" style={{ marginRight: 4 }} />
+              <CheckCircle2 size={14} color={styles.forestIcon.color} style={{ marginRight: 4 }} />
               <Text style={styles.scoreTextGreen}>{outfit.weatherSuitability}</Text>
             </View>
           </View>
@@ -128,7 +128,7 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
             style={styles.wearBtn}
           />
           <Pressable style={styles.saveOutlineBtn} onPress={handleSaveOutfit}>
-            <Bookmark size={18} color="#7C3AED" style={{ marginRight: 6 }} />
+            <Bookmark size={18} color={styles.primaryIcon.color} style={{ marginRight: 6 }} />
             <Text style={styles.saveOutlineText}>{t('style_pantry.save_outfit')}</Text>
           </Pressable>
         </View>
@@ -165,6 +165,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    primaryIcon: {
+      color: colors.primary,
+    },
+    forestIcon: {
+      color: colors.forest,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -175,18 +181,18 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingBottom: spacing.xxl,
     },
     heroCard: {
-      backgroundColor: '#F3E8FF',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: radius.lg,
       padding: spacing.lg,
       borderWidth: 1,
-      borderColor: '#DDD6FE',
+      borderColor: colors.border,
       marginBottom: spacing.md,
       ...shadow.soft,
     },
     occasionBadge: {
       fontFamily: fonts.sansBold,
       fontSize: 11,
-      color: '#7C3AED',
+      color: colors.primary,
       letterSpacing: 1,
       marginBottom: 4,
     },
@@ -198,7 +204,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     eventTitle: {
       fontFamily: fonts.sansMedium,
       fontSize: 13,
-      color: '#6D28D9',
+      color: colors.textSecondary,
       marginTop: 2,
       marginBottom: spacing.md,
     },
@@ -208,7 +214,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     scorePillPurple: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: spacing.md,
       paddingVertical: 6,
       borderRadius: radius.md,
@@ -216,12 +224,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     scoreTextPurple: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#6D28D9',
+      color: colors.primary,
     },
     scorePillGreen: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: spacing.md,
       paddingVertical: 6,
       borderRadius: radius.md,
@@ -229,7 +239,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     scoreTextGreen: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#15803D',
+      color: colors.forest,
     },
     sectionTitle: {
       fontFamily: fonts.sansBold,
@@ -270,7 +280,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 48,
       height: 48,
       borderRadius: radius.md,
-      backgroundColor: '#F1F5F9',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.md,
@@ -290,7 +302,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       gap: spacing.sm,
     },
     wearBtn: {
-      backgroundColor: '#7C3AED',
+      backgroundColor: colors.primary,
     },
     saveOutlineBtn: {
       flexDirection: 'row',
@@ -300,11 +312,11 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderRadius: radius.md,
       paddingVertical: spacing.md,
       borderWidth: 1,
-      borderColor: '#7C3AED',
+      borderColor: colors.border,
     },
     saveOutlineText: {
       fontFamily: fonts.sansBold,
       fontSize: 14,
-      color: '#7C3AED',
+      color: colors.primary,
     },
   });

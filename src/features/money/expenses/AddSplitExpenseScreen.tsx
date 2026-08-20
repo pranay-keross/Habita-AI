@@ -82,12 +82,12 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert('Missing Title', 'Please enter a description for the expense.');
+      Alert.alert(t('expenses.missing_title'), t('expenses.enter_desc_msg'));
       return;
     }
     const amt = parseFloat(amountStr);
     if (isNaN(amt) || amt <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid expense amount.');
+      Alert.alert(t('expenses.invalid_amount'), t('expenses.enter_valid_amount_msg'));
       return;
     }
     if (!group) return;
@@ -112,7 +112,10 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
         splits[m.id] = Math.round((amountInINR * p) / 100);
       });
       if (Math.abs(totalPct - 100) > 1) {
-        Alert.alert('Invalid Percentage', `Percentages must sum to 100%. Current sum: ${totalPct}%`);
+        Alert.alert(
+          t('expenses.invalid_percentage'),
+          t('expenses.percentage_sum_msg', { sum: totalPct }),
+        );
         return;
       }
     } else if (splitMode === 'shares') {
@@ -140,14 +143,20 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
     });
     setSaving(false);
 
-    Alert.alert('Expense Added!', `₹${amountInINR.toLocaleString('en-IN')} added to ${group.name}`);
+    Alert.alert(
+      t('expenses.expense_added'),
+      t('expenses.expense_added_msg', {
+        amount: amountInINR.toLocaleString('en-IN'),
+        group: group.name,
+      }),
+    );
     navigation.goBack();
   };
 
   if (loading || !group) {
     return (
       <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color="#004F63" />
+        <ActivityIndicator size="large" color={styles.payerTextActive.color} />
       </View>
     );
   }
@@ -166,7 +175,9 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Group Pill Header */}
         <View style={styles.groupPill}>
-          <Text style={styles.groupPillText}>Adding to {group.emoji} {group.name}</Text>
+          <Text style={styles.groupPillText}>
+            {t('expenses.adding_to_group', { emoji: group.emoji, name: group.name })}
+          </Text>
         </View>
 
         {/* Amount Input */}
@@ -238,7 +249,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
                 ]}>
                 {member.name} {member.id === 'm_1' ? '(You)' : ''}
               </Text>
-              {payerId === member.id && <Check size={18} color="#004F63" />}
+              {payerId === member.id && <Check size={18} color={styles.payerTextActive.color} />}
             </Pressable>
           ))}
         </View>
@@ -356,7 +367,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingBottom: spacing.xxl,
     },
     groupPill: {
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignSelf: 'flex-start',
       paddingHorizontal: 12,
       paddingVertical: 6,
@@ -367,10 +380,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     groupPillText: {
       fontFamily: fonts.sansBold,
       fontSize: 12,
-      color: '#0284C7',
+      color: colors.primary,
     },
     amountCard: {
-      backgroundColor: '#054E63',
+      backgroundColor: colors.primaryDark,
       borderRadius: 20,
       padding: spacing.lg,
       marginBottom: spacing.lg,
@@ -379,7 +392,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     amountLabel: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#99F6E4',
+      color: colors.textOnPrimaryMuted,
     },
     amountInputRow: {
       flexDirection: 'row',
@@ -389,14 +402,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     currencySymbolText: {
       fontFamily: fonts.sansBold,
       fontSize: 32,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       marginRight: 6,
     },
     amountInput: {
       flex: 1,
       fontFamily: fonts.sansBold,
       fontSize: 32,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     currencyRow: {
       flexDirection: 'row',
@@ -411,15 +424,15 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderRadius: 12,
     },
     currencyChipActive: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surfaceElevated,
     },
     currencyChipText: {
       fontFamily: fonts.sansMedium,
       fontSize: 11,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     currencyChipTextActive: {
-      color: '#054E63',
+      color: colors.primary,
       fontFamily: fonts.sansBold,
     },
     sectionTitle: {
@@ -457,7 +470,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderRadius: 12,
     },
     payerRowActive: {
-      backgroundColor: '#E3F2F5',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     payerText: {
       fontFamily: fonts.sansMedium,
@@ -465,7 +480,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textPrimary,
     },
     payerTextActive: {
-      color: '#004F63',
+      color: colors.primary,
       fontFamily: fonts.sansBold,
     },
     segmentedRow: {
@@ -483,8 +498,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       alignItems: 'center',
     },
     splitModeBtnActive: {
-      backgroundColor: '#004F63',
-      borderColor: '#004F63',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     splitModeText: {
       fontFamily: fonts.sansMedium,
@@ -493,7 +508,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     splitModeTextActive: {
       fontFamily: fonts.sansBold,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     splitNoticeText: {
       fontFamily: fonts.sans,

@@ -50,6 +50,34 @@ export const PantryInventoryView: React.FC<Props> = ({
   const { theme } = useTheme();
   const styles = useThemedStyles(makeStyles);
 
+  const getLocLabel = (loc: StorageLocation | 'All') => {
+    switch (loc) {
+      case 'All':
+        return `🌐 ${t('smart_pantry.loc_all')}`;
+      case 'Fridge':
+        return `❄️ ${t('smart_pantry.loc_fridge')}`;
+      case 'Freezer':
+        return `🧊 ${t('smart_pantry.loc_freezer')}`;
+      case 'Pantry Shelf':
+        return `🧺 ${t('smart_pantry.loc_pantry_shelf')}`;
+      default:
+        return loc;
+    }
+  };
+
+  const getLocName = (loc: StorageLocation) => {
+    switch (loc) {
+      case 'Fridge':
+        return t('smart_pantry.loc_fridge');
+      case 'Freezer':
+        return t('smart_pantry.loc_freezer');
+      case 'Pantry Shelf':
+        return t('smart_pantry.loc_pantry_shelf');
+      default:
+        return loc;
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionHeading}>{t('smart_pantry.inv_title')}</Text>
@@ -79,7 +107,7 @@ export const PantryInventoryView: React.FC<Props> = ({
             style={[styles.pillChip, selectedLocation === loc && styles.pillChipActive]}
             onPress={() => onLocationSelect(loc)}>
             <Text style={[styles.pillChipText, selectedLocation === loc && styles.pillChipTextActive]}>
-              {loc === 'All' ? '🌐 All' : loc === 'Fridge' ? '❄️ Fridge' : loc === 'Freezer' ? '🧊 Freezer' : '🧺 Shelf'}
+              {getLocLabel(loc)}
             </Text>
           </Pressable>
         ))}
@@ -100,7 +128,7 @@ export const PantryInventoryView: React.FC<Props> = ({
             style={[styles.allergenFilterChip, selectedAllergenFilter === def.tag && styles.allergenFilterChipActive]}
             onPress={() => onAllergenFilterSelect(def.tag)}>
             <Text style={[styles.allergenFilterChipText, selectedAllergenFilter === def.tag && styles.allergenFilterChipTextActive]}>
-              {def.icon} {def.label}
+              {def.icon} {def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label}
             </Text>
           </Pressable>
         ))}
@@ -154,7 +182,7 @@ export const PantryInventoryView: React.FC<Props> = ({
                 <View style={{ flex: 1 }}>
                   <Text style={styles.inventoryName}>{item.name}</Text>
                   <Text style={styles.inventorySub}>
-                    Qty: {item.quantity} {item.unit} · {item.storageLocation}
+                    {t('smart_pantry.quantity', { defaultValue: 'Qty' })}: {item.quantity} {item.unit} · {getLocName(item.storageLocation)}
                   </Text>
                 </View>
                 <View
@@ -167,7 +195,7 @@ export const PantryInventoryView: React.FC<Props> = ({
                       styles.expiryPillText,
                       isUrgent ? styles.expiryPillTextUrgent : isWarning ? styles.expiryPillTextWarning : styles.expiryPillTextSafe,
                     ]}>
-                    {daysLeft <= 0 ? 'Expired' : `${daysLeft}d left`}
+                    {daysLeft <= 0 ? (t('doc_hub.status_expired', { defaultValue: 'Expired' })) : `${daysLeft}d left`}
                   </Text>
                 </View>
               </View>
@@ -197,24 +225,24 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     searchInput: { flex: 1, fontSize: 14, color: colors.textPrimary },
     filterChipRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
     pillChip: { backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
-    pillChipActive: { backgroundColor: '#004F63', borderColor: '#004F63' },
+    pillChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     pillChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
-    pillChipTextActive: { fontFamily: fonts.sansBold, color: '#FFFFFF' },
+    pillChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     allergenChipRow: { gap: 6, marginBottom: 10 },
     allergenFilterChip: { backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
-    allergenFilterChipActive: { backgroundColor: '#004F63', borderColor: '#004F63' },
+    allergenFilterChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     allergenFilterChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
-    allergenFilterChipTextActive: { fontFamily: fonts.sansBold, color: '#FFFFFF' },
+    allergenFilterChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     sortBar: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 10 },
     resultsCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted },
     sortBtn: { paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.sm, backgroundColor: colors.surface },
-    sortBtnActive: { backgroundColor: '#004F63' },
+    sortBtnActive: { backgroundColor: colors.primary },
     sortBtnText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
-    sortBtnTextActive: { fontFamily: fonts.sansBold, color: '#FFFFFF' },
+    sortBtnTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     emptyStateContainer: { alignItems: 'center', justifyContent: 'center', paddingVertical: 40 },
     emptyStateTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textPrimary },
-    emptyStateBtn: { backgroundColor: '#004F63', paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill, marginTop: 12 },
-    emptyStateBtnText: { fontFamily: fonts.sansBold, fontSize: 12, color: '#FFFFFF' },
+    emptyStateBtn: { backgroundColor: colors.primary, paddingHorizontal: 16, paddingVertical: 8, borderRadius: radius.pill, marginTop: 12 },
+    emptyStateBtnText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimary },
     inventoryCard: {
       backgroundColor: colors.surface,
       borderRadius: radius.lg,
@@ -237,11 +265,11 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     inventoryName: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary },
     inventorySub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted, marginTop: 2 },
     expiryPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill },
-    expiryPillUrgent: { backgroundColor: '#FEE2E2' },
-    expiryPillWarning: { backgroundColor: '#FEF3C7' },
-    expiryPillSafe: { backgroundColor: '#E0E7FF' },
+    expiryPillUrgent: { backgroundColor: colors.dangerSoft },
+    expiryPillWarning: { backgroundColor: colors.turmericSoft },
+    expiryPillSafe: { backgroundColor: colors.surfaceElevated },
     expiryPillText: { fontFamily: fonts.sansBold, fontSize: 10 },
-    expiryPillTextUrgent: { color: '#991B1B' },
-    expiryPillTextWarning: { color: '#92400E' },
-    expiryPillTextSafe: { color: '#3730A3' },
+    expiryPillTextUrgent: { color: colors.danger },
+    expiryPillTextWarning: { color: colors.turmeric },
+    expiryPillTextSafe: { color: colors.textSecondary },
   });

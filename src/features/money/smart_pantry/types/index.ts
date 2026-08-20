@@ -33,6 +33,7 @@ export interface ZeroWasteRecipe {
 
 export interface AllergenDefinition {
   tag: AllergenTag;
+  labelKey?: string;
   label: string;
   icon: string;
   color: string;

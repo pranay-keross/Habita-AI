@@ -121,7 +121,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
       {/* Header */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <ArrowLeft size={18} color="#1E293B" />
+          <ArrowLeft size={18} color={styles.headerTitle.color} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('expenses.groups_header')}</Text>
         <Pressable
@@ -132,7 +132,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Split & Track Expenses Dark Teal Hero Banner */}
+        {/* Split & Track Expenses Hero Banner */}
         <View style={styles.heroBanner}>
           <Text style={styles.heroTitle}>{t('expenses.hero_title')}</Text>
           <Text style={styles.heroSubtitle}>
@@ -149,14 +149,14 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.heroStatPill}>
-              <Text style={[styles.heroStatVal, { color: '#34D399' }]}>
+              <Text style={[styles.heroStatVal, styles.getBackStatVal]}>
                 ₹{(totals.youAreOwed || 33900).toLocaleString('en-IN')}
               </Text>
               <Text style={styles.heroStatLbl}>{t('expenses.you_get_back')}</Text>
             </View>
 
             <View style={styles.heroStatPill}>
-              <Text style={[styles.heroStatVal, { color: '#FFFFFF' }]}>
+              <Text style={styles.heroStatVal}>
                 ₹{(totals.youOwe || 0).toLocaleString('en-IN')}
               </Text>
               <Text style={styles.heroStatLbl}>{t('expenses.you_owe')}</Text>
@@ -179,8 +179,8 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               style={({ pressed }) => [styles.moduleBox, pressed && styles.moduleBoxPressed]}
               onPress={() => navigation.navigate('DocHub')}>
               <View style={styles.moduleBoxHeader}>
-                <View style={[styles.moduleBoxBadge, { backgroundColor: '#E3F2F5' }]}>
-                  <FileText size={20} color="#004F63" />
+                <View style={styles.moduleBoxBadge}>
+                  <FileText size={20} color={styles.operatingHubSubTitle.color} />
                 </View>
                 <View style={styles.moduleStatusTag}>
                   <Text style={styles.moduleStatusTagText}>{t('expenses.vaulted_count')}</Text>
@@ -195,8 +195,8 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               style={({ pressed }) => [styles.moduleBox, pressed && styles.moduleBoxPressed]}
               onPress={() => navigation.navigate('Pantry')}>
               <View style={styles.moduleBoxHeader}>
-                <View style={[styles.moduleBoxBadge, { backgroundColor: '#E3F2F5' }]}>
-                  <ShoppingCart size={20} color="#004F63" />
+                <View style={styles.moduleBoxBadge}>
+                  <ShoppingCart size={20} color={styles.operatingHubSubTitle.color} />
                 </View>
                 <View style={styles.moduleStatusTag}>
                   <Text style={styles.moduleStatusTagText}>{t('expenses.radar_active')}</Text>
@@ -211,8 +211,8 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               style={({ pressed }) => [styles.moduleBox, pressed && styles.moduleBoxPressed]}
               onPress={() => navigation.navigate('Voice')}>
               <View style={styles.moduleBoxHeader}>
-                <View style={[styles.moduleBoxBadge, { backgroundColor: '#E3F2F5' }]}>
-                  <Mic size={20} color="#004F63" />
+                <View style={styles.moduleBoxBadge}>
+                  <Mic size={20} color={styles.operatingHubSubTitle.color} />
                 </View>
                 <View style={styles.moduleStatusTag}>
                   <Text style={styles.moduleStatusTagText}>{t('expenses.ai_copilot')}</Text>
@@ -227,8 +227,8 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               style={({ pressed }) => [styles.moduleBox, pressed && styles.moduleBoxPressed]}
               onPress={() => navigation.navigate('Wardrobe')}>
               <View style={styles.moduleBoxHeader}>
-                <View style={[styles.moduleBoxBadge, { backgroundColor: '#E3F2F5' }]}>
-                  <Shirt size={20} color="#004F63" />
+                <View style={styles.moduleBoxBadge}>
+                  <Shirt size={20} color={styles.operatingHubSubTitle.color} />
                 </View>
                 <View style={styles.moduleStatusTag}>
                   <Text style={styles.moduleStatusTagText}>{t('expenses.weather_fit')}</Text>
@@ -244,7 +244,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
         <Text style={styles.sectionTitle}>{t('expenses.your_groups', { count: groups.length })}</Text>
 
         {loading ? (
-          <ActivityIndicator color="#004F63" style={{ marginTop: 24 }} />
+          <ActivityIndicator color={styles.operatingHubSubTitle.color} style={{ marginTop: 24 }} />
         ) : (
           groups.map((group) => {
             const { balances } = calculateGroupBalances(group, expenses, settlements);
@@ -340,7 +340,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               placeholderTextColor={styles.placeholder.color}
             />
             <Pressable style={styles.addMemberBtn} onPress={handleAddMember}>
-              <Plus size={18} color="#FFFFFF" />
+              <Plus size={18} color={styles.addMemberBtnIcon.color} />
             </Pressable>
           </View>
 
@@ -374,17 +374,19 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 38,
       height: 38,
       borderRadius: 19,
-      backgroundColor: '#E4EFF2',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
-      color: '#1E293B',
+      color: colors.textPrimary,
     },
     createGroupPill: {
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       paddingHorizontal: 14,
       paddingVertical: 8,
       borderRadius: 20,
@@ -394,7 +396,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     createGroupPillText: {
       fontFamily: fonts.sansBold,
       fontSize: 13,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     content: {
       paddingHorizontal: spacing.lg,
@@ -402,7 +404,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingTop: spacing.xs,
     },
     heroBanner: {
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primaryDark,
       borderRadius: 24,
       padding: 20,
       marginBottom: 16,
@@ -410,13 +412,13 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     heroTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 22,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       marginBottom: 6,
     },
     heroSubtitle: {
       fontFamily: fonts.sans,
       fontSize: 13,
-      color: 'rgba(255, 255, 255, 0.85)',
+      color: colors.textOnPrimaryMuted,
       lineHeight: 18,
       marginBottom: 18,
     },
@@ -436,20 +438,26 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     heroStatVal: {
       fontFamily: fonts.sansBold,
       fontSize: 15,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       marginBottom: 2,
+    },
+    getBackStatVal: {
+      color: colors.forest,
+    },
+    addMemberBtnIcon: {
+      color: colors.textOnPrimary,
     },
     heroStatLbl: {
       fontFamily: fonts.sans,
       fontSize: 11,
-      color: 'rgba(255, 255, 255, 0.78)',
+      color: colors.textOnPrimaryMuted,
     },
     operatingHubContainer: {
-      backgroundColor: '#EEF6F8',
+      backgroundColor: colors.surface,
       borderRadius: 22,
       padding: 14,
       borderWidth: 1,
-      borderColor: '#D5E6EA',
+      borderColor: colors.border,
       marginBottom: 20,
     },
     operatingHubHeader: {
@@ -461,16 +469,16 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     operatingHubTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 16,
-      color: '#1E293B',
+      color: colors.textPrimary,
     },
     operatingHubSubTitle: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#004F63',
+      color: colors.primary,
     },
     operatingHubDivider: {
       height: 1,
-      backgroundColor: '#D4E5E9',
+      backgroundColor: colors.border,
       marginVertical: 12,
     },
     modulesGrid: {
@@ -480,13 +488,13 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     moduleBox: {
       width: '48.5%',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: 18,
       padding: 12,
       minHeight: 112,
       justifyContent: 'space-between',
       borderWidth: 1,
-      borderColor: '#E2E8F0',
+      borderColor: colors.border,
       shadowColor: '#000',
       shadowOffset: { width: 0, height: 1 },
       shadowOpacity: 0.03,
@@ -501,6 +509,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 36,
       height: 36,
       borderRadius: 18,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -511,28 +522,28 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: 10,
     },
     moduleStatusTag: {
-      backgroundColor: '#E6F3F6',
+      backgroundColor: colors.surface,
       paddingHorizontal: 7,
       paddingVertical: 3,
       borderRadius: 8,
       borderWidth: 1,
-      borderColor: '#CBE4EA',
+      borderColor: colors.border,
     },
     moduleStatusTagText: {
       fontFamily: fonts.sansBold,
       fontSize: 10,
-      color: '#004F63',
+      color: colors.primary,
     },
     moduleBoxTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 13,
-      color: '#1E293B',
+      color: colors.textPrimary,
       marginBottom: 2,
     },
     moduleBoxSub: {
       fontFamily: fonts.sans,
       fontSize: 11,
-      color: '#64748B',
+      color: colors.textSecondary,
       lineHeight: 14,
     },
     sectionTitle: {
@@ -601,12 +612,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     groupNetOwed: {
       fontFamily: fonts.sansBold,
       fontSize: 12.5,
-      color: '#16A34A',
+      color: colors.forest,
     },
     groupNetOwe: {
       fontFamily: fonts.sansBold,
       fontSize: 12.5,
-      color: '#EA580C',
+      color: colors.danger,
     },
     groupNetSettled: {
       fontFamily: fonts.sansMedium,
@@ -650,8 +661,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       justifyContent: 'center',
     },
     emojiChipActive: {
-      borderColor: '#004F63',
-      backgroundColor: '#E3F2F5',
+      borderColor: colors.primary,
+      backgroundColor: colors.surface,
     },
     memberChipsRow: {
       flexDirection: 'row',
@@ -660,7 +671,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: 8,
     },
     memberChip: {
-      backgroundColor: '#E3F2F5',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: 12,
@@ -668,7 +681,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     memberChipText: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#004F63',
+      color: colors.primary,
     },
     addMemberInputRow: {
       flexDirection: 'row',
@@ -679,7 +692,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 40,
       height: 40,
       borderRadius: 12,
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
     },

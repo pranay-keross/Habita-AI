@@ -30,12 +30,12 @@ const CATEGORY_OPTIONS: { key: ClothingCategory; labelKey: string; emoji: string
   { key: 'accessories', labelKey: 'style_pantry.cat_accessories', emoji: '⌚' },
 ];
 
-const SEASON_OPTIONS: { key: ClothingSeason; label: string }[] = [
-  { key: 'all-year', label: 'All Year' },
-  { key: 'summer', label: 'Summer' },
-  { key: 'winter', label: 'Winter' },
-  { key: 'monsoon', label: 'Monsoon' },
-  { key: 'spring', label: 'Spring / Autumn' },
+const SEASON_OPTIONS: { key: ClothingSeason; labelKey: string }[] = [
+  { key: 'all-year', labelKey: 'style_pantry.season_all_year' },
+  { key: 'summer', labelKey: 'style_pantry.season_summer' },
+  { key: 'winter', labelKey: 'style_pantry.season_winter' },
+  { key: 'monsoon', labelKey: 'style_pantry.season_monsoon' },
+  { key: 'spring', labelKey: 'style_pantry.season_spring' },
 ];
 
 export default function AddEditClothingScreen({ navigation, route }: Props) {
@@ -78,7 +78,7 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
 
   const handlePickPhoto = () => {
     setPhotoSelected(true);
-    Alert.alert('Photo Captured', 'Clothing photo attached to item.');
+    Alert.alert(t('style_pantry.photo_captured'), t('style_pantry.photo_attached'));
   };
 
   const handleSave = async () => {
@@ -145,7 +145,7 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
         {/* Photo Upload Card */}
         <Pressable style={styles.photoUploadCard} onPress={handlePickPhoto}>
           <View style={styles.cameraCircle}>
-            <Camera size={24} color="#004F63" />
+            <Camera size={24} color={styles.primaryIcon.color} />
           </View>
           <Text style={styles.photoUploadTitle}>
             {photoSelected ? t('style_pantry.photo_selected') : t('style_pantry.take_photo')}
@@ -205,7 +205,7 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
         </View>
 
         {/* Specialized Details Card */}
-        <Text style={styles.sectionTitle}>Season, Material & Tags</Text>
+        <Text style={styles.sectionTitle}>{t('style_pantry.season_material_tags')}</Text>
         <View style={styles.card}>
           <Text style={styles.inputLabel}>{t('style_pantry.season_label')}</Text>
           <View style={styles.seasonWrap}>
@@ -222,7 +222,7 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
                     styles.seasonChipText,
                     season === s.key && styles.seasonChipTextActive,
                   ]}>
-                  {s.label}
+                  {t(s.labelKey)}
                 </Text>
               </Pressable>
             ))}
@@ -287,6 +287,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    primaryIcon: {
+      color: colors.primary,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -297,13 +300,13 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingBottom: spacing.xxl,
     },
     photoUploadCard: {
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: radius.lg,
       padding: spacing.lg,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
-      borderColor: '#BAE6FD',
+      borderColor: colors.border,
       borderStyle: 'dashed',
       marginBottom: spacing.md,
     },
@@ -311,7 +314,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 52,
       height: 52,
       borderRadius: 26,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.xs,
@@ -319,7 +324,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     photoUploadTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 14,
-      color: '#004F63',
+      color: colors.primary,
     },
     card: {
       backgroundColor: colors.surface,
@@ -371,8 +376,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: 4,
     },
     catOptionChipActive: {
-      backgroundColor: '#004F63',
-      borderColor: '#004F63',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     catOptionEmoji: {
       fontSize: 14,
@@ -384,7 +389,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textSecondary,
     },
     catOptionTextActive: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     sectionTitle: {
       fontFamily: fonts.sansBold,
@@ -409,8 +414,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: 4,
     },
     seasonChipActive: {
-      backgroundColor: '#004F63',
-      borderColor: '#004F63',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     seasonChipText: {
       fontFamily: fonts.sansMedium,
@@ -418,7 +423,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textSecondary,
     },
     seasonChipTextActive: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     saveBtn: {
       marginTop: spacing.md,

@@ -97,15 +97,15 @@ export default function DocHubScreen({ navigation }: Props) {
   const getCategoryIcon = (category: DocCategory) => {
     switch (category) {
       case 'passport':
-        return <FileText size={18} color="#004F63" />;
+        return <FileText size={18} color={styles.primaryIcon.color} />;
       case 'visa':
-        return <Globe size={18} color="#9333EA" />;
+        return <Globe size={18} color={styles.primaryIcon.color} />;
       case 'license':
-        return <CreditCard size={18} color="#D97706" />;
+        return <CreditCard size={18} color={styles.primaryIcon.color} />;
       case 'insurance':
-        return <ShieldCheck size={18} color="#16A34A" />;
+        return <ShieldCheck size={18} color={styles.primaryIcon.color} />;
       default:
-        return <FileText size={18} color="#475569" />;
+        return <FileText size={18} color={styles.placeholder.color} />;
     }
   };
 
@@ -120,7 +120,7 @@ export default function DocHubScreen({ navigation }: Props) {
         <Pressable
           onPress={() => navigation.navigate('AddDoc')}
           style={styles.addNavBtn}>
-          <Plus size={20} color="#FFFFFF" />
+          <Plus size={20} color={styles.addIcon.color} />
         </Pressable>
       </View>
 
@@ -144,7 +144,7 @@ export default function DocHubScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('ExpirationAlerts')}>
             <View style={styles.alertBannerLeft}>
               <View style={styles.alertIconCircle}>
-                <AlertTriangle size={20} color="#EA580C" />
+                <AlertTriangle size={20} color={styles.alertTitle.color} />
               </View>
               <View style={{ flex: 1 }}>
                 <Text style={styles.alertTitle}>{t('doc_hub.exp_warnings')}</Text>
@@ -155,7 +155,7 @@ export default function DocHubScreen({ navigation }: Props) {
                 </Text>
               </View>
             </View>
-            <ChevronRight size={18} color="#EA580C" />
+            <ChevronRight size={18} color={styles.alertTitle.color} />
           </Pressable>
         )}
 
@@ -192,7 +192,7 @@ export default function DocHubScreen({ navigation }: Props) {
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#004F63" style={{ marginTop: 24 }} />
+          <ActivityIndicator color={styles.primaryIcon.color} style={{ marginTop: 24 }} />
         ) : filteredDocs.length === 0 ? (
           <View style={styles.emptyStateCard}>
             <FileText size={36} color={styles.placeholder.color} />
@@ -287,6 +287,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    primaryIcon: {
+      color: colors.primary,
+    },
+    addIcon: {
+      color: colors.textOnPrimary,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -296,7 +302,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadow.soft,
@@ -331,9 +337,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: '#FFEDD5',
+      backgroundColor: colors.surfaceElevated,
       borderWidth: 1,
-      borderColor: '#FED7AA',
+      borderColor: colors.border,
       borderRadius: 16,
       padding: 14,
       marginBottom: spacing.md,
@@ -348,19 +354,21 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
     alertTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 14,
-      color: '#C2410C',
+      color: colors.primary,
     },
     alertSub: {
       fontFamily: fonts.sans,
       fontSize: 12,
-      color: '#EA580C',
+      color: colors.textSecondary,
       marginTop: 2,
     },
     categoriesContainer: {
@@ -379,8 +387,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingVertical: 8,
     },
     categoryChipActive: {
-      backgroundColor: '#004F63',
-      borderColor: '#004F63',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     chipEmoji: {
       fontSize: 14,
@@ -391,7 +399,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textPrimary,
     },
     chipTextActive: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       fontFamily: fonts.sansBold,
     },
     listHeaderRow: {
@@ -421,7 +429,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#E3F2F5',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -443,14 +453,16 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingHorizontal: 10,
       paddingVertical: 4,
       borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
-    badgeExpired: { backgroundColor: '#FEE2E2' },
-    badgeExpiring: { backgroundColor: '#FFEDD5' },
-    badgeValid: { backgroundColor: '#DCFCE7' },
+    badgeExpired: { backgroundColor: colors.surfaceElevated },
+    badgeExpiring: { backgroundColor: colors.surfaceElevated },
+    badgeValid: { backgroundColor: colors.surfaceElevated },
     statusBadgeText: { fontFamily: fonts.sansBold, fontSize: 11 },
-    textExpired: { color: '#EF4444' },
-    textExpiring: { color: '#EA580C' },
-    textValid: { color: '#16A34A' },
+    textExpired: { color: colors.danger },
+    textExpiring: { color: colors.primary },
+    textValid: { color: colors.forest },
     docCardFooter: {
       flexDirection: 'row',
       justifyContent: 'space-between',

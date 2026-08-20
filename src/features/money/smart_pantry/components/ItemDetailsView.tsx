@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { CategoryType, PantryItem } from '../types';
+import { CategoryType, PantryItem, StorageLocation } from '../types';
 import { ALLERGEN_DEFINITIONS } from '../data/mockPantryData';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
-import { PANTRY_COLORS } from '../constants/colors';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
@@ -34,6 +33,19 @@ export const ItemDetailsView: React.FC<Props> = ({
 }) => {
   const styles = useThemedStyles(makeStyles);
 
+  const getLocName = (loc: StorageLocation) => {
+    switch (loc) {
+      case 'Fridge':
+        return t('smart_pantry.loc_fridge');
+      case 'Freezer':
+        return t('smart_pantry.loc_freezer');
+      case 'Pantry Shelf':
+        return t('smart_pantry.loc_pantry_shelf');
+      default:
+        return loc;
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionHeading}>{t('smart_pantry.details_title')}</Text>
@@ -62,7 +74,7 @@ export const ItemDetailsView: React.FC<Props> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.detailsTitle}>{selectedItem.name}</Text>
               <Text style={styles.detailsSub}>
-                {selectedItem.category.toUpperCase()} · Storage: {selectedItem.storageLocation}
+                {selectedItem.category.toUpperCase()} · {t('smart_pantry.storage_location_prefix', { location: getLocName(selectedItem.storageLocation) })}
               </Text>
             </View>
           </View>
@@ -71,7 +83,10 @@ export const ItemDetailsView: React.FC<Props> = ({
           <View style={styles.detailsExpiryBanner}>
             <Text style={styles.detailsExpiryTitle}>{t('smart_pantry.expiry_countdown')}</Text>
             <Text style={styles.detailsExpiryVal}>
-              Expires on {selectedItem.expiryDate} ({getDaysUntilExpiry(selectedItem.expiryDate)} days remaining)
+              {t('smart_pantry.expires_on_date', {
+                date: selectedItem.expiryDate,
+                days: getDaysUntilExpiry(selectedItem.expiryDate),
+              })}
             </Text>
           </View>
 
@@ -92,13 +107,15 @@ export const ItemDetailsView: React.FC<Props> = ({
           {/* Safety Badges */}
           <Text style={[styles.formLabel, { marginTop: 12 }]}>{t('smart_pantry.safety_badges')}</Text>
           <View style={styles.badgeRow}>
-            {selectedItem.allergens.map((tag) => (
-              <View key={tag} style={styles.microBadge}>
-                <Text style={styles.microBadgeText}>
-                  ✓ {ALLERGEN_DEFINITIONS.find((a) => a.tag === tag)?.label || tag}
-                </Text>
-              </View>
-            ))}
+            {selectedItem.allergens.map((tag) => {
+              const def = ALLERGEN_DEFINITIONS.find((a) => a.tag === tag);
+              const label = def ? (def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label) : tag;
+              return (
+                <View key={tag} style={styles.microBadge}>
+                  <Text style={styles.microBadgeText}>✓ {label}</Text>
+                </View>
+              );
+            })}
           </View>
 
           {/* Actions */}
@@ -124,9 +141,9 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     sectionHeading: { fontFamily: fonts.serif, fontSize: 17, color: colors.textPrimary, marginBottom: 8 },
     formLabel: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
     catChip: { backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
-    catChipActive: { backgroundColor: '#004F63', borderColor: '#004F63' },
+    catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     catChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
-    catChipTextActive: { fontFamily: fonts.sansBold, color: '#FFFFFF' },
+    catChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     itemDetailsCard: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
     detailsHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
     detailsEmojiCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
@@ -136,16 +153,16 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     detailsExpiryTitle: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted },
     detailsExpiryVal: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textPrimary, marginTop: 2 },
     qtyStepperRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 20, marginVertical: 8 },
-    qtyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: '#004F63', alignItems: 'center', justifyContent: 'center' },
-    qtyBtnText: { fontSize: 18, fontFamily: fonts.sansBold, color: '#FFFFFF' },
+    qtyBtn: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.primary, alignItems: 'center', justifyContent: 'center' },
+    qtyBtnText: { fontSize: 18, fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     qtyValueText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.textPrimary },
     badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
-    microBadge: { backgroundColor: '#D1FAE5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill },
-    microBadgeText: { fontFamily: fonts.sansBold, fontSize: 9, color: '#065F46' },
+    microBadge: { backgroundColor: colors.surfaceElevated, paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill },
+    microBadgeText: { fontFamily: fonts.sansBold, fontSize: 9, color: colors.textSecondary },
     detailsActionRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
-    deleteBtn: { flex: 1, backgroundColor: '#FEE2E2', paddingVertical: 10, borderRadius: radius.md, alignItems: 'center' },
-    deleteBtnText: { fontFamily: fonts.sansBold, fontSize: 13, color: '#991B1B' },
-    consumeBtn: { flex: 1, backgroundColor: '#004F63', paddingVertical: 10, borderRadius: radius.md, alignItems: 'center' },
-    consumeBtnText: { fontFamily: fonts.sansBold, fontSize: 13, color: '#FFFFFF' },
+    deleteBtn: { flex: 1, backgroundColor: colors.dangerSoft, paddingVertical: 10, borderRadius: radius.md, alignItems: 'center' },
+    deleteBtnText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.danger },
+    consumeBtn: { flex: 1, backgroundColor: colors.primary, paddingVertical: 10, borderRadius: radius.md, alignItems: 'center' },
+    consumeBtnText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textOnPrimary },
     noItemText: { fontFamily: fonts.sans, fontSize: 13, color: colors.textMuted, fontStyle: 'italic' },
   });
