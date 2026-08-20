@@ -22,12 +22,14 @@ import CreditCard from 'lucide-react-native/icons/credit-card';
 import Users from 'lucide-react-native/icons/users';
 import TrendingUp from 'lucide-react-native/icons/trending-up';
 import FolderOpen from 'lucide-react-native/icons/folder-open';
-import Package from 'lucide-react-native/icons/package';
-import Mic from 'lucide-react-native/icons/mic';
+// import Package from 'lucide-react-native/icons/package';
+// import Mic from 'lucide-react-native/icons/mic';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import HeartPulse from 'lucide-react-native/icons/heart-pulse';
 import Shirt from 'lucide-react-native/icons/shirt';
 import CalendarDays from 'lucide-react-native/icons/calendar-days';
+import CalendarHeart from 'lucide-react-native/icons/calendar-heart';
+import Smile from 'lucide-react-native/icons/smile';
 import House from 'lucide-react-native/icons/house';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import type { RootStackParamList } from './_layout';
@@ -62,8 +64,22 @@ interface ProfileDetailsResponse {
 
 // Stable IDs a translation reword can't break — `handleTilePress`/quick actions
 // route on these, never on the (locale-dependent) label text. See `M1-T7`.
-type TileId = 'scan' | 'pay' | 'family' | 'money' | 'docs' | 'safety' | 'wellness' | 'style' | 'events' | 'medicine' | 'household';
-type ActionId = 'scan' | 'pay' | 'meds' | 'expense' | 'fuel' | 'premium';
+// type TileId =
+//   | 'scan'
+//   | 'pay'
+//   | 'family'
+//   | 'money'
+//   | 'docs'
+//   | 'safety'
+//   | 'wellness'
+//   | 'cycle'
+//   | 'style'
+//   | 'events'
+//   | 'medicine';
+type ActionId = 'scan' | 'pay' | 'meds' | 'mood' | 'cycle' | 'expense' | 'fuel' | 'premium';
+type TileId = 'scan' | 'pay' | 'family' | 'money' | 'docs' | 'safety' | 'wellness' | 'style' | 'events'|   'cycle'
+ | 'medicine' | 'household';
+// type ActionId = 'scan' | 'pay' | 'meds' | 'expense' | 'fuel' | 'premium';
 
 // `Date.getHours()` reads the device's own local time — already "current location time"
 // for wherever the phone actually is, no geolocation/timezone lookup needed. Boundaries
@@ -93,6 +109,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
     { id: 'scan', label: t('dashboard.action_scan'), Icon: ScanLine },
     { id: 'pay', label: t('dashboard.action_pay'), Icon: IndianRupee },
     { id: 'meds', label: t('dashboard.action_meds'), Icon: Pill },
+    { id: 'mood', label: t('dashboard.action_mood'), Icon: Smile },
+    { id: 'cycle', label: t('dashboard.action_cycle'), Icon: CalendarHeart },
     { id: 'expense', label: t('dashboard.action_expense'), Icon: Receipt },
     { id: 'fuel', label: t('dashboard.action_fuel'), Icon: Fuel },
     { id: 'premium', label: t('dashboard.action_premium'), Icon: Crown },
@@ -107,6 +125,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
     { id: 'docs', title: t('dashboard.tile_docs'), Icon: FolderOpen },
     { id: 'safety', title: t('dashboard.tile_safety'), Icon: ShieldCheck },
     { id: 'wellness', title: t('dashboard.tile_wellness'), Icon: HeartPulse },
+    { id: 'cycle', title: t('dashboard.tile_cycle'), Icon: CalendarHeart },
     { id: 'style', title: t('dashboard.tile_style'), Icon: Shirt },
     { id: 'events', title: t('dashboard.tile_events'), Icon: CalendarDays },
     { id: 'household', title: t('dashboard.tile_household_operations'), Icon: House },
@@ -209,6 +228,10 @@ export default function DashboardScreen({ navigation, route }: Props) {
       navigation.navigate('Family');
     } else if (id === 'medicine') {
       navigation.navigate('Medicine');
+    } else if (id === 'wellness') {
+      navigation.navigate('Wellness');
+    } else if (id === 'cycle') {
+      navigation.navigate('Cycle');
     } else if (id === 'household') {
       navigation.navigate('HouseholdOperations');
     } else if (id === 'money') {
@@ -227,6 +250,10 @@ export default function DashboardScreen({ navigation, route }: Props) {
   const handleActionPress = (id: ActionId) => {
     if (id === 'meds') {
       navigation.navigate('Medicine');
+    } else if (id === 'mood') {
+      navigation.navigate('Wellness');
+    } else if (id === 'cycle') {
+      navigation.navigate('Cycle');
     } else if (id === 'expense') {
       navigation.navigate('ExpenseGroups');
     } else if (id === 'scan' || id === 'pay') {

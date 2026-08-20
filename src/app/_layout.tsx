@@ -10,6 +10,8 @@ import ProfileScreen from './onboarding/profile';
 import DashboardScreen from './dashboard';
 import FamilyScreen from '../features/family/FamilyScreen';
 import MedicineScreen from '../features/medicine/MedicineScreen';
+import WellnessScreen from '../features/wellness/WellnessScreen';
+import CycleScreen from '../features/cycle/CycleScreen';
 import HouseholdOperationsScreen from '../features/household/HouseholdOperationsScreen';
 import HouseholdAreaScreen from '../features/household/HouseholdAreaScreen';
 import StaffScreen from '../features/staff/StaffScreen';
@@ -57,6 +59,8 @@ export type RootStackParamList = {
   Dashboard: { profileUpdated?: boolean } | undefined;
   Family: undefined;
   Medicine: undefined;
+  Wellness: undefined;
+  Cycle: undefined;
   HouseholdOperations: undefined;
   HouseholdArea: { area: 'caregiver' | 'resources' | 'events' | 'assets' };
   Staff: undefined;
@@ -126,6 +130,8 @@ const AppLayout = () => {
           <Stack.Screen name="Dashboard" component={DashboardScreen} />
           <Stack.Screen name="Family" component={FamilyScreen} />
           <Stack.Screen name="Medicine" component={MedicineScreen} />
+          <Stack.Screen name="Wellness" component={WellnessScreen} />
+          <Stack.Screen name="Cycle" component={CycleScreen} />
           <Stack.Screen
             name="HouseholdOperations"
             component={HouseholdOperationsScreen}

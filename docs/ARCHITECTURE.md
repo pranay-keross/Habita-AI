@@ -164,12 +164,15 @@ Since `M1-T2` (2026-07-30) this is the **only** path to storage — `src/utils/s
 | `habita.session` | `hooks/useAuth.ts` | `{accessToken, refreshToken, expiresIn, userId, issuedAt, phone}` JSON | added `M2-T1`/`M2-T4` (`docs/DECISIONS.md` D-012); presence of this key is what `signedIn` means — see §6 |
 | `habita.medicines` | `features/medicine/medicineStore.ts` | `Medicine[]` JSON | added `M4-T2`; empty until the user adds a first medicine |
 | `habita.medicine_intake_log` | `features/medicine/medicineStore.ts` | `IntakeLogEntry[]` JSON | added `M4-T3`; append-only, one entry per marked-taken dose; read by `calculateAdherence()` |
+| `habita.mood_entries` | `features/wellness/wellnessStore.ts` | `MoodEntry[]` JSON | added `M4-T6`; one entry per check-in, several per day allowed; read by `averageMood`/`checkInStreak`/`moodTrend`/`topFactors` and by the CBT coach's input |
+| `habita.cycle_log` | `features/cycle/cycleStore.ts` | `PeriodCycle[]` JSON | added `M4-T8`; one entry per logged period, `endDate` null while ongoing; read by `predictNextCycle()` |
+| `habita.cycle_settings` | `features/cycle/cycleStore.ts` | `CycleSettings` JSON | added `M4-T8`; life stage plus the user's own cycle/period length expectations, used until enough logged cycles exist to beat them. Read through a `{...DEFAULT_CYCLE_SETTINGS, ...stored}` merge, not raw — `getItem` only falls back when the key is *absent*, so an object written by an older build would otherwise arrive missing fields added since |
 | `habita.caregivers` | `features/staff/staffStore.ts` | `Caregiver[]` JSON | added `M5-T6`; local caregiver and domestic-staff profiles |
 | `habita.caregiver_transactions` | `features/staff/staffStore.ts` | `CaregiverTransaction[]` JSON | extra-payment records, added after M5-T6 |
 | `habita.resource_log` | `features/resources/resourceStore.ts` | `ResourceLog[]` JSON | added `M5-T9`; local delivery history |
 | `habita.quick_tap_items` | `features/resources/resourceStore.ts` | `QuickTapItem[]` JSON | added `M5-T9`; user-managed dashboard delivery counters |
 
-`clearAll()` (Delete Account) wipes **all** of the above, including language, palette, and the session — so Delete Account also signs the device out. `handleSignOut` in `profile.tsx` calls `useAuth().logout()`, which since `M2-T6` clears `habita.session` and, since `docs/DECISIONS.md` D-028 (2026-08-11), also clears the account-scoped keys below via `clearAccountData()` — `habita.user_profile`, `habita.medicines`, `habita.medicine_intake_log` — so a second phone number signing in on the same device no longer inherits the first account's cached name/photo/medicines. Device preferences (`habita.lang`, `habita.theme.palette`) are deliberately left alone, and `habita.user_phone` is left alone too (the very next onboarding screen always overwrites it). The same clearing also runs pre-emptively inside `verify()` if the cached profile's phone doesn't match the number just verified, as a safety net for sessions that went stale without an explicit sign-out.
+`clearAll()` (Delete Account) wipes **all** of the above, including language, palette, and the session — so Delete Account also signs the device out. `handleSignOut` in `profile.tsx` calls `useAuth().logout()`, which since `M2-T6` clears `habita.session` and, since `docs/DECISIONS.md` D-028 (2026-08-11), also clears the account-scoped keys below via `clearAccountData()` — `habita.user_profile`, `habita.medicines`, `habita.medicine_intake_log`, and since `M4-T6`/`M4-T8` also `habita.mood_entries`, `habita.cycle_log`, `habita.cycle_settings` — so a second phone number signing in on the same device no longer inherits the first account's cached name/photo/medicines, mood history or cycle history. The last three matter most: they are the keys where leaking data across accounts would expose someone's mood notes and period history to whoever signs in next. Device preferences (`habita.lang`, `habita.theme.palette`) are deliberately left alone, and `habita.user_phone` is left alone too (the very next onboarding screen always overwrites it). The same clearing also runs pre-emptively inside `verify()` if the cached profile's phone doesn't match the number just verified, as a safety net for sessions that went stale without an explicit sign-out.
 
 **Family has no local storage key at all** (`docs/DECISIONS.md` D-023, 2026-08-10) — same pattern as `UserProfile`'s `GET`/`PUT` split, not the local-first pattern the rest of this table follows. `FamilyScreen.tsx` always reads live from `GET /families`/`GET /families/invites`; nothing is cached to `AsyncStorage`, so there is no `habita.family_members` key to list here or to wipe on Delete Account. The old key is gone, not renamed — a device with pre-D-023 local data simply stops reading it, the same fallback-safe shape D-007 already established for other removed/renamed keys.
 
@@ -237,6 +240,43 @@ interface IntakeLogEntry {
   medicineId: string;
   slot: 'morning' | 'afternoon' | 'evening' | 'night';
   takenAt: number;        // epoch ms
+}
+
+// src/features/wellness/types.ts  (M4-T6 / M4-T7)
+interface MoodEntry {
+  id: string;
+  level: 1 | 2 | 3 | 4 | 5;                 // ascending: 1 is the hardest day
+  factors: ('work' | 'family' | 'sleep' | 'health' | 'money' | 'self')[];
+  note: string;
+  loggedAt: number;       // epoch ms
+}
+
+// The AI hook-point for M8-T4. `LocalCbtCoach` (cbtCoach.ts) is the shipping
+// implementation and the permanent offline fallback; replies are i18n *keys*, not
+// text, so the coaching is multi-language by construction. See D-030.
+interface CbtCoach {
+  readonly source: 'local' | 'remote';
+  respond(input: CbtCoachInput): Promise<CbtReply>;
+}
+
+// src/features/cycle/types.ts  (M4-T8 / M4-T9)
+// Dates are `YYYY-MM-DD` local-calendar strings, never epoch ms — cycleStore.ts
+// normalises to local midnight before any arithmetic, which is what keeps a cycle
+// from drifting by a day across a DST boundary.
+interface PeriodCycle {
+  id: string;
+  startDate: string;      // YYYY-MM-DD
+  endDate: string | null; // null while the period is ongoing
+  flow: 'light' | 'medium' | 'heavy';
+  symptoms: CycleSymptom[];
+  note: string;
+}
+
+interface CycleSettings {
+  lifeStage: 'cycling' | 'fertility' | 'postpartum' | 'perimenopause' | 'menopause';
+  averageCycleLength: number;   // default 28
+  averagePeriodLength: number;  // default 5
+  remindersEnabled: boolean;
 }
 ```
 
@@ -347,7 +387,11 @@ interface IntakeLogEntry {
 
 Screens still define most of their own `StyleSheet` blocks locally. Only `Card`, `SectionHeader` and `BottomSheet` are reused across screens. Import them from `src/components/` directly — the `src/shared/components/index.ts` re-export barrel was deleted in `M1-T1` (2026-07-30).
 
-**Icons** (`M1-T13`, 2026-08-05, `docs/DECISIONS.md` D-010) — `dashboard.tsx` renders `lucide-react-native` stroke icons instead of emoji, imported per-icon (`lucide-react-native/icons/pill`, not the package barrel) so Metro doesn't bundle the full icon set. Icon color is read from the same style factory as everything else (`styles.moduleIconColor.color`, `styles.actionIconColor.color`), so it follows the palette. No other screen has been migrated yet — `FamilyScreen.tsx` and the rest still render whatever glyphs they used before.
+**Icons** (`M1-T13`, 2026-08-05, `docs/DECISIONS.md` D-010) — `dashboard.tsx` renders `lucide-react-native` stroke icons instead of emoji, imported per-icon (`lucide-react-native/icons/pill`, not the package barrel) so Metro doesn't bundle the full icon set. Icon color is read from the same style factory as everything else (`styles.moduleIconColor.color`, `styles.actionIconColor.color`), so it follows the palette. `WellnessScreen.tsx` and `CycleScreen.tsx` (`M4-T6`/`M4-T8`) follow the same convention, exposing icon colors as `styles.iconAccent.color` / `styles.iconOnPrimary.color` / `styles.iconMuted.color`. `FamilyScreen.tsx` and `MedicineScreen.tsx` still render emoji or plain text glyphs.
+
+**Responsive layout** (`M4-T6`/`M4-T8`, 2026-08-20, `docs/DECISIONS.md` D-030) — `src/hooks/useResponsive.ts` is the one place that turns window size into layout numbers. It reads `useWindowDimensions()` (built into React Native — no new dependency) and returns `scale(size)`, `font(size)`, `columns(minItemWidth)`, `columnWidth(n, gap, padding)`, `contentWidth`, `contentMaxWidth` and the `isCompact`/`isExpanded` size classes.
+
+The division of labour matters: **`useThemedStyles` owns colour, type and spacing tokens; `useResponsive` owns window-dependent numbers, applied as inline overrides on top of a themed style.** The style-factory signature stays `(tokens: ThemeTokens) => StyleSheet`, so §11's convention and `themedScreens.test.tsx`'s source-scan guard both still hold. Scaling is relative to a 390dp base, clamped so an ordinary phone gets exactly the values already tuned by hand; type is clamped much harder than boxes (0.94–1.1 vs 0.86–1.24), and the OS font-scale setting is deliberately not read — `Text` applies it on top, and applying it twice is what makes accessibility-sized text overflow. Only the two `M4` screens use it so far; earlier screens are unchanged and still fixed-width.
 
 ### Signature interaction: the dashboard scroll header
 
@@ -407,7 +451,11 @@ Resolved this pass, kept here as a record rather than silently deleted:
 
 `__tests__/themedScreens.test.tsx` (added in `M1-T3b`) does the same for the real files — `Card`, `Button`, `SectionHeader` and `otp.tsx` — and adds a source-scan guard: every file under `src/` is asserted not to contain a top-level `const styles = StyleSheet.create(`. That is the one form the type checker and eslint both accept and that silently breaks theming, so it is checked by reading the source rather than by rendering. `otp.tsx` is still the screen chosen to mount, though it's no longer effect-free: `M2-T2` added a self-rescheduling `setTimeout` countdown (the resend timer) that starts on mount. It's still a safe mount target because the test unmounts inside `act()` (line ~99), which runs the effect's cleanup (`clearTimeout`) before the suite moves on — no leaked timer, no new open-handle warning. `M2-T1`'s async storage read and network call still only run from the Verify button's `onPress`, which this test never triggers.
 
-Current run (2026-08-10): 3 suites, 34 tests, all passing — up from 29 because `themedScreens.test.tsx`'s source-scan guard (`it.each(sourceFiles(SRC)...)`, above) generates one test per `.tsx?` file under `src/`; `M3-T4`/`M4-T1` originally added five (`family/types.ts`, `family/familyStore.ts`, `medicine/types.ts`, `medicine/medicineStore.ts`, `medicine/MedicineScreen.tsx`), and D-023's Family backend integration swapped `family/familyStore.ts` for `family/api.ts` — net file count unchanged, so the total is still 34. Jest still reports `A worker process has failed to exit gracefully` — `@react-navigation/native`'s `useLinking` timer stays pending because the smoke test never unmounts (`M9-T8b`). The React `act()` warning previously recorded here **did not reproduce**, on this tree or on a stashed-clean one; treat it as timing-dependent rather than fixed (`M9-T8a`). `M2-T1` added a second candidate for this warning — `_layout.tsx`'s `useAuth()` boot check resolves its `getItem` promise asynchronously, same shape as the language-loading pattern already tolerated here — but it did not reproduce either on this run.
+`__tests__/healthModules.test.ts` (added `M4-T6`/`M4-T8`, 2026-08-20) is the pattern for **pure-logic** tests, as opposed to the render-and-assert pattern above: it imports only from `cycleStore.ts`, `wellnessStore.ts` and `cbtCoach.ts`, renders nothing, and mocks nothing — every function under test takes `now`/`today` as an argument rather than reading the clock, which is what makes date-sensitive behaviour (leap days, month boundaries, a late period, a streak that survives midnight) testable without fake timers. `M4-T8`'s acceptance criterion asked for exactly this.
+
+Current run (2026-08-20): 4 suites, 80 tests, all passing — up from 34 because `healthModules.test.ts` adds 38, and `themedScreens.test.tsx`'s per-file source-scan guard generates one more test for each of the 8 new files under `src/` (`hooks/useResponsive.ts`, `features/wellness/{types,wellnessStore,cbtCoach,WellnessScreen}`, `features/cycle/{types,cycleStore,CycleScreen}`). Both pre-existing warnings still appear and are still tracked as `M9-T8a`/`M9-T8b` — they come from `App.test.tsx`'s smoke test, not the new suite.
+
+Previous run (2026-08-10): 3 suites, 34 tests, all passing — up from 29 because `themedScreens.test.tsx`'s source-scan guard (`it.each(sourceFiles(SRC)...)`, above) generates one test per `.tsx?` file under `src/`; `M3-T4`/`M4-T1` originally added five (`family/types.ts`, `family/familyStore.ts`, `medicine/types.ts`, `medicine/medicineStore.ts`, `medicine/MedicineScreen.tsx`), and D-023's Family backend integration swapped `family/familyStore.ts` for `family/api.ts` — net file count unchanged, so the total is still 34. Jest still reports `A worker process has failed to exit gracefully` — `@react-navigation/native`'s `useLinking` timer stays pending because the smoke test never unmounts (`M9-T8b`). The React `act()` warning previously recorded here **did not reproduce**, on this tree or on a stashed-clean one; treat it as timing-dependent rather than fixed (`M9-T8a`). `M2-T1` added a second candidate for this warning — `_layout.tsx`'s `useAuth()` boot check resolves its `getItem` promise asynchronously, same shape as the language-loading pattern already tolerated here — but it did not reproduce either on this run.
 
 ---
 
@@ -420,4 +468,5 @@ Current run (2026-08-10): 3 suites, 34 tests, all passing — up from 29 because
 - **Reactivity to language:** subscribe via `subscribeToLanguageChanges` and key the root view on a `localeVersion` counter.
 - **Storage:** always through `src/utils/storage.ts`, always with a `habita.` key prefix, and document the key in §5 of this file.
 - **Safe area:** screens handle their own insets; the navigator has no header.
+- **Responsive layout:** window-dependent numbers come from `useResponsive()` (§8) and are applied as inline style overrides. Do not put them in the themed style factory, and do not read `Dimensions.get()` at module scope — that value is captured once and never updates on rotation or split-screen.
 - **Before finishing:** `npx tsc --noEmit` must pass.
