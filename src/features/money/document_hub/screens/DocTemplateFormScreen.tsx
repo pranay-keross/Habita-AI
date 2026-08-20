@@ -163,7 +163,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
         </View>
 
         {/* Expiration & Dates Fields */}
-        <Text style={styles.sectionTitle}>Dates & Validity</Text>
+        <Text style={styles.sectionTitle}>{t('doc_hub.dates_validity')}</Text>
         <View style={styles.card}>
           <View style={styles.dateRow}>
             <View style={{ flex: 1 }}>
@@ -191,7 +191,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
         </View>
 
         {/* Template Specific Specialized Fields */}
-        <Text style={styles.sectionTitle}>Template Details</Text>
+        <Text style={styles.sectionTitle}>{t('doc_hub.template_details')}</Text>
         <View style={styles.card}>
           <Text style={styles.inputLabel}>{t('doc_hub.issuing_authority')}</Text>
           <TextInput
@@ -200,10 +200,10 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             onChangeText={setIssuingAuthority}
             placeholder={
               templateType === 'passport'
-                ? 'e.g. Passport Seva Kendra Kolkata'
+                ? t('doc_hub.auth_placeholder_passport')
                 : templateType === 'insurance'
-                ? 'e.g. HDFC ERGO Health Insurance'
-                : 'e.g. US Consulate / State RTO'
+                ? t('doc_hub.auth_placeholder_insurance')
+                : t('doc_hub.auth_placeholder_default')
             }
             placeholderTextColor={styles.placeholder.color}
           />
@@ -248,13 +248,13 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
         {/* Upload Attachment Card */}
         <Text style={styles.sectionTitle}>{t('doc_hub.doc_attachment')}</Text>
         <Pressable style={styles.uploadCard} onPress={handlePickFile}>
-          <Upload size={22} color="#004F63" />
+          <Upload size={22} color={styles.primaryIcon.color} />
           <View style={{ flex: 1 }}>
             <Text style={styles.uploadTitle}>
               {fileName ? fileName : t('doc_hub.attach_file')}
             </Text>
             <Text style={styles.uploadSub}>
-              {fileName ? 'File selected & ready for vault' : t('doc_hub.select_file')}
+              {fileName ? t('doc_hub.file_ready_vault') : t('doc_hub.select_file')}
             </Text>
           </View>
         </Pressable>
@@ -299,6 +299,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    primaryIcon: {
+      color: colors.primary,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -325,6 +328,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 44,
       height: 44,
       borderRadius: 22,
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -384,16 +390,16 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 12,
-      backgroundColor: '#E3F2F5',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: 16,
       borderWidth: 1,
-      borderColor: '#CBE4EA',
+      borderColor: colors.border,
       padding: spacing.md,
     },
     uploadTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 13.5,
-      color: '#004F63',
+      color: colors.primary,
     },
     uploadSub: {
       fontFamily: fonts.sans,

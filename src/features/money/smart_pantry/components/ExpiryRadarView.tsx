@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { CategoryType, PantryItem, ScreenTab } from '../types';
+import { CategoryType, PantryItem, StorageLocation } from '../types';
 import { ALLERGEN_DEFINITIONS } from '../data/mockPantryData';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
-import { PANTRY_COLORS } from '../constants/colors';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
@@ -28,6 +27,19 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) =
   const urgentItems = items.filter((i) => getDaysUntilExpiry(i.expiryDate) <= 2);
   const upcomingItems = items.filter((i) => getDaysUntilExpiry(i.expiryDate) > 2 && getDaysUntilExpiry(i.expiryDate) <= 7);
 
+  const getLocName = (loc: StorageLocation) => {
+    switch (loc) {
+      case 'Fridge':
+        return t('smart_pantry.loc_fridge');
+      case 'Freezer':
+        return t('smart_pantry.loc_freezer');
+      case 'Pantry Shelf':
+        return t('smart_pantry.loc_pantry_shelf');
+      default:
+        return loc;
+    }
+  };
+
   return (
     <View style={styles.container}>
       <View style={styles.radarHeaderCard}>
@@ -41,12 +53,16 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) =
         <Text style={styles.noUrgentText}>{t('smart_pantry.no_urgent')}</Text>
       ) : (
         urgentItems.map((item) => (
-          <View key={item.id} style={[styles.radarItemCard, { borderLeftColor: PANTRY_COLORS.urgentRed }]}>
+          <View key={item.id} style={[styles.radarItemCard, styles.radarItemCardUrgent]}>
             <Text style={{ fontSize: 22, marginRight: 10 }}>{CATEGORY_EMOJIS[item.category] || '📦'}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.radarItemName}>{item.name}</Text>
               <Text style={styles.radarItemSub}>
-                Expires in {getDaysUntilExpiry(item.expiryDate)} day(s) · Qty: {item.quantity} {item.unit}
+                {t('smart_pantry.expires_in_days', {
+                  days: getDaysUntilExpiry(item.expiryDate),
+                  qty: item.quantity,
+                  unit: item.unit,
+                })}
               </Text>
             </View>
             <Pressable style={styles.cookActionBtn} onPress={onNavigateRecipes}>
@@ -58,12 +74,15 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) =
 
       <Text style={[styles.sectionHeading, { marginTop: 16 }]}>{t('smart_pantry.upcoming_exp')}</Text>
       {upcomingItems.map((item) => (
-        <View key={item.id} style={[styles.radarItemCard, { borderLeftColor: PANTRY_COLORS.warningAmber }]}>
+        <View key={item.id} style={[styles.radarItemCard, styles.radarItemCardWarning]}>
           <Text style={{ fontSize: 22, marginRight: 10 }}>{CATEGORY_EMOJIS[item.category] || '📦'}</Text>
           <View style={{ flex: 1 }}>
             <Text style={styles.radarItemName}>{item.name}</Text>
             <Text style={styles.radarItemSub}>
-              Expires in {getDaysUntilExpiry(item.expiryDate)} days · {item.storageLocation}
+              {t('smart_pantry.expires_in_days_loc', {
+                days: getDaysUntilExpiry(item.expiryDate),
+                location: getLocName(item.storageLocation),
+              })}
             </Text>
           </View>
         </View>
@@ -77,7 +96,7 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) =
           return (
             <View key={def.tag} style={styles.matrixRow}>
               <Text style={{ fontSize: 18, width: 30 }}>{def.icon}</Text>
-              <Text style={styles.matrixLabel}>{def.label}</Text>
+              <Text style={styles.matrixLabel}>{def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label}</Text>
               <Text style={styles.matrixValue}>{t('smart_pantry.items_safe', { safe: safeCount, total: items.length })}</Text>
             </View>
           );
@@ -95,6 +114,8 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     radarHeaderTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textOnPrimary },
     radarHeaderSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textOnPrimaryMuted, marginTop: 2 },
     radarItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, padding: spacing.md, marginBottom: 8 },
+    radarItemCardUrgent: { borderLeftColor: colors.danger },
+    radarItemCardWarning: { borderLeftColor: colors.turmeric },
     radarItemName: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary },
     radarItemSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted, marginTop: 2 },
     cookActionBtn: { backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },

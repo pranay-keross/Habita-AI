@@ -76,7 +76,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color="#004F63" />
+        <ActivityIndicator size="large" color={styles.primaryIcon.color} />
       </View>
     );
   }
@@ -110,7 +110,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
         </Pressable>
         <Text style={styles.headerTitle}>{t('doc_hub.details_title')}</Text>
         <Pressable onPress={handleDelete} style={styles.deleteHeaderBtn}>
-          <Trash2 size={18} color="#EF4444" />
+          <Trash2 size={18} color={styles.dangerText.color} />
         </Pressable>
       </View>
 
@@ -118,7 +118,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
         {/* Document Hero Badge */}
         <View style={styles.docHeroCard}>
           <View style={styles.heroIconBadge}>
-            <FileText size={28} color="#004F63" />
+            <FileText size={28} color={styles.primaryIcon.color} />
           </View>
           <Text style={styles.heroTitle}>{doc.title}</Text>
           <Text style={styles.heroCategory}>{doc.category.toUpperCase()} DOCUMENT</Text>
@@ -162,9 +162,9 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
                 style={styles.eyeBtn}
                 onPress={() => setShowDocNumber(!showDocNumber)}>
                 {showDocNumber ? (
-                  <EyeOff size={18} color="#004F63" />
+                  <EyeOff size={18} color={styles.primaryIcon.color} />
                 ) : (
-                  <Eye size={18} color="#004F63" />
+                  <Eye size={18} color={styles.primaryIcon.color} />
                 )}
               </Pressable>
             )}
@@ -246,7 +246,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
         <Text style={styles.sectionTitle}>{t('doc_hub.doc_attachment')}</Text>
         <View style={styles.card}>
           <View style={styles.attachmentRow}>
-            <File size={20} color="#004F63" />
+            <File size={20} color={styles.primaryIcon.color} />
             <View style={{ flex: 1 }}>
               <Text style={styles.attachmentTitle}>
                 {doc.fileName || `${doc.title}.pdf`}
@@ -279,11 +279,11 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginTop: 12,
       paddingHorizontal: 16,
       paddingVertical: 8,
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       borderRadius: 12,
     },
     backLinkText: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       fontFamily: fonts.sansBold,
     },
     headerBar: {
@@ -309,12 +309,20 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#FEE2E2',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
     headerIcon: {
       color: colors.textPrimary,
+    },
+    primaryIcon: {
+      color: colors.primary,
+    },
+    dangerText: {
+      color: colors.danger,
     },
     headerTitle: {
       fontFamily: fonts.sansBold,
@@ -340,7 +348,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 56,
       height: 56,
       borderRadius: 28,
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 10,
@@ -365,14 +375,16 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 14,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
-    badgeExpired: { backgroundColor: '#FEE2E2' },
-    badgeExpiring: { backgroundColor: '#FFEDD5' },
-    badgeValid: { backgroundColor: '#DCFCE7' },
+    badgeExpired: { backgroundColor: colors.surfaceElevated },
+    badgeExpiring: { backgroundColor: colors.surfaceElevated },
+    badgeValid: { backgroundColor: colors.surfaceElevated },
     statusBadgeText: { fontFamily: fonts.sansBold, fontSize: 12 },
-    textExpired: { color: '#EF4444' },
-    textExpiring: { color: '#EA580C' },
-    textValid: { color: '#16A34A' },
+    textExpired: { color: colors.danger },
+    textExpiring: { color: colors.primary },
+    textValid: { color: colors.forest },
 
     sectionTitle: {
       fontFamily: fonts.sansBold,
@@ -410,7 +422,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 36,
       height: 36,
       borderRadius: 18,
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },

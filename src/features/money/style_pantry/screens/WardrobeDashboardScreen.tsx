@@ -82,7 +82,7 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
         <Pressable
           onPress={() => navigation.navigate('AddEditClothing', {})}
           style={styles.addNavBtn}>
-          <Plus size={20} color="#FFFFFF" />
+          <Plus size={20} color={styles.addIcon.color} />
         </Pressable>
       </View>
 
@@ -105,14 +105,14 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
           onPress={() => navigation.navigate('StyleMirror')}>
           <View style={styles.aiBannerLeft}>
             <View style={styles.sparkleCircle}>
-              <Sparkles size={22} color="#7C3AED" />
+              <Sparkles size={22} color={styles.primaryIcon.color} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.aiBannerTitle}>{t('style_pantry.ai_banner_title')}</Text>
               <Text style={styles.aiBannerSub}>{t('style_pantry.ai_banner_sub')}</Text>
             </View>
           </View>
-          <ChevronRight size={20} color="#7C3AED" />
+          <ChevronRight size={20} color={styles.primaryIcon.color} />
         </Pressable>
 
         {/* Category Horizontal Filter Chips */}
@@ -153,7 +153,7 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#004F63" style={{ marginTop: 24 }} />
+          <ActivityIndicator color={styles.primaryIcon.color} style={{ marginTop: 24 }} />
         ) : filteredItems.length === 0 ? (
           <View style={styles.emptyCard}>
             <Shirt size={36} color={styles.placeholder.color} />
@@ -220,6 +220,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    primaryIcon: {
+      color: colors.primary,
+    },
+    addIcon: {
+      color: colors.textOnPrimary,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -229,7 +235,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadow.soft,
@@ -263,11 +269,11 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: '#F3E8FF',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: radius.lg,
       padding: spacing.md,
       borderWidth: 1,
-      borderColor: '#DDD6FE',
+      borderColor: colors.border,
       marginBottom: spacing.md,
       ...shadow.soft,
     },
@@ -281,7 +287,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.sm,
@@ -289,12 +297,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     aiBannerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 15,
-      color: '#5B21B6',
+      color: colors.primary,
     },
     aiBannerSub: {
       fontFamily: fonts.sans,
       fontSize: 12,
-      color: '#6D28D9',
+      color: colors.textSecondary,
       marginTop: 2,
     },
     categoriesContainer: {
@@ -314,8 +322,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginRight: 6,
     },
     categoryChipActive: {
-      backgroundColor: '#004F63',
-      borderColor: '#004F63',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     chipEmoji: {
       fontSize: 14,
@@ -327,7 +335,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textSecondary,
     },
     chipTextActive: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     listHeaderRow: {
       flexDirection: 'row',
@@ -347,7 +355,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     inlineAddBtnText: {
       fontFamily: fonts.sansBold,
       fontSize: 13,
-      color: '#004F63',
+      color: colors.primary,
     },
     emptyCard: {
       backgroundColor: colors.surface,
@@ -391,7 +399,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 56,
       height: 56,
       borderRadius: radius.md,
-      backgroundColor: '#F1F5F9',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.sm,
@@ -420,6 +430,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     wearCountText: {
       fontFamily: fonts.sansMedium,
       fontSize: 11,
-      color: '#004F63',
+      color: colors.primary,
     },
   });

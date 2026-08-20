@@ -6,7 +6,6 @@ import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
-import { PANTRY_COLORS } from './constants/colors';
 
 import { ScreenTab } from './types';
 import { useSmartPantry } from './hooks/useSmartPantry';

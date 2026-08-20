@@ -92,7 +92,7 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
         <View style={styles.alertSummaryHero}>
           <View style={styles.heroRow}>
             <View style={styles.alertCircleBadge}>
-              <AlertTriangle size={24} color="#EA580C" />
+              <AlertTriangle size={24} color={styles.alertHeroTitle.color} />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.alertHeroTitle}>{t('doc_hub.warning_center')}</Text>
@@ -116,10 +116,10 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#004F63" style={{ marginTop: 24 }} />
+          <ActivityIndicator color={styles.primaryIcon.color} style={{ marginTop: 24 }} />
         ) : expiredList.length === 0 && expiringList.length === 0 ? (
           <View style={styles.emptyStateCard}>
-            <CheckCircle2 size={40} color="#16A34A" />
+            <CheckCircle2 size={40} color={styles.forestText.color} />
             <Text style={styles.emptyTitle}>{t('doc_hub.all_current_title')}</Text>
             <Text style={styles.emptySub}>
               {t('doc_hub.all_current_sub')}
@@ -136,7 +136,7 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
                   return (
                     <View key={doc.id} style={styles.docCardRed}>
                       <View style={styles.cardHeader}>
-                        <FileText size={20} color="#EF4444" />
+                        <FileText size={20} color={styles.dangerText.color} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.docTitle}>{doc.title}</Text>
                           <Text style={styles.docMember}>{t('doc_hub.owner_label', { name: doc.memberName })}</Text>
@@ -148,7 +148,7 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
 
                       <View style={styles.cardFooterRow}>
                         <View style={styles.clockRow}>
-                          <Clock size={12} color="#EF4444" />
+                          <Clock size={12} color={styles.dangerText.color} />
                           <Text style={styles.daysExpiredText}>
                             {t('doc_hub.expired_days_ago', { count: Math.abs(daysLeft) })} ({doc.expiryDate})
                           </Text>
@@ -177,7 +177,7 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
                   return (
                     <View key={doc.id} style={styles.docCardOrange}>
                       <View style={styles.cardHeader}>
-                        <FileText size={20} color="#EA580C" />
+                        <FileText size={20} color={styles.primaryIcon.color} />
                         <View style={{ flex: 1 }}>
                           <Text style={styles.docTitle}>{doc.title}</Text>
                           <Text style={styles.docMember}>{t('doc_hub.owner_label', { name: doc.memberName })}</Text>
@@ -189,7 +189,7 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
 
                       <View style={styles.cardFooterRow}>
                         <View style={styles.clockRow}>
-                          <Clock size={12} color="#EA580C" />
+                          <Clock size={12} color={styles.primaryIcon.color} />
                           <Text style={styles.daysExpiringText}>
                             {t('doc_hub.expires_label', { date: doc.expiryDate })}
                           </Text>
@@ -266,6 +266,15 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    primaryIcon: {
+      color: colors.primary,
+    },
+    dangerText: {
+      color: colors.danger,
+    },
+    forestText: {
+      color: colors.forest,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -276,10 +285,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingBottom: spacing.xxl,
     },
     alertSummaryHero: {
-      backgroundColor: '#FFEDD5',
+      backgroundColor: colors.surfaceElevated,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: '#FED7AA',
+      borderColor: colors.border,
       padding: spacing.lg,
       marginTop: spacing.md,
       marginBottom: spacing.lg,
@@ -294,19 +303,21 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
     alertHeroTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 16,
-      color: '#C2410C',
+      color: colors.primary,
     },
     alertHeroSub: {
       fontFamily: fonts.sans,
       fontSize: 12,
-      color: '#EA580C',
+      color: colors.textSecondary,
       marginTop: 2,
       lineHeight: 16,
     },
@@ -319,46 +330,48 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderRadius: 14,
       paddingVertical: 12,
       alignItems: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     statBoxRed: {
-      backgroundColor: '#FEE2E2',
+      backgroundColor: colors.surface,
     },
     statNumberRed: {
       fontFamily: fonts.sansBold,
       fontSize: 20,
-      color: '#EF4444',
+      color: colors.danger,
     },
     statLabelRed: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#EF4444',
+      color: colors.danger,
       marginTop: 2,
     },
     statBoxOrange: {
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
     },
     statNumberOrange: {
       fontFamily: fonts.sansBold,
       fontSize: 20,
-      color: '#EA580C',
+      color: colors.primary,
     },
     statLabelOrange: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#EA580C',
+      color: colors.primary,
       marginTop: 2,
     },
     sectionTitleRed: {
       fontFamily: fonts.sansBold,
       fontSize: 15,
-      color: '#EF4444',
+      color: colors.danger,
       marginBottom: spacing.xs,
       marginTop: spacing.md,
     },
     sectionTitleOrange: {
       fontFamily: fonts.sansBold,
       fontSize: 15,
-      color: '#EA580C',
+      color: colors.primary,
       marginBottom: spacing.xs,
       marginTop: spacing.md,
     },
@@ -366,7 +379,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       backgroundColor: colors.surface,
       borderRadius: 18,
       borderWidth: 1,
-      borderColor: '#FCA5A5',
+      borderColor: colors.border,
       padding: spacing.md,
       marginBottom: spacing.sm,
       ...shadow.soft,
@@ -375,7 +388,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       backgroundColor: colors.surface,
       borderRadius: 18,
       borderWidth: 1,
-      borderColor: '#FDBA74',
+      borderColor: colors.border,
       padding: spacing.md,
       marginBottom: spacing.sm,
       ...shadow.soft,
@@ -398,7 +411,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginTop: 2,
     },
     badgeExpired: {
-      backgroundColor: '#FEE2E2',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: 8,
       paddingVertical: 4,
       borderRadius: 10,
@@ -406,10 +421,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     textExpired: {
       fontFamily: fonts.sansBold,
       fontSize: 11,
-      color: '#EF4444',
+      color: colors.danger,
     },
     badgeExpiring: {
-      backgroundColor: '#FFEDD5',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       paddingHorizontal: 8,
       paddingVertical: 4,
       borderRadius: 10,
@@ -417,7 +434,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     textExpiring: {
       fontFamily: fonts.sansBold,
       fontSize: 11,
-      color: '#EA580C',
+      color: colors.primary,
     },
     cardFooterRow: {
       flexDirection: 'row',
@@ -435,32 +452,32 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     daysExpiredText: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#EF4444',
+      color: colors.danger,
     },
     daysExpiringText: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#EA580C',
+      color: colors.primary,
     },
     renewBtnRed: {
-      backgroundColor: '#EF4444',
+      backgroundColor: colors.danger,
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 12,
     },
     renewBtnTextRed: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       fontFamily: fonts.sansBold,
       fontSize: 12,
     },
     renewBtnOrange: {
-      backgroundColor: '#EA580C',
+      backgroundColor: colors.primary,
       paddingHorizontal: 12,
       paddingVertical: 6,
       borderRadius: 12,
     },
     renewBtnTextOrange: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       fontFamily: fonts.sansBold,
       fontSize: 12,
     },

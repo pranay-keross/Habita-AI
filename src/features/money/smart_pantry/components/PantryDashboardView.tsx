@@ -2,7 +2,6 @@ import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { PantryItem, ScreenTab, StorageLocation } from '../types';
 import { ALLERGEN_DEFINITIONS } from '../data/mockPantryData';
-import { PANTRY_COLORS } from '../constants/colors';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
@@ -28,6 +27,19 @@ export const PantryDashboardView: React.FC<Props> = ({
 }) => {
   const styles = useThemedStyles(makeStyles);
 
+  const getLocName = (loc: StorageLocation) => {
+    switch (loc) {
+      case 'Fridge':
+        return t('smart_pantry.loc_fridge');
+      case 'Freezer':
+        return t('smart_pantry.loc_freezer');
+      case 'Pantry Shelf':
+        return t('smart_pantry.loc_pantry_shelf');
+      default:
+        return loc;
+    }
+  };
+
   return (
     <View style={styles.container}>
       {/* Hero Summary */}
@@ -39,16 +51,16 @@ export const PantryDashboardView: React.FC<Props> = ({
             <Text style={styles.metricVal}>{totalItemsCount}</Text>
             <Text style={styles.metricLabel}>{t('smart_pantry.stat_total')}</Text>
           </View>
-          <View style={[styles.metricCard, { borderLeftColor: PANTRY_COLORS.urgentRed }]}>
-            <Text style={[styles.metricVal, { color: PANTRY_COLORS.urgentRed }]}>{expiringSoonItems.length}</Text>
+          <View style={[styles.metricCard, styles.urgentCard]}>
+            <Text style={[styles.metricVal, styles.urgentText]}>{expiringSoonItems.length}</Text>
             <Text style={styles.metricLabel}>{t('smart_pantry.stat_expiring')}</Text>
           </View>
-          <View style={[styles.metricCard, { borderLeftColor: PANTRY_COLORS.warningAmber }]}>
-            <Text style={[styles.metricVal, { color: PANTRY_COLORS.warningAmber }]}>{lowStockItems.length}</Text>
+          <View style={[styles.metricCard, styles.warningCard]}>
+            <Text style={[styles.metricVal, styles.warningText]}>{lowStockItems.length}</Text>
             <Text style={styles.metricLabel}>{t('smart_pantry.stat_low_stock')}</Text>
           </View>
-          <View style={[styles.metricCard, { borderLeftColor: PANTRY_COLORS.safeGreen }]}>
-            <Text style={[styles.metricVal, { color: PANTRY_COLORS.safeGreen }]}>{ALLERGEN_DEFINITIONS.length}</Text>
+          <View style={[styles.metricCard, styles.safeCard]}>
+            <Text style={[styles.metricVal, styles.safeText]}>{ALLERGEN_DEFINITIONS.length}</Text>
             <Text style={styles.metricLabel}>{t('smart_pantry.stat_allergen_tags')}</Text>
           </View>
         </View>
@@ -80,27 +92,27 @@ export const PantryDashboardView: React.FC<Props> = ({
         <Pressable style={styles.actionTile} onPress={() => onNavigateTab('inventory')}>
           <Text style={styles.actionTileIcon}>📦</Text>
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_inventory', { count: items.length })}</Text>
-          <Text style={styles.actionTileSub}>Search & filter items</Text>
+          <Text style={styles.actionTileSub}>{t('smart_pantry.sub_inventory')}</Text>
         </Pressable>
         <Pressable style={styles.actionTile} onPress={() => onNavigateTab('add')}>
           <Text style={styles.actionTileIcon}>📸</Text>
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_add')}</Text>
-          <Text style={styles.actionTileSub}>Barcode & receipt OCR</Text>
+          <Text style={styles.actionTileSub}>{t('smart_pantry.sub_add')}</Text>
         </Pressable>
         <Pressable style={styles.actionTile} onPress={() => onNavigateTab('details')}>
           <Text style={styles.actionTileIcon}>🔍</Text>
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_details')}</Text>
-          <Text style={styles.actionTileSub}>Inspect & edit stock</Text>
+          <Text style={styles.actionTileSub}>{t('smart_pantry.sub_details')}</Text>
         </Pressable>
         <Pressable style={styles.actionTile} onPress={() => onNavigateTab('radar')}>
           <Text style={styles.actionTileIcon}>📡</Text>
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_radar', { count: expiringSoonItems.length })}</Text>
-          <Text style={styles.actionTileSub}>Safety & allergen checks</Text>
+          <Text style={styles.actionTileSub}>{t('smart_pantry.sub_radar')}</Text>
         </Pressable>
         <Pressable style={[styles.actionTile, { width: '100%' }]} onPress={() => onNavigateTab('recipes')}>
           <Text style={styles.actionTileIcon}>🍳</Text>
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_recipes')}</Text>
-          <Text style={styles.actionTileSub}>Cook recipes generated from expiring pantry stock</Text>
+          <Text style={styles.actionTileSub}>{t('smart_pantry.sub_recipes')}</Text>
         </Pressable>
       </View>
 
@@ -119,7 +131,7 @@ export const PantryDashboardView: React.FC<Props> = ({
                 onNavigateTab('inventory');
               }}>
               <Text style={{ fontSize: 18, marginRight: 8 }}>{emoji}</Text>
-              <Text style={styles.storageName}>{loc}</Text>
+              <Text style={styles.storageName}>{getLocName(loc)}</Text>
               <View style={styles.storageBadge}>
                 <Text style={styles.storageBadgeText}>{t('smart_pantry.items_count', { count })}</Text>
               </View>
@@ -153,6 +165,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderLeftWidth: 3,
       borderLeftColor: colors.textOnPrimaryAccent,
     },
+    urgentCard: { borderLeftColor: colors.danger },
+    urgentText: { color: colors.textOnPrimary },
+    warningCard: { borderLeftColor: colors.turmeric },
+    warningText: { color: colors.textOnPrimary },
+    safeCard: { borderLeftColor: colors.forest },
+    safeText: { color: colors.textOnPrimary },
     metricVal: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.textOnPrimary },
     metricLabel: { fontFamily: fonts.sans, fontSize: 11, color: colors.textOnPrimaryMuted },
     warningAlertCard: {

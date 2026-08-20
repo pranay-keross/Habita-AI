@@ -2,7 +2,6 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, Modal, ScrollView, Alert } from 'react-native';
 import { ZeroWasteRecipe } from '../types';
 import { ALLERGEN_DEFINITIONS, MOCK_ZERO_WASTE_RECIPES } from '../data/mockPantryData';
-import { PANTRY_COLORS } from '../constants/colors';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';

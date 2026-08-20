@@ -1,9 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { CategoryType, PantryItem } from '../types';
+import { CategoryType, PantryItem, StorageLocation } from '../types';
 import { ALLERGEN_DEFINITIONS } from '../data/mockPantryData';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
-import { PANTRY_COLORS } from '../constants/colors';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
@@ -34,6 +33,19 @@ export const ItemDetailsView: React.FC<Props> = ({
 }) => {
   const styles = useThemedStyles(makeStyles);
 
+  const getLocName = (loc: StorageLocation) => {
+    switch (loc) {
+      case 'Fridge':
+        return t('smart_pantry.loc_fridge');
+      case 'Freezer':
+        return t('smart_pantry.loc_freezer');
+      case 'Pantry Shelf':
+        return t('smart_pantry.loc_pantry_shelf');
+      default:
+        return loc;
+    }
+  };
+
   return (
     <View style={styles.container}>
       <Text style={styles.sectionHeading}>{t('smart_pantry.details_title')}</Text>
@@ -62,7 +74,7 @@ export const ItemDetailsView: React.FC<Props> = ({
             <View style={{ flex: 1 }}>
               <Text style={styles.detailsTitle}>{selectedItem.name}</Text>
               <Text style={styles.detailsSub}>
-                {selectedItem.category.toUpperCase()} · Storage: {selectedItem.storageLocation}
+                {selectedItem.category.toUpperCase()} · {t('smart_pantry.storage_location_prefix', { location: getLocName(selectedItem.storageLocation) })}
               </Text>
             </View>
           </View>
@@ -71,7 +83,10 @@ export const ItemDetailsView: React.FC<Props> = ({
           <View style={styles.detailsExpiryBanner}>
             <Text style={styles.detailsExpiryTitle}>{t('smart_pantry.expiry_countdown')}</Text>
             <Text style={styles.detailsExpiryVal}>
-              Expires on {selectedItem.expiryDate} ({getDaysUntilExpiry(selectedItem.expiryDate)} days remaining)
+              {t('smart_pantry.expires_on_date', {
+                date: selectedItem.expiryDate,
+                days: getDaysUntilExpiry(selectedItem.expiryDate),
+              })}
             </Text>
           </View>
 
@@ -92,13 +107,15 @@ export const ItemDetailsView: React.FC<Props> = ({
           {/* Safety Badges */}
           <Text style={[styles.formLabel, { marginTop: 12 }]}>{t('smart_pantry.safety_badges')}</Text>
           <View style={styles.badgeRow}>
-            {selectedItem.allergens.map((tag) => (
-              <View key={tag} style={styles.microBadge}>
-                <Text style={styles.microBadgeText}>
-                  ✓ {ALLERGEN_DEFINITIONS.find((a) => a.tag === tag)?.label || tag}
-                </Text>
-              </View>
-            ))}
+            {selectedItem.allergens.map((tag) => {
+              const def = ALLERGEN_DEFINITIONS.find((a) => a.tag === tag);
+              const label = def ? (def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label) : tag;
+              return (
+                <View key={tag} style={styles.microBadge}>
+                  <Text style={styles.microBadgeText}>✓ {label}</Text>
+                </View>
+              );
+            })}
           </View>
 
           {/* Actions */}
