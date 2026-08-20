@@ -57,11 +57,6 @@ This repository is the React Native 0.86 client. It is mostly still a **static, 
 ### Medicine Chest
 `src/features/medicine/MedicineScreen.tsx` (`M4-T1`–`M4-T3`, `M4-T5`) — the first SRS-mapped domain module, built as the template for the rest. Add/edit medicines (name, dosage, a multi-select morning/afternoon/evening/night schedule, stock count) via a bottom sheet; mark a scheduled dose "taken" for the day, which decrements stock and logs to `habita.medicine_intake_log`. A pure `calculateAdherence()` function drives both the screen's own stat and the dashboard's "7-day adherence" card. Its own data is still local-only; the permission gate now reads the real Family backend — a plain `MEMBER` gets read-only access, `ADMIN`/`OWNER` get full access, and having no family at all still means full access. Local notification reminders (`M4-T4`) are still undecided — needs a library choice.
 
-### Caregiver & Home Services
-`src/features/staff/StaffScreen.tsx` (`M5-T6`) â€” opened from the Caregiver card in Household Operations. Add, edit, and remove local caregiver or domestic-staff profiles, including their role, monthly or hourly agreed rate, phone number, and notes. Profiles persist offline in `habita.caregivers`; attendance and the wage ledger are separately tracked follow-up work (`M5-T7`/`M5-T8`).
-
-### Resources & Utilities
-`src/features/resources/ResourcesScreen.tsx` (`M5-T9`) â€” manage recurring supply counters and add, edit, or remove delivery records with quantities and notes. Active counters appear on the home dashboard for one-tap logging, while the full screen retains the reviewable delivery history. Data stays local in `habita.resource_log` and `habita.quick_tap_items`; AI utility-bill OCR remains the explicit next task (`M5-T10`).
 ### Expense Groups & Money (`src/features/money/`)
 A complete 4-screen expense sharing, multi-currency conversion, and debt settlement system designed in accordance with Google Material UI guidelines & Habita AI's warm pastel design language. Tapping **"Money"** or **"Add expense"** on the Dashboard routes directly to:
 1. **Expense Groups (`ExpenseGroupsScreen.tsx`)**: Group list, net balance summary cards ("You owe" vs "You get back"), group creation modal with emoji icon selection and member management.
