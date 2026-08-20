@@ -197,8 +197,6 @@
                   "    if (json.devOtp) {",
                   "        pm.collectionVariables.set(\"otp\", json.devOtp);",
                   "    }",
-                  "    pm.collectionVariables.set(\"accessToken\", json.accessToken);",
-                  "     pm.collectionVariables.set(\"refreshToken\", json.refreshToken);",
                   "",
                   "}"
                 ],
@@ -1614,6 +1612,9 @@
         {
           "name": "List My Families",
           "request": {
+            "auth": {
+              "type": "noauth"
+            },
             "method": "GET",
             "header": [],
             "url": {
@@ -1876,7 +1877,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n    \"phone\": \"{{invitedPhone}}\",\n    \"role\": \"MEMBER\"\n}"
+              "raw": "{\n    \"phone\": \"{{invitedPhone}}\",\n    \"relation\": \"MOTHER\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -1890,7 +1891,7 @@
                 "members"
               ]
             },
-            "description": "Creates a PENDING FamilyInvite for an already-registered user by phone — does not attach them as a member yet (superseded the old immediate-attach behavior, see docs/DECISIONS.md D-012). The target accepts/declines via the Accept/Decline Invite requests below, run as that user. Requires OWNER/ADMIN on the family (requireAdminAccess). role cannot be OWNER.\n\n{{invitedPhone}} must already be a verified registered user — run the Auth folder's Register to Verify OTP flow for that phone first (in a second Postman run, or temporarily swap {{phone}})."
+            "description": "Creates a PENDING FamilyInvite for an already-registered user by phone — does not attach them as a member yet (superseded the old immediate-attach behavior, see docs/DECISIONS.md D-012). The target accepts/declines via the Accept/Decline Invite requests below, run as that user. Any member of the family can invite (docs/DECISIONS.md D-039, 2026-08-18) — there is no admin-only gate any more, and the invited member is always created as MEMBER (there is no role field on this request; OWNER is permanent and assigned only at family creation). relation is required — the invitee's relation to the caller, e.g. inviting your mother: relation: \"MOTHER\".\n\n{{invitedPhone}} must already be a verified registered user — run the Auth folder's Register to Verify OTP flow for that phone first (in a second Postman run, or temporarily swap {{phone}})."
           },
           "response": [
             {
@@ -1905,7 +1906,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\"\n}"
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"relation\": \"MOTHER\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -1944,7 +1945,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9000000001\",\n    \"role\": \"MEMBER\"\n}"
+                  "raw": "{\n    \"phone\": \"9000000001\",\n    \"relation\": \"MOTHER\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -1983,7 +1984,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\"\n}"
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"relation\": \"MOTHER\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -2022,7 +2023,7 @@
                 ],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\"\n}"
+                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"relation\": \"MOTHER\"\n}"
                 },
                 "url": {
                   "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
@@ -2048,84 +2049,6 @@
               ],
               "cookie": [],
               "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"User already has a pending invite to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "400 Bad Request — role OWNER is not assignable",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"OWNER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members"
-                  ]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Ownership cannot be assigned this way\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"phone\": \"9876500000\",\n    \"role\": \"MEMBER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members\",\n    \"details\": []\n}"
             }
           ]
         },
@@ -2547,7 +2470,7 @@
                 "invites"
               ]
             },
-            "description": "Every PENDING invite outstanding for this family. Requires OWNER/ADMIN (requireAdminAccess) — run with the inviter's token."
+            "description": "Every PENDING invite outstanding for this family. Any member can read (docs/DECISIONS.md D-039, 2026-08-18 — previously required OWNER/ADMIN)."
           },
           "response": [
             {
@@ -2579,36 +2502,6 @@
               ],
               "cookie": [],
               "body": "[\n    {\n        \"id\": \"c3d4e5f6-a7b8-4901-c234-56789abcdef0\",\n        \"familyId\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n        \"familyName\": \"Sharma Family\",\n        \"invitedByName\": \"Aarti Sharma\",\n        \"role\": \"MEMBER\",\n        \"status\": \"PENDING\",\n        \"createdAt\": \"2026-08-10T09:12:41.331Z\"\n    }\n]"
-            },
-            {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
-              "originalRequest": {
-                "method": "GET",
-                "header": [],
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/invites",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "invites"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/invites\",\n    \"details\": []\n}"
             }
           ]
         },
@@ -2630,7 +2523,7 @@
                 "{{inviteId}}"
               ]
             },
-            "description": "Cancels a still-PENDING invite before the target responds to it. Requires OWNER/ADMIN. Run this only if you did not already Accept/Decline the same {{inviteId}} above."
+            "description": "Cancels a still-PENDING invite before the target responds to it. Any member can cancel (docs/DECISIONS.md D-039, 2026-08-18 — previously required OWNER/ADMIN). Run this only if you did not already Accept/Decline the same {{inviteId}} above."
           },
           "response": [
             {
@@ -2724,244 +2617,6 @@
           ]
         },
         {
-          "name": "Update Member Role",
-          "request": {
-            "method": "PATCH",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n    \"role\": \"ADMIN\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "families",
-                "{{familyId}}",
-                "members",
-                "{{familyMemberId}}",
-                "role"
-              ]
-            },
-            "description": "Changes a member's role. Requires OWNER/ADMIN (requireAdminAccess). role cannot be OWNER, and a member whose current role is OWNER cannot be changed at all — ownership is permanent and non-transferable through this endpoint (see docs/DECISIONS.md D-013)."
-          },
-          "response": [
-            {
-              "name": "200 OK — role updated",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "OK",
-              "code": 200,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"id\": \"a1b2c3d4-e5f6-4789-a012-3456789abcde\",\n    \"name\": \"Sharma Family\",\n    \"ownerUserId\": \"3fa85f64-5717-4562-b3fc-2c963f66afa6\",\n    \"members\": [\n        {\n            \"id\": \"b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n            \"name\": \"Aarti Sharma\",\n            \"role\": \"OWNER\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        },\n        {\n            \"id\": \"d4e5f6a7-b8c9-4012-d345-6789abcdef01\",\n            \"name\": \"Rahul Sharma\",\n            \"role\": \"ADMIN\",\n            \"managed\": false,\n            \"managedMemberId\": null\n        }\n    ]\n}"
-            },
-            {
-              "name": "400 Bad Request — cannot change the owner's role",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"MEMBER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Cannot change the family owner's role\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/b2c3d4e5-f6a7-4890-b123-456789abcdef/role\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "400 Bad Request — role OWNER is not assignable",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"OWNER\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "Bad Request",
-              "code": 400,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Ownership cannot be assigned this way\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01/role\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "404 Not Found — family member does not exist",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "Not Found",
-              "code": 404,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family member not found\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01/role\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
-              "originalRequest": {
-                "method": "PATCH",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"role\": \"ADMIN\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/members/{{familyMemberId}}/role",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "members",
-                    "{{familyMemberId}}",
-                    "role"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/d4e5f6a7-b8c9-4012-d345-6789abcdef01/role\",\n    \"details\": []\n}"
-            }
-          ]
-        },
-        {
           "name": "Remove Member",
           "request": {
             "method": "DELETE",
@@ -2979,7 +2634,7 @@
                 "{{familyMemberId}}"
               ]
             },
-            "description": "Removes a member (unlinks the FamilyMember row; works for either a User-backed or ManagedMember-backed row, but does not touch the underlying ManagedMember record — see Remove Managed Member for that). Requires OWNER/ADMIN. The OWNER can never be removed."
+            "description": "Removes a member (unlinks the FamilyMember row; works for either a User-backed or ManagedMember-backed row, but does not touch the underlying ManagedMember record — see Remove Managed Member for that). Since docs/DECISIONS.md D-039 (2026-08-18): the caller must either be the family creator (OWNER) removing someone else, or be removing themselves (self-service leave) — a non-creator member targeting anyone but their own row gets 401 \"Only the family creator can remove other members\". The OWNER can never be removed, including by themselves."
           },
           "response": [
             {
@@ -3037,7 +2692,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Cannot remove the family owner\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n    \"details\": []\n}"
+              "body": "{\n    \"timestamp\": \"2026-08-18T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Cannot remove the family creator\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/members/b2c3d4e5-f6a7-4890-b123-456789abcdef\",\n    \"details\": []\n}"
             },
             {
               "name": "404 Not Found — family member does not exist",
@@ -3117,7 +2772,7 @@
                 "managed-members"
               ]
             },
-            "description": "Creates a ManagedMember (a dependent with no login of their own — e.g. an elderly parent or child) owned by the caller, and attaches them to the family with role MEMBER immediately (no invite/consent step — a ManagedMember cannot consent for themselves). Requires OWNER/ADMIN."
+            "description": "Creates a ManagedMember (a dependent with no login of their own — e.g. an elderly parent or child) owned by the caller, and attaches them to the family with role MEMBER immediately (no invite/consent step — a ManagedMember cannot consent for themselves). Any member can add one (docs/DECISIONS.md D-039, 2026-08-18 — previously required OWNER/ADMIN); removing one is still creator-only, see Remove Managed Member."
           },
           "response": [
             {
@@ -3197,45 +2852,6 @@
               ],
               "cookie": [],
               "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Family already has the maximum of 5 members\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members\",\n    \"details\": []\n}"
-            },
-            {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
-              "originalRequest": {
-                "method": "POST",
-                "header": [
-                  {
-                    "key": "Content-Type",
-                    "value": "application/json"
-                  }
-                ],
-                "body": {
-                  "mode": "raw",
-                  "raw": "{\n    \"name\": \"Grandma Sharma\",\n    \"relationship\": \"Mother\"\n}"
-                },
-                "url": {
-                  "raw": "{{baseUrl}}/api/families/{{familyId}}/managed-members",
-                  "host": [
-                    "{{baseUrl}}"
-                  ],
-                  "path": [
-                    "api",
-                    "families",
-                    "{{familyId}}",
-                    "managed-members"
-                  ]
-                }
-              },
-              "status": "Unauthorized",
-              "code": 401,
-              "_postman_previewlanguage": "json",
-              "header": [
-                {
-                  "key": "Content-Type",
-                  "value": "application/json"
-                }
-              ],
-              "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members\",\n    \"details\": []\n}"
             }
           ]
         },
@@ -3257,7 +2873,7 @@
                 "{{managedMemberId}}"
               ]
             },
-            "description": "Fully retires a dependent: deletes the FamilyMember link and sets ManagedMember.active = false. Takes the managedMemberId (from FamilyMemberResponse.managedMemberId), not the familyMemberId — distinct from Remove Member, which only unlinks. Requires OWNER/ADMIN."
+            "description": "Fully retires a dependent: deletes the FamilyMember link and sets ManagedMember.active = false. Takes the managedMemberId (from FamilyMemberResponse.managedMemberId), not the familyMemberId — distinct from Remove Member, which only unlinks. Creator-only (docs/DECISIONS.md D-039, 2026-08-18) — any member can add a managed member, but only the family creator (OWNER) can remove one."
           },
           "response": [
             {
@@ -3318,7 +2934,7 @@
               "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Managed member not found in this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members/f6a7b8c9-d0e1-4234-f567-89abcdef0123\",\n    \"details\": []\n}"
             },
             {
-              "name": "401 Unauthorized — caller is not OWNER/ADMIN",
+              "name": "401 Unauthorized — caller is not the family creator",
               "originalRequest": {
                 "method": "DELETE",
                 "header": [],
@@ -3346,7 +2962,7 @@
                 }
               ],
               "cookie": [],
-              "body": "{\n    \"timestamp\": \"2026-08-10T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have admin access to this family\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members/f6a7b8c9-d0e1-4234-f567-89abcdef0123\",\n    \"details\": []\n}"
+              "body": "{\n    \"timestamp\": \"2026-08-18T09:12:41.331Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"Only the family creator can perform this action\",\n    \"path\": \"/api/families/a1b2c3d4-e5f6-4789-a012-3456789abcde/managed-members/f6a7b8c9-d0e1-4234-f567-89abcdef0123\",\n    \"details\": []\n}"
             }
           ]
         },
@@ -3526,7 +3142,7 @@
           ]
         }
       ],
-      "description": "Family multi-tenancy: create/list/get, invite-consent membership (invite then accept/decline/cancel), role updates, and member/managed-member removal. All endpoints require a USER-typed Bearer access token; every write goes through FamilyAccessService (requireAdminAccess for membership changes, requireRole for reads). Accept/Decline/List-My-Invites requests run as the invited user via {{invitedUserAccessToken}}, overriding the collection default — see each request's description."
+      "description": "Family multi-tenancy: create/list/get, invite-consent membership (invite then accept/decline), and member/managed-member removal. All endpoints require a USER-typed Bearer access token. Role model simplified 2026-08-18 (docs/DECISIONS.md D-039): only OWNER (the family creator, permanent) and MEMBER exist — every write goes through FamilyAccessService, with requireRole (any member) covering invites, managed-member add, and reads, and requireCreatorAccess (OWNER only) covering member/managed-member removal — removeMember additionally allows a non-creator member to remove *themselves* (self-service leave). Accept/Decline/List-My-Invites requests run as the invited user via {{invitedUserAccessToken}}, overriding the collection default — see each request's description."
     },
     {
       "name": "Medchest",
@@ -3947,12 +3563,2417 @@
           ]
         },
         {
-          "name": "New Request",
+          "name": "create medicine",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"name\": \"Paracetamol\",\r\n  \"dosage\": \"500mg\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"stockQuantity\": 10,\r\n  \"lowStockThreshold\": 3\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "localhost:8080/api/profiles/{{familyProfileId}}/medicines",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "profiles",
+                "{{familyProfileId}}",
+                "medicines"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK -create medicine",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"name\": \"Paracetamol\",\r\n  \"dosage\": \"500mg\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"stockQuantity\": 10,\r\n  \"lowStockThreshold\": 3\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/medicines",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "medicines"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 05:53:14 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"05cf3bc1-2265-40fa-90fd-46af5de0d6e0\",\n    \"name\": \"Paracetamol\",\n    \"dosage\": \"500mg\",\n    \"scheduleTimes\": [\n        \"09:00\",\n        \"21:00\"\n    ],\n    \"stockQuantity\": 10,\n    \"lowStockThreshold\": 3,\n    \"lowStock\": false,\n    \"adherenceRate\": 100\n}"
+            },
+            {
+              "name": "400 Bad Request -Name not provided",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n\r\n  \"dosage\": \"500mg\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"stockQuantity\": 10,\r\n  \"lowStockThreshold\": 3\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/medicines",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "medicines"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 05:54:06 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T05:54:06.873292200Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Validation failed\",\n    \"path\": \"/api/profiles/6898cde9-f06b-42a1-b100-10bd94370238/medicines\",\n    \"details\": [\n        \"name: must not be blank\"\n    ]\n}"
+            },
+            {
+              "name": "400 Bad Request - scheduleTimes not provided",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"name\": \"Paracetamol\",\r\n  \"dosage\": \"500mg\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"stockQuantity\": 10,\r\n  \"lowStockThreshold\": 3\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/medicines",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "medicines"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 05:54:57 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T05:54:57.669781600Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Validation failed\",\n    \"path\": \"/api/profiles/6898cde9-f06b-42a1-b100-10bd94370238/medicines\",\n    \"details\": [\n        \"scheduleTimes: must not be null\"\n    ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "List Medicines",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "localhost:8080/api/profiles/{{familyProfileId}}/medicines",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "profiles",
+                "{{familyProfileId}}",
+                "medicines"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK-List Medicines",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/medicines",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "medicines"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 06:02:09 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"05cf3bc1-2265-40fa-90fd-46af5de0d6e0\",\n        \"name\": \"Paracetamol\",\n        \"dosage\": \"500mg\",\n        \"scheduleTimes\": [\n            \"09:00\",\n            \"21:00\"\n        ],\n        \"stockQuantity\": 10,\n        \"lowStockThreshold\": 3,\n        \"lowStock\": false,\n        \"adherenceRate\": 100\n    }\n]"
+            },
+            {
+              "name": "404 Not found-Wrong family profile id given",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/medicines",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "medicines"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 06:02:47 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T06:02:47.159571700Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family profile not found\",\n    \"path\": \"/api/profiles/898cde9-f06b-42a1-b100-10bd94370238/medicines\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Update medicine dosage",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"name\": \"Tab. Omega-3\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"dosage\" : \"1 capsule\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{medicine}}/{{medicineId}}",
+              "host": [
+                "{{medicine}}"
+              ],
+              "path": [
+                "{{medicineId}}"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "200 OK-Update medicine dosage",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"name\": \"Paracetamol\",\r\n  \"dosage\": \"500mg\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"stockQuantity\": 10,\r\n  \"lowStockThreshold\": 6\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{medicine}}/{{medicineId}}",
+                  "host": [
+                    "{{medicine}}"
+                  ],
+                  "path": [
+                    "{{medicineId}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 06:07:32 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"05cf3bc1-2265-40fa-90fd-46af5de0d6e0\",\n    \"name\": \"Paracetamol\",\n    \"dosage\": \"500mg\",\n    \"scheduleTimes\": [\n        \"09:00\",\n        \"21:00\"\n    ],\n    \"stockQuantity\": 10,\n    \"lowStockThreshold\": 6,\n    \"lowStock\": false,\n    \"adherenceRate\": 100\n}"
+            },
+            {
+              "name": "400 Bad Request-Name not givven",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n\r\n  \"dosage\": \"500mg\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"stockQuantity\": 10,\r\n  \"lowStockThreshold\": 6\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{medicine}}/{{medicineId}}",
+                  "host": [
+                    "{{medicine}}"
+                  ],
+                  "path": [
+                    "{{medicineId}}"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 06:08:57 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T06:08:57.490677100Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Validation failed\",\n    \"path\": \"/api/medicines/05cf3bc1-2265-40fa-90fd-46af5de0d6e0\",\n    \"details\": [\n        \"name: must not be blank\"\n    ]\n}"
+            },
+            {
+              "name": "400 Bad Request - Scheduledtime not given",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"name\": \"Paracetamol\",\r\n  \"dosage\": \"500mg\",\r\n\r\n  \"stockQuantity\": 10,\r\n  \"lowStockThreshold\": 6\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{medicine}}/{{medicineId}}",
+                  "host": [
+                    "{{medicine}}"
+                  ],
+                  "path": [
+                    "{{medicineId}}"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 06:09:30 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T06:09:30.654468200Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Validation failed\",\n    \"path\": \"/api/medicines/05cf3bc1-2265-40fa-90fd-46af5de0d6e0\",\n    \"details\": [\n        \"scheduleTimes: must not be null\"\n    ]\n}"
+            }
+          ]
+        },
+        {
+          "name": "Log Intake",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "raw",
+              "raw": "{\r\n  \"status\": \"TAKEN\",\r\n  \"note\": \"Taken 1 dose for today\"\r\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{medicine}}/{{medicineId}}/intake",
+              "host": [
+                "{{medicine}}"
+              ],
+              "path": [
+                "{{medicineId}}",
+                "intake"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "404 Not found - Medicine id not found",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"status\": \"TAKEN\",\r\n  \"note\": \"Taken 1 dose for today\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{medicine}}/{{medicineId}}/intake",
+                  "host": [
+                    "{{medicine}}"
+                  ],
+                  "path": [
+                    "{{medicineId}}",
+                    "intake"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 13 Aug 2026 06:11:49 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-13T06:11:49.498059500Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Medicine not found\",\n    \"path\": \"/api/medicines/05cf3bc1-2265-40fa-90fd-46af5de0d6e/intake\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "204 Success No Content",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"status\": \"TAKEN\",\r\n  \"note\": \"Taken 1 dose for today\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{medicine}}/{{medicineId}}/intake",
+                  "host": [
+                    "{{medicine}}"
+                  ],
+                  "path": [
+                    "{{medicineId}}",
+                    "intake"
+                  ]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 13 Aug 2026 06:13:05 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": null
+            }
+          ]
+        },
+        {
+          "name": "MedicalDocumentsUpload",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "file",
+                  "type": "file",
+                  "uuid": "44a24ca8-8e91-4d42-ac51-dec55a85961f",
+                  "src": "/C:/Users/ayushchowdhury/Pictures/Screenshots/Screenshot 2026-08-07 114749.png"
+                },
+                {
+                  "key": "documentType",
+                  "value": "\"PRESCRIPTION\"",
+                  "type": "text",
+                  "uuid": "ff2d3325-48c4-4771-82bc-a0be347c3b41",
+                  "contentType": "application/json"
+                }
+              ]
+            },
+            "url": {
+              "raw": "localhost:8080/api/profiles/{{familyProfileId}}/documents",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "profiles",
+                "{{familyProfileId}}",
+                "documents"
+              ]
+            },
+            "description": "Runs the uploaded file through an AI extraction step and auto-creates Medicine rows from whatever it reads, before saving the document itself. As of docs/DECISIONS.md D-039 (2026-08-18) the response's ocrStatus genuinely reflects the outcome — PROCESSED on a successful extraction, FAILED on any parsing error (bad image, invalid AI JSON, etc.) — instead of always being PENDING as the 200 example below (captured 2026-08-11, predates this fix) shows. The response also gained extractedMedicineNames: string[] — the names of any medicines just auto-created from this specific upload (empty if none, e.g. on FAILED or if every extracted name collided with an existing medicine, which since D-039 is skipped rather than aborting the whole upload). Full current shape: {id, originalFilename, documentType, uploadedAt, ocrStatus, documentPath, extractedMedicineNames}."
+          },
+          "response": [
+            {
+              "name": "200 OK-MedicalDocumentsUpload (2026-08-11 capture, predates D-039 — ocrStatus/extractedMedicineNames now differ, see request description)",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "uuid": "44a24ca8-8e91-4d42-ac51-dec55a85961f",
+                      "src": "/C:/Users/ayushchowdhury/Pictures/Screenshots/Screenshot 2026-08-07 114749.png"
+                    },
+                    {
+                      "key": "documentType",
+                      "value": "\"PRESCRIPTION\"",
+                      "type": "text",
+                      "uuid": "ff2d3325-48c4-4771-82bc-a0be347c3b41",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/documents",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 09:52:48 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"4cad7d9e-06a1-4387-8d35-4c5a50cee9c0\",\n    \"originalFilename\": \"Screenshot 2026-08-07 114749.png\",\n    \"documentType\": \"PRESCRIPTION\",\n    \"uploadedAt\": \"2026-08-11T09:52:48.411386700Z\",\n    \"ocrStatus\": \"PENDING\"\n}"
+            },
+            {
+              "name": "500 error-Wrong familyId given",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "uuid": "44a24ca8-8e91-4d42-ac51-dec55a85961f",
+                      "src": "/C:/Users/ayushchowdhury/Pictures/Screenshots/Screenshot 2026-08-07 114749.png"
+                    },
+                    {
+                      "key": "documentType",
+                      "value": "\"PRESCRIPTION\"",
+                      "type": "text",
+                      "uuid": "ff2d3325-48c4-4771-82bc-a0be347c3b41",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/documents",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 09:53:39 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T09:53:39.867864700Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/profiles/6898cde9-f0P6b-42a1-b100-10bd94370238/documents\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "500 Error- DocumentType not provided",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "uuid": "44a24ca8-8e91-4d42-ac51-dec55a85961f",
+                      "src": "/C:/Users/ayushchowdhury/Pictures/Screenshots/Screenshot 2026-08-07 114749.png"
+                    },
+                    {
+                      "key": "documentType",
+                      "value": "\"PRESCRIPTION\"",
+                      "type": "text",
+                      "uuid": "ff2d3325-48c4-4771-82bc-a0be347c3b41",
+                      "contentType": "application/json",
+                      "disabled": true
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/documents",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 09:54:21 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T09:54:21.117125100Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/profiles/6898cde9-f06b-42a1-b100-10bd94370238/documents\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "500 Error -Document Type not according to the enums",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "uuid": "44a24ca8-8e91-4d42-ac51-dec55a85961f",
+                      "src": "/C:/Users/ayushchowdhury/Pictures/Screenshots/Screenshot 2026-08-07 114749.png"
+                    },
+                    {
+                      "key": "documentType",
+                      "value": "\"prescription\"",
+                      "type": "text",
+                      "uuid": "ff2d3325-48c4-4771-82bc-a0be347c3b41",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/documents",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 09:55:30 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T09:55:30.860431900Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/profiles/6898cde9-f06b-42a1-b100-10bd94370238/documents\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "500 Error-Document file not provided",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "uuid": "44a24ca8-8e91-4d42-ac51-dec55a85961f",
+                      "src": "/C:/Users/ayushchowdhury/Pictures/Screenshots/Screenshot 2026-08-07 114749.png",
+                      "disabled": true
+                    },
+                    {
+                      "key": "documentType",
+                      "value": "\"PRESCRIPTION\"",
+                      "type": "text",
+                      "uuid": "ff2d3325-48c4-4771-82bc-a0be347c3b41",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/documents",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "Internal Server Error",
+              "code": 500,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 09:56:28 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T09:56:28.273204300Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/profiles/6898cde9-f06b-42a1-b100-10bd94370238/documents\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "200 OK-Medical Documents Retrieve",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "localhost:8080/api/profiles/{{familyProfileId}}/documents",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "profiles",
+                "{{familyProfileId}}",
+                "documents"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "Medical Documents Retrieve",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/documents",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 09:57:48 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"4cad7d9e-06a1-4387-8d35-4c5a50cee9c0\",\n        \"originalFilename\": \"Screenshot 2026-08-07 114749.png\",\n        \"documentType\": \"PRESCRIPTION\",\n        \"uploadedAt\": \"2026-08-11T09:52:48.411387Z\",\n        \"ocrStatus\": \"PENDING\"\n    }\n]"
+            },
+            {
+              "name": "404 Not Found-wrong family profile id given",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/profiles/{{familyProfileId}}/documents",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "profiles",
+                    "{{familyProfileId}}",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Tue, 11 Aug 2026 09:58:27 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-11T09:58:27.859129100Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family profile not found\",\n    \"path\": \"/api/profiles/6898cde9-f06b-2a1-b100-10bd94370238/documents\",\n    \"details\": []\n}"
+            }
+          ]
+        },
+        {
+          "name": "Get Relationship available",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "localhost:8080/api/families/relationship/type",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "families",
+                "relationship",
+                "type"
+              ]
+            }
+          },
+          "response": [
+            {
+              "name": "403 Forbidden- because no access token given",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/families/relationship/type",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "families",
+                    "relationship",
+                    "type"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "0"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 13 Aug 2026 06:04:33 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": null
+            },
+            {
+              "name": "200 OK-Get Relationship available",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/families/relationship/type",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "families",
+                    "relationship",
+                    "type"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Thu, 13 Aug 2026 06:09:58 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"156a31e8-f8e2-42d1-ab05-4acc8c744ff2\",\n        \"relationshipType\": \"SELF\",\n        \"createdAt\": \"2026-08-13T06:02:55.606591Z\",\n        \"updatedAt\": \"2026-08-13T06:02:55.606591Z\"\n    },\n    {\n        \"id\": \"ca96abab-2990-4e2c-b314-03609e9c4a52\",\n        \"relationshipType\": \"KID\",\n        \"createdAt\": \"2026-08-13T06:02:55.606591Z\",\n        \"updatedAt\": \"2026-08-13T06:02:55.606591Z\"\n    },\n    {\n        \"id\": \"d3fa58b3-4bef-4975-902c-ba9e32965120\",\n        \"relationshipType\": \"ELDER\",\n        \"createdAt\": \"2026-08-13T06:02:55.606591Z\",\n        \"updatedAt\": \"2026-08-13T06:02:55.606591Z\"\n    },\n    {\n        \"id\": \"68a11c54-82f3-4bbf-9839-766e2ef9eeb8\",\n        \"relationshipType\": \"OTHER\",\n        \"createdAt\": \"2026-08-13T06:02:55.606591Z\",\n        \"updatedAt\": \"2026-08-13T06:02:55.606591Z\"\n    }\n]"
+            }
+          ]
+        },
+        {
+          "name": "Delete medicine",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "localhost:8080/api/medicine/eec84ba4-799e-4cd1-a594-f796630ed09b",
+              "host": [
+                "localhost"
+              ],
+              "port": "8080",
+              "path": [
+                "api",
+                "medicine",
+                "eec84ba4-799e-4cd1-a594-f796630ed09b"
+              ]
+            },
+            "description": "Note the singular `medicine` in the path (every other medicine route is plural `medicines`) — a real inconsistency in the backend's own routing, left as-is. Until docs/DECISIONS.md D-039 (2026-08-18) this endpoint had NO access control at all — any authenticated user could delete any medicine in the system by id, cross-family. It now requires the caller to be a member of the medicine's family (any member, not just the creator), via the same requireWriteAccess check every other write on this domain uses — a caller who isn't a member of that family now gets 401 \"You do not have write access to this family\" instead of silently succeeding. It also now looks the medicine up the same way every other method in MedicineService does (a 404 \"Medicine not found\" on a bad id), replacing the ad hoc existsById/deleteById pair it used before — see the 400 example below, captured before this fix, which is superseded by that change (a bad id now 404s, not 400)."
+          },
+          "response": [
+            {
+              "name": "400 Bad Request - Medicine id does not exist (pre-D-039 capture, superseded — see request description)",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/medicine/feef5209-17e6-4374-b863-c56c2174068e",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "medicine",
+                    "feef5209-17e6-4374-b863-c56c2174068e"
+                  ]
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:40:18 GMT"
+                },
+                {
+                  "key": "Connection",
+                  "value": "close"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-17T10:40:18.660650600Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"message\": \"Medicine doesnot exists\",\n    \"path\": \"/api/medicine/feef5209-17e6-4374-b863-c56c2174068e\",\n    \"details\": []\n}"
+            },
+            {
+              "name": "200 OK-Delete medicine",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/medicine/3549b48f-783a-4a26-8353-937f9befb07a",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "medicine",
+                    "3549b48f-783a-4a26-8353-937f9befb07a"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "text/plain;charset=UTF-8"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "20"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:41:50 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "Deleted Successfully"
+            }
+          ]
+        },
+        {
+          "name": "List Profiles",
           "request": {
             "method": "GET",
             "header": []
           },
-          "response": []
+          "response": [
+            {
+              "name": "200 OK- List profiles",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/families/{{familyId}}/profiles",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:32:52 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"e468b074-c3bd-4371-ae97-4ceb25adcd21\",\n        \"familyMemberId\": null,\n        \"name\": \"GrandMa Sharma\",\n        \"category\": \"KID\",\n        \"dateOfBirth\": \"2026-08-11\"\n    }\n]"
+            },
+            {
+              "name": "403 Forbidden -No auth token given",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/families/{{familyId}}/profiles",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "Forbidden",
+              "code": 403,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Length",
+                  "value": "0"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:33:30 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": null
+            },
+            {
+              "name": "401 Unauthorized- Wrong family id given",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "localhost:8080/api/families/{{familyId}}/profiles",
+                  "host": [
+                    "localhost"
+                  ],
+                  "port": "8080",
+                  "path": [
+                    "api",
+                    "families",
+                    "{{familyId}}",
+                    "profiles"
+                  ]
+                }
+              },
+              "status": "Unauthorized",
+              "code": 401,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Mon, 17 Aug 2026 10:34:07 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-08-17T10:34:07.242732500Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/e10adce-49ea-489c-8ac1-aefa4bcbc275/profiles\",\n    \"details\": []\n}"
+            }
+          ]
         }
       ]
     }
@@ -4080,6 +6101,10 @@
     },
     {
       "key": "familyProfileId",
+      "value": ""
+    },
+    {
+      "key": "medicineId",
       "value": ""
     }
   ]

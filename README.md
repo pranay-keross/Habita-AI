@@ -46,6 +46,11 @@ This repository is the React Native 0.86 client. It is mostly still a **static, 
 
 ### Home dashboard
 `src/app/dashboard.tsx` — a plain-background greeting with a muted `2 Pending · 4 Due` status line (still placeholder numbers), two stat cards (30-day spend — still hardcoded; 7-day medicine adherence — real, `M4-T3`), a wrapping grid of quick-action icon buttons, and a bordered module list (11 tiles, `M1-T14`). A sticky AppBar fades in on scroll with a compact echo of the pending/due status. Tiles and quick actions route on a stable ID (`M1-T7`), not the translated label. **Family**, **Medicine**, **Wellness** and **Cycle** all navigate to real screens; the rest are still static. The quick-action grid gained "Log mood" and "Log period" alongside "Take medicine" (`M4-T6`/`M4-T8`).
+`src/app/dashboard.tsx` — a plain-background greeting with a muted `2 Pending · 4 Due` status line (still placeholder numbers), two stat cards (30-day spend — still hardcoded; 7-day medicine adherence — real, `M4-T3`), a wrapping grid of quick-action icon buttons, and a bordered module list. A sticky AppBar fades in on scroll with a compact echo of the pending/due status. Tiles and quick actions route on a stable ID (`M1-T7`), not the translated label. **Family**, **Medicine**, and the static **Household Operations** overview navigate to real screens; the remaining tiles are still static.
+
+### Household Operations overview
+
+`src/features/household/HouseholdOperationsScreen.tsx` (`M5-T0`) — a fully localized, static design overview for Caregiver & Home Services, Resource & Utility Logistics, Shared Family Events & Budgeting, and Property Asset Vault & Vehicle Upkeep. It intentionally stores no data and makes no network calls; the individual M5 module tasks own the later local functionality and any OCR/calendar integration.
 
 ### Family & sharing — now backed by a real server (`docs/DECISIONS.md` D-023, 2026-08-10)
 `src/features/family/FamilyScreen.tsx` — fully localized (all 6 locales), calling the real `/api/families/**` contract (`src/features/family/api.ts`), not local storage. Create a family, invite an already-registered user by phone (they accept/decline from their own account), manage roles (`OWNER`/`ADMIN`/`MEMBER` — no per-module permission matrix, since the backend doesn't have one), add/remove Managed Members (dependents with no login of their own — children, elderly parents), see invites addressed to you across every family you're not yet in, and (for an admin) view a full invite history — every invite ever sent for the family, any status, not just the still-pending ones (`docs/DECISIONS.md` D-024). A plain `MEMBER` gets a read-only view; only `ADMIN`/`OWNER` can invite, change roles, remove members, or manage dependents. This superseded `M3`'s local-only model outright (`familyStore.ts` and `habita.family_members` are gone, not deprecated) and closed the previously-open Managed Members backlog item (`M2-T9`). See `docs/ARCHITECTURE.md` §7 for the full contract, including two real backend limitations worth knowing before you extend this screen: there's no reliable way to identify "which member is me" beyond the family owner, and a plain member has no self-service way to leave a family.
@@ -60,6 +65,41 @@ This repository is the React Native 0.86 client. It is mostly still a **static, 
 `src/features/cycle/CycleScreen.tsx` — log a period (first day, optional last day, flow, symptoms, note) and get a prediction: next start, estimated ovulation, fertile window, current phase and day-of-cycle, with an honest `low`/`medium`/`high` confidence based on how many completed cycles it had to work from. `predictNextCycle()` is pure and unit-tested; it returns nothing rather than inventing a forecast when there's no history, and it drops implausible gaps (a mis-typed date) instead of letting them drag the average. **Life stage is not a label** — `cycling`, `fertility`, `postpartum`, `perimenopause` and `menopause` each change what is predicted (menopause switches prediction off entirely), what is shown, how confident the estimate is allowed to be, and which nutrition and movement guidance appears. Reminders are computed and listed in-app; actual phone notifications still wait on `M4-T4`'s library decision.
 
 **Both screens are device-private**: mood and cycle data are deliberately *not* shared with or gated by the Family module, unlike the Medicine Chest — see `docs/DECISIONS.md` D-030, which is explicit that this is a product call worth revisiting rather than a technical limit. Both are also the first screens built responsively, via `useResponsive()` (`docs/ARCHITECTURE.md` §8).
+### Expense Groups & Money (`src/features/money/`)
+A complete 4-screen expense sharing, multi-currency conversion, and debt settlement system designed in accordance with Google Material UI guidelines & Habita AI's warm pastel design language. Tapping **"Money"** or **"Add expense"** on the Dashboard routes directly to:
+1. **Expense Groups (`ExpenseGroupsScreen.tsx`)**: Group list, net balance summary cards ("You owe" vs "You get back"), group creation modal with emoji icon selection and member management.
+2. **Group Details (`GroupDetailsScreen.tsx`)**: Segmented tabs for **Expenses** (itemized logs), **Balances** (simplified pairwise debt matrix: who owes whom), and **Summary** (category spend breakdown analytics).
+3. **Add / Split Expense (`AddSplitExpenseScreen.tsx`)**: Form with multi-currency support (INR ₹, USD $, EUR €, AED, GBP) with live exchange rate conversion, category tags, paid-by selector, and 3 interactive split modes:
+   - **Equal**: Automatic equal division among members.
+   - **Percentage (%)**: Custom percentage input per member with real-time validation (must sum to 100%).
+   - **Shares**: Weighted multiplier shares (e.g. 1 share, 2 shares).
+4. **Expense Details / Settle Up (`ExpenseDetailsSettleUpScreen.tsx`)**: Detailed itemized share view for existing expenses, and a full **Settle Up** mode (select Payer/Payee, payment method: UPI 💳, Cash 💵, Bank 🏦, and record settlement to automatically recalculate balances), backed by a persistent settlement history log.
+
+### Ambient Voice AI Engine & Voice Settings (`src/features/voice/`)
+A high-fidelity natural language voice command interface and configuration suite designed for multi-domain orchestration (money, health, inventory, reminders):
+1. **Voice Command Screen (`VoiceScreen.tsx`)**:
+   - **Interactive Listening Banner**: Deep teal hero banner with animated concentric glowing rings and real-time audio wave graphic overlays.
+   - **Quick Suggestion Chips**: Tap-to-speak voice prompt presets:
+     - `"Add ₹150 for dinner in Goa Trip"`
+     - `"What's the balance in Home Rent & Bills?"`
+     - `"Remind me to pay electricity bill"`
+   - **Recent Spoken Commands Log**: Detailed card history displaying query intent, timestamp, module tag, and execution status (`✔`).
+   - **What You Can Ask Grid**: Quick action cards covering **Groups & Balances**, **Add Expense**, **Spending Summary**, **Bills & Reminders**, **Inventory & Stock**, and **Contacts**.
+   - **Bottom Voice Input Bar**: Floating microphone button (`#054E63`) flanked by animated audio wave bars.
+2. **Voice Settings Screen (`VoiceSettingsScreen.tsx`)**:
+   - Tapped via the top-right settings gear icon (`⚙`) on `VoiceScreen.tsx`.
+   - **Language Selection**: Switch speech recognition locale between English 🇬🇧, Hindi 🇮🇳, Bengali 🇮🇳, Tamil 🇮🇳, Spanish 🇪🇸, and Arabic 🇸🇦.
+   - **Recognition Engine Mode**: Choose between Dual-LLM Cloud AI Engine and On-Device Offline Recognition.
+   - **Audio & Controls**: Toggle chimes/sound feedback, auto-submitting after 2s silence, and ambient noise cancellation.
+   - **Hands-Free & Privacy**: Enable `"Hey Habita"` wake word detection, command history logging, or wipe all stored voice logs with `clearVoiceHistory()`.
+
+### Document Hub (`src/features/dochub/`)
+A complete 5-page digital vault, document management, and expiration alerting system:
+1. **Document Hub (`DocHubScreen.tsx`)**: Main repository list, category filter chips (Passports 📘, Visas 🛂, Licenses 🪪, Insurance 🏥, Warranties 🏷️, Property 🏠, Tax 🧾), real-time search bar, and warning banner.
+2. **Document Details (`DocDetailsScreen.tsx`)**: Full document detail view with owner attribution, masked document number with toggle reveal (`👁️`), validity status pill, and encrypted file attachment view.
+3. **Add Document (`AddDocScreen.tsx`)**: Template choice hub to pick pre-built document templates or perform custom file uploads.
+4. **Document Template / Form (`DocTemplateFormScreen.tsx`)**: Tailored form fields for **Passport**, **Visa**, **Driver's License**, and **Health Insurance** with attachment picker (`@react-native-documents/picker`).
+5. **Expiration & Alerts (`ExpirationAlertsScreen.tsx`)**: Warning center categorizing **Expired** (red alert) and **Expiring Soon** (within 60 days, orange alert) documents with 1-tap expiry date renewal modals.
 
 ### Design system
 - Three palettes in `src/theme.ts`: Terracotta (default), Ocean Breeze, Midnight (dark).

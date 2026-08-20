@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useState } from 'react';
 import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
 import Animated, {
   FadeInDown,
@@ -22,12 +22,15 @@ import CreditCard from 'lucide-react-native/icons/credit-card';
 import Users from 'lucide-react-native/icons/users';
 import TrendingUp from 'lucide-react-native/icons/trending-up';
 import FolderOpen from 'lucide-react-native/icons/folder-open';
+// import Package from 'lucide-react-native/icons/package';
+// import Mic from 'lucide-react-native/icons/mic';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import HeartPulse from 'lucide-react-native/icons/heart-pulse';
 import Shirt from 'lucide-react-native/icons/shirt';
 import CalendarDays from 'lucide-react-native/icons/calendar-days';
 import CalendarHeart from 'lucide-react-native/icons/calendar-heart';
 import Smile from 'lucide-react-native/icons/smile';
+import House from 'lucide-react-native/icons/house';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import type { RootStackParamList } from './_layout';
 import type { ThemeTokens } from '../theme';
@@ -36,6 +39,8 @@ import SectionHeader from '../components/SectionHeader';
 import { subscribeToLanguageChanges, setLanguage, SUPPORTED_LANGS, t } from '../i18n';
 import { getItem } from '../utils/storage';
 import { calculateAdherence, loadIntakeLog, loadMedicines } from '../features/medicine/medicineStore';
+import { loadQuickTapItems, saveResourceLogs } from '../features/resources/resourceStore';
+import type { QuickTapItem, ResourceLog } from '../features/resources/types';
 import useAuth from '../hooks/useAuth';
 import { apiFetch } from '../features/auth/api';
 
@@ -59,21 +64,36 @@ interface ProfileDetailsResponse {
 
 // Stable IDs a translation reword can't break — `handleTilePress`/quick actions
 // route on these, never on the (locale-dependent) label text. See `M1-T7`.
-type TileId =
-  | 'scan'
-  | 'pay'
-  | 'family'
-  | 'money'
-  | 'docs'
-  | 'safety'
-  | 'wellness'
-  | 'cycle'
-  | 'style'
-  | 'events'
-  | 'medicine';
+// type TileId =
+//   | 'scan'
+//   | 'pay'
+//   | 'family'
+//   | 'money'
+//   | 'docs'
+//   | 'safety'
+//   | 'wellness'
+//   | 'cycle'
+//   | 'style'
+//   | 'events'
+//   | 'medicine';
 type ActionId = 'scan' | 'pay' | 'meds' | 'mood' | 'cycle' | 'expense' | 'fuel' | 'premium';
+type TileId = 'scan' | 'pay' | 'family' | 'money' | 'docs' | 'safety' | 'wellness' | 'style' | 'events'|   'cycle'
+ | 'medicine' | 'household';
+// type ActionId = 'scan' | 'pay' | 'meds' | 'expense' | 'fuel' | 'premium';
 
-export default function DashboardScreen({ navigation }: Props) {
+// `Date.getHours()` reads the device's own local time — already "current location time"
+// for wherever the phone actually is, no geolocation/timezone lookup needed. Boundaries
+// are the common-usage buckets (5am/12pm/5pm/9pm), not tied to any locale.
+function getGreetingKey(): string {
+  const hour = new Date().getHours();
+  if (hour < 5) return 'dashboard.greeting_night';
+  if (hour < 12) return 'dashboard.greeting_morning';
+  if (hour < 17) return 'dashboard.greeting_afternoon';
+  if (hour < 21) return 'dashboard.greeting_evening';
+  return 'dashboard.greeting_night';
+}
+
+export default function DashboardScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
@@ -82,6 +102,7 @@ export default function DashboardScreen({ navigation }: Props) {
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [localeVersion, setLocaleVersion] = useState(0);
   const [adherence, setAdherence] = useState<number | null>(null);
+  const [resourceItems, setResourceItems] = useState<QuickTapItem[]>([]);
 
   // Dynamic translated arrays evaluated on render
   const quickActions: { id: ActionId; label: string; Icon: LucideIcon }[] = [
@@ -107,49 +128,72 @@ export default function DashboardScreen({ navigation }: Props) {
     { id: 'cycle', title: t('dashboard.tile_cycle'), Icon: CalendarHeart },
     { id: 'style', title: t('dashboard.tile_style'), Icon: Shirt },
     { id: 'events', title: t('dashboard.tile_events'), Icon: CalendarDays },
+    { id: 'household', title: t('dashboard.tile_household_operations'), Icon: House },
   ];
+
+  // Live GET /profile/details — deliberately *not* wired to every focus event any more
+  // (docs/DECISIONS.md): `avatarUrl` is a freshly-signed S3 URL each call, so refetching
+  // on every return-to-Dashboard changed the `<Image>` `uri` prop every time, forcing a
+  // visible reload/flicker on a photo that hadn't actually changed. Called from exactly
+  // two places below: once on this screen's first mount, and once when Profile edit
+  // signals it just saved. Trade-off, accepted deliberately: a presigned URL is only
+  // valid ~10 minutes, so a photo can go stale (broken image) if the user sits on
+  // Dashboard, or bounces to other screens and back, for longer than that without
+  // touching Profile edit — judged an acceptable cost for not re-fetching on every
+  // focus.
+  const fetchLiveProfile = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const details = await apiFetch<ProfileDetailsResponse>('/profile/details', { method: 'GET', token });
+      if (details.avatarUrl) {
+        setPhotoUri(details.avatarUrl);
+      }
+      if (details.preferredLanguage && SUPPORTED_LANGS.some((l) => l.code === details.preferredLanguage)) {
+        await setLanguage(details.preferredLanguage);
+      }
+    } catch {
+      // Offline, or profile not created yet — local cache (below) already covers
+      // the screen.
+    }
+  }, [getAccessToken]);
+
+  // First-time-this-session fetch. Deliberately `[]` — this screen stays mounted across
+  // every future focus (React Navigation pops back to it rather than remounting), so a
+  // mount-only effect really does mean "once per app session," not "once ever."
+  useEffect(() => {
+    fetchLiveProfile();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Profile edit navigates back with `{ profileUpdated: true }` on a successful save —
+  // the other trigger for a live re-fetch. `setParams` clears the flag immediately after
+  // consuming it so a later focus (e.g. bouncing to Family and back) doesn't re-trigger
+  // this from the same stale param.
+  useEffect(() => {
+    if (route.params?.profileUpdated) {
+      fetchLiveProfile();
+      navigation.setParams({ profileUpdated: undefined });
+    }
+  }, [route.params?.profileUpdated, fetchLiveProfile, navigation]);
 
   useEffect(() => {
     const unsubFocus = navigation.addListener('focus', () => {
       setLocaleVersion((v) => v + 1);
 
-      // Set once the live fetch below succeeds — guards the local-cache callback so a
-      // slow AsyncStorage read can't resolve after a successful fetch and silently
-      // reapply a stale cached photo over a fresh one. Same pattern, same reason, as
-      // `onboarding/profile.tsx`'s edit-mode load (docs/DECISIONS.md D-028).
-      let liveProfileLoaded = false;
-
+      // Local-only, cheap — safe to re-read on every focus. `avatar` (the emoji
+      // fallback) has no backend field at all, so it always applies. `photoUri` only
+      // fills in from cache when nothing's set yet (functional update): once
+      // `fetchLiveProfile` has set a live S3 URL, a plain cache re-read on a later focus
+      // must not clobber it with a possibly-stale cached value.
       getItem(PROFILE_STORAGE_KEY, { avatar: '👩‍💼', photoUri: null }).then((data) => {
         if (data && data.avatar) setAvatar(data.avatar);
-        if (!liveProfileLoaded) {
-          setPhotoUri(data?.photoUri ?? null);
-        }
+        setPhotoUri((current) => current ?? data?.photoUri ?? null);
       });
-
-      // Previously only Profile edit ever fetched this, so the dashboard kept showing
-      // whatever photo/language happened to be cached locally until the user went
-      // looking for it — confirmed live as a real gap (docs/DECISIONS.md D-029) and
-      // fixed the same way profile.tsx's own load already was.
-      (async () => {
-        try {
-          const token = await getAccessToken();
-          const details = await apiFetch<ProfileDetailsResponse>('/profile/details', { method: 'GET', token });
-          liveProfileLoaded = true;
-          if (details.avatarUrl) {
-            setPhotoUri(details.avatarUrl);
-          }
-          if (details.preferredLanguage && SUPPORTED_LANGS.some((l) => l.code === details.preferredLanguage)) {
-            await setLanguage(details.preferredLanguage);
-          }
-        } catch {
-          // Offline, or profile not created yet — local cache above already covers
-          // the screen.
-        }
-      })();
 
       Promise.all([loadMedicines(), loadIntakeLog()]).then(([medicines, log]) => {
         setAdherence(calculateAdherence(medicines, log));
       });
+      loadQuickTapItems().then((items) => setResourceItems(items.filter((item) => item.active)));
     });
 
     const unsubLang = subscribeToLanguageChanges(() => {
@@ -160,7 +204,7 @@ export default function DashboardScreen({ navigation }: Props) {
       unsubFocus();
       unsubLang();
     };
-  }, [navigation, getAccessToken]);
+  }, [navigation]);
 
   // Scroll handler runs entirely on the UI thread, so the app bar fade-in
   // stays glitch-free even on a busy JS thread.
@@ -188,8 +232,19 @@ export default function DashboardScreen({ navigation }: Props) {
       navigation.navigate('Wellness');
     } else if (id === 'cycle') {
       navigation.navigate('Cycle');
+    } else if (id === 'household') {
+      navigation.navigate('HouseholdOperations');
+    } else if (id === 'money') {
+      navigation.navigate('ExpenseGroups');
+    } else if (id === 'docs') {
+      navigation.navigate('DocHub');
+    } else if (id === 'safety') {
+      navigation.navigate('Staff');
+    } else if (id === 'style') {
+      navigation.navigate('Wardrobe');
+    } else if (id === 'scan' || id === 'pay') {
+      navigation.navigate('Voice');
     }
-    // Other tiles have no screen yet — see docs/BACKLOG.md M5-M7.
   };
 
   const handleActionPress = (id: ActionId) => {
@@ -199,8 +254,20 @@ export default function DashboardScreen({ navigation }: Props) {
       navigation.navigate('Wellness');
     } else if (id === 'cycle') {
       navigation.navigate('Cycle');
+    } else if (id === 'expense') {
+      navigation.navigate('ExpenseGroups');
+    } else if (id === 'scan' || id === 'pay') {
+      navigation.navigate('Voice');
     }
-    // Other quick actions have no screen yet — see docs/BACKLOG.md M5-M7.
+  };
+
+  const handleResourceTap = async (item: QuickTapItem) => {
+    const { loadResourceLogs } = await import('../features/resources/resourceStore');
+    const existing = await loadResourceLogs();
+    const entry: ResourceLog = {
+      id: String(Date.now()), quickTapItemId: item.id, itemName: item.name, quantity: 1, note: '', loggedAt: Date.now(),
+    };
+    await saveResourceLogs([entry, ...existing]);
   };
 
   return (
@@ -240,7 +307,7 @@ export default function DashboardScreen({ navigation }: Props) {
             instead of separate staggered entrances for the greeting and the cards. */}
         <Animated.View entering={FadeInDown.duration(280)}>
           <View style={styles.greetingBlock}>
-            <Text style={styles.greetingTitle}>{t('dashboard.greeting')}</Text>
+            <Text style={styles.greetingTitle}>{t(getGreetingKey())}</Text>
             <Text style={styles.greetingSubtitle}>{t('dashboard.subheading')}</Text>
             <View style={styles.statusRow}>
               <View style={styles.statusDot} />
@@ -288,8 +355,18 @@ export default function DashboardScreen({ navigation }: Props) {
           </View>
         </View>
 
+        {
+          resourceItems.length > 0 ? (
+            <View style={styles.resourcePanel}>
+              <View style={styles.resourceHeader}><View><Text style={styles.sectionTitle}>{t('resources.dashboard_title')}</Text><Text style={styles.sectionSubtitle}>{t('resources.dashboard_subtitle')}</Text></View><Pressable onPress={() => navigation.navigate('Resources')}><Text style={styles.resourceOpen}>{t('resources.open')}</Text></Pressable></View>
+              <View style={styles.resourceTaps}>{resourceItems.slice(0, 4).map((item) => <Pressable key={item.id} style={styles.resourceTap} onPress={() => handleResourceTap(item)}><Text style={styles.resourceTapPlus}>+</Text><Text style={styles.resourceTapName} numberOfLines={1}>{item.name}</Text></Pressable>)}</View>
+            </View>
+          ) : null
+        }
+
         {/* Module list — same reasoning: ten rows staggering in individually was
             the largest source of visible motion on this screen. */}
+        {/* Module list */}
         <SectionHeader title={t('dashboard.quick_tiles')} subtitle={t('dashboard.quick_tiles_sub')} style={styles.gridHeader} />
         <View style={styles.moduleList}>
           {tiles.map((tile, idx) => (
@@ -311,8 +388,8 @@ export default function DashboardScreen({ navigation }: Props) {
           <Text style={styles.footerBrand}>Habita AI · Home & Life OS</Text>
           <Text style={styles.footerText}>{t('dashboard.footer_note')}</Text>
         </View>
-      </Animated.ScrollView>
-    </View>
+      </Animated.ScrollView >
+    </View >
   );
 }
 
@@ -457,6 +534,13 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   sectionMargin: {
     marginBottom: spacing.xl,
   },
+  resourcePanel: { marginBottom: spacing.xl },
+  resourceHeader: { flexDirection: 'row', alignItems: 'flex-start', justifyContent: 'space-between' },
+  resourceOpen: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary, marginTop: 5 },
+  resourceTaps: { flexDirection: 'row', gap: spacing.sm },
+  resourceTap: { flex: 1, minHeight: 72, padding: spacing.sm, borderRadius: radius.md, borderWidth: 1, borderColor: colors.border, backgroundColor: colors.surface, justifyContent: 'space-between' },
+  resourceTapPlus: { fontFamily: fonts.serif, fontSize: 20, color: colors.primary },
+  resourceTapName: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textPrimary },
   sectionTitle: {
     fontFamily: fonts.serif,
     fontSize: 22,

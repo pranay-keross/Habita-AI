@@ -4,6 +4,8 @@ import { authService, type TokenPair } from '../features/auth/auth';
 import { MEDICINE_STORAGE_KEY, INTAKE_LOG_STORAGE_KEY } from '../features/medicine/medicineStore';
 import { MOOD_STORAGE_KEY } from '../features/wellness/wellnessStore';
 import { CYCLE_STORAGE_KEY, CYCLE_SETTINGS_STORAGE_KEY } from '../features/cycle/cycleStore';
+import { CAREGIVER_STORAGE_KEY, CAREGIVER_TRANSACTION_STORAGE_KEY } from '../features/staff/staffStore';
+import { QUICK_TAP_STORAGE_KEY, RESOURCE_LOG_STORAGE_KEY } from '../features/resources/resourceStore';
 
 const SESSION_KEY = 'habita.session';
 
@@ -22,14 +24,17 @@ const PROFILE_STORAGE_KEY = 'habita.user_profile';
 // Mood and cycle data (added M4-T6/M4-T8) matter here more than anything else on the
 // list: leaving them behind would show a second person signing in on the same device
 // the first account's mood notes and period history.
-const ACCOUNT_SCOPED_KEYS = [
-  PROFILE_STORAGE_KEY,
-  MEDICINE_STORAGE_KEY,
-  INTAKE_LOG_STORAGE_KEY,
-  MOOD_STORAGE_KEY,
+// const ACCOUNT_SCOPED_KEYS = [
+//   PROFILE_STORAGE_KEY,
+//   MEDICINE_STORAGE_KEY,
+//   INTAKE_LOG_STORAGE_KEY,
+//   MOOD_STORAGE_KEY,
+//   CYCLE_STORAGE_KEY,
+//   CYCLE_SETTINGS_STORAGE_KEY,
+// ];
+const ACCOUNT_SCOPED_KEYS = [PROFILE_STORAGE_KEY,  MOOD_STORAGE_KEY,
   CYCLE_STORAGE_KEY,
-  CYCLE_SETTINGS_STORAGE_KEY,
-];
+  CYCLE_SETTINGS_STORAGE_KEY, MEDICINE_STORAGE_KEY, INTAKE_LOG_STORAGE_KEY, CAREGIVER_STORAGE_KEY, CAREGIVER_TRANSACTION_STORAGE_KEY, RESOURCE_LOG_STORAGE_KEY, QUICK_TAP_STORAGE_KEY];
 
 async function clearAccountData(): Promise<void> {
   await Promise.all(ACCOUNT_SCOPED_KEYS.map((key) => removeItem(key)));
@@ -157,10 +162,18 @@ export default function useAuth() {
   }, []);
 
   const logout = useCallback(async () => {
+    const current = session ?? (await getItem<Session | null>(SESSION_KEY, null));
+    if (current) {
+      // Best-effort: blacklists both tokens server-side (docs/DECISIONS.md) so they
+      // can't be replayed before their natural expiry. A failure here (offline, backend
+      // unreachable, token already expired) shouldn't block sign-out — the local session
+      // is cleared below regardless, the same end state the user asked for either way.
+      await authService.logout(current.accessToken, current.refreshToken).catch(() => {});
+    }
     await removeItem(SESSION_KEY);
     await clearAccountData();
     setSession(null);
-  }, []);
+  }, [session]);
 
   // Read-through-state-then-storage, then silently refresh if what's found has expired
   // (or is about to). Updates this hook instance's own `session` state whenever the
