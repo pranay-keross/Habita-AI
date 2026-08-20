@@ -10,28 +10,30 @@ import Animated, {
 } from 'react-native-reanimated';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
-import type { LucideIcon } from 'lucide-react-native';
-import ScanLine from 'lucide-react-native/icons/scan-line';
-import IndianRupee from 'lucide-react-native/icons/indian-rupee';
-import Pill from 'lucide-react-native/icons/pill';
-import Receipt from 'lucide-react-native/icons/receipt';
-import Fuel from 'lucide-react-native/icons/fuel';
-import Crown from 'lucide-react-native/icons/crown';
-import ScanSearch from 'lucide-react-native/icons/scan-search';
-import CreditCard from 'lucide-react-native/icons/credit-card';
-import Users from 'lucide-react-native/icons/users';
-import TrendingUp from 'lucide-react-native/icons/trending-up';
-import FolderOpen from 'lucide-react-native/icons/folder-open';
+import {
+  CalendarDays,
+  CalendarHeart,
+  ChevronRight,
+  CreditCard,
+  Crown,
+  FolderOpen,
+  Fuel,
+  HeartPulse,
+  House,
+  IndianRupee,
+  Pill,
+  Receipt,
+  ScanLine,
+  ScanSearch,
+  ShieldCheck,
+  Shirt,
+  Smile,
+  TrendingUp,
+  Users,
+  type LucideIcon,
+} from 'lucide-react-native';
 // import Package from 'lucide-react-native/icons/package';
 // import Mic from 'lucide-react-native/icons/mic';
-import ShieldCheck from 'lucide-react-native/icons/shield-check';
-import HeartPulse from 'lucide-react-native/icons/heart-pulse';
-import Shirt from 'lucide-react-native/icons/shirt';
-import CalendarDays from 'lucide-react-native/icons/calendar-days';
-import CalendarHeart from 'lucide-react-native/icons/calendar-heart';
-import Smile from 'lucide-react-native/icons/smile';
-import House from 'lucide-react-native/icons/house';
-import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import type { RootStackParamList } from './_layout';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
@@ -120,6 +122,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
     { id: 'scan', title: t('dashboard.tile_scan'), Icon: ScanSearch },
     { id: 'pay', title: t('dashboard.tile_pay'), Icon: CreditCard },
     { id: 'family', title: t('dashboard.tile_family'), Icon: Users },
+    { id: 'household', title: t('dashboard.tile_household_operations'), Icon: House },
     { id: 'medicine', title: t('dashboard.tile_medicine'), Icon: Pill },
     { id: 'money', title: t('dashboard.tile_money'), Icon: TrendingUp },
     { id: 'docs', title: t('dashboard.tile_docs'), Icon: FolderOpen },
@@ -128,7 +131,6 @@ export default function DashboardScreen({ navigation, route }: Props) {
     { id: 'cycle', title: t('dashboard.tile_cycle'), Icon: CalendarHeart },
     { id: 'style', title: t('dashboard.tile_style'), Icon: Shirt },
     { id: 'events', title: t('dashboard.tile_events'), Icon: CalendarDays },
-    { id: 'household', title: t('dashboard.tile_household_operations'), Icon: House },
   ];
 
   // Live GET /profile/details — deliberately *not* wired to every focus event any more

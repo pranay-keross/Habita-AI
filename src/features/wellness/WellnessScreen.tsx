@@ -2,21 +2,23 @@ import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
-import type { LucideIcon } from 'lucide-react-native';
-import ArrowLeft from 'lucide-react-native/icons/arrow-left';
-import Frown from 'lucide-react-native/icons/frown';
-import Annoyed from 'lucide-react-native/icons/annoyed';
-import Meh from 'lucide-react-native/icons/meh';
-import Smile from 'lucide-react-native/icons/smile';
-import Laugh from 'lucide-react-native/icons/laugh';
-import Brain from 'lucide-react-native/icons/brain';
-import Wind from 'lucide-react-native/icons/wind';
-import Sparkles from 'lucide-react-native/icons/sparkles';
-import HeartHandshake from 'lucide-react-native/icons/heart-handshake';
-import MoonStar from 'lucide-react-native/icons/moon-star';
-import Leaf from 'lucide-react-native/icons/leaf';
-import Timer from 'lucide-react-native/icons/timer';
-import Plus from 'lucide-react-native/icons/plus';
+import {
+  Annoyed,
+  ArrowLeft,
+  Brain,
+  Frown,
+  HeartHandshake,
+  Laugh,
+  Leaf,
+  Meh,
+  MoonStar,
+  Plus,
+  Smile,
+  Sparkles,
+  Timer,
+  Wind,
+  type LucideIcon,
+} from 'lucide-react-native';
 import type { RootStackParamList } from '../../app/_layout';
 import type { ThemeTokens } from '../../theme';
 import useThemedStyles from '../../hooks/useThemedStyles';
