@@ -149,14 +149,14 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
             </View>
 
             <View style={styles.heroStatPill}>
-              <Text style={[styles.heroStatVal, { color: '#34D399' }]}>
+              <Text style={[styles.heroStatVal, styles.getBackStatVal]}>
                 ₹{(totals.youAreOwed || 33900).toLocaleString('en-IN')}
               </Text>
               <Text style={styles.heroStatLbl}>{t('expenses.you_get_back')}</Text>
             </View>
 
             <View style={styles.heroStatPill}>
-              <Text style={[styles.heroStatVal, { color: styles.heroTitle.color }]}>
+              <Text style={styles.heroStatVal}>
                 ₹{(totals.youOwe || 0).toLocaleString('en-IN')}
               </Text>
               <Text style={styles.heroStatLbl}>{t('expenses.you_owe')}</Text>
@@ -340,7 +340,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               placeholderTextColor={styles.placeholder.color}
             />
             <Pressable style={styles.addMemberBtn} onPress={handleAddMember}>
-              <Plus size={18} color="#FFFFFF" />
+              <Plus size={18} color={styles.addMemberBtnIcon.color} />
             </Pressable>
           </View>
 
@@ -440,6 +440,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       fontSize: 15,
       color: colors.textOnPrimary,
       marginBottom: 2,
+    },
+    getBackStatVal: {
+      color: colors.forest,
+    },
+    addMemberBtnIcon: {
+      color: colors.textOnPrimary,
     },
     heroStatLbl: {
       fontFamily: fonts.sans,

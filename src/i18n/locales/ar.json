@@ -533,7 +533,22 @@
     "paid_by": "تم الدفع بواسطة",
     "date_logged": "تاريخ التسجيل",
     "split_mode": "وضع التقسيم",
-    "itemized_shares": "تفصيل الحصص"
+    "itemized_shares": "تفصيل الحصص",
+    "adding_to_group": "الإضافة إلى {{emoji}} {{name}}",
+    "missing_title": "العنوان مفقود",
+    "enter_desc_msg": "يرجى إدخال وصف للمصروف.",
+    "invalid_amount": "مبلغ غير صالحة",
+    "enter_valid_amount_msg": "يرجى إدخال مبلغ مصروف صحيح.",
+    "invalid_percentage": "نسبة مئوية غير صالحة",
+    "percentage_sum_msg": "يجب أن يكون مجموع النسبة 100%. المجموع الحالي: {{sum}}%",
+    "expense_added": "تمت إضافة المصروف!",
+    "expense_added_msg": "تمت إضافة ₹{{amount}} إلى {{group}}",
+    "settlement_recorded_title": "تم تسجيل التسوية!",
+    "settlement_recorded_msg": "تم تسجيل الدفع من {{payer}} إلى {{payee}} عبر {{method}}.",
+    "method_upi": "يو بي أي / جي باي",
+    "method_cash": "نقداً",
+    "method_bank_transfer": "تحويل بنكي",
+    "metadata_title": "البيانات الوصفية"
   },
   "doc_hub": {
     "hub_title": "مركز المستندات",

@@ -533,7 +533,22 @@
     "paid_by": "Pagado por",
     "date_logged": "Fecha registrada",
     "split_mode": "Modo de división",
-    "itemized_shares": "Partes Detalladas"
+    "itemized_shares": "Partes Detalladas",
+    "adding_to_group": "Añadiendo a {{emoji}} {{name}}",
+    "missing_title": "Falta el título",
+    "enter_desc_msg": "Por favor ingresa una descripción para el gasto.",
+    "invalid_amount": "Monto no válido",
+    "enter_valid_amount_msg": "Por favor ingresa un monto de gasto válido.",
+    "invalid_percentage": "Porcentaje no válido",
+    "percentage_sum_msg": "Los porcentajes deben sumar 100%. Suma actual: {{sum}}%",
+    "expense_added": "¡Gasto Añadido!",
+    "expense_added_msg": "₹{{amount}} añadido a {{group}}",
+    "settlement_recorded_title": "¡Liquidación Registrada!",
+    "settlement_recorded_msg": "Pago de {{payer}} a {{payee}} registrado mediante {{method}}.",
+    "method_upi": "UPI / GPay",
+    "method_cash": "Efectivo",
+    "method_bank_transfer": "Transferencia Bancaria",
+    "metadata_title": "Metadatos"
   },
   "doc_hub": {
     "hub_title": "Centro de Documentos",

@@ -82,12 +82,12 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
 
   const handleSave = async () => {
     if (!title.trim()) {
-      Alert.alert('Missing Title', 'Please enter a description for the expense.');
+      Alert.alert(t('expenses.missing_title'), t('expenses.enter_desc_msg'));
       return;
     }
     const amt = parseFloat(amountStr);
     if (isNaN(amt) || amt <= 0) {
-      Alert.alert('Invalid Amount', 'Please enter a valid expense amount.');
+      Alert.alert(t('expenses.invalid_amount'), t('expenses.enter_valid_amount_msg'));
       return;
     }
     if (!group) return;
@@ -112,7 +112,10 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
         splits[m.id] = Math.round((amountInINR * p) / 100);
       });
       if (Math.abs(totalPct - 100) > 1) {
-        Alert.alert('Invalid Percentage', `Percentages must sum to 100%. Current sum: ${totalPct}%`);
+        Alert.alert(
+          t('expenses.invalid_percentage'),
+          t('expenses.percentage_sum_msg', { sum: totalPct }),
+        );
         return;
       }
     } else if (splitMode === 'shares') {
@@ -140,7 +143,13 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
     });
     setSaving(false);
 
-    Alert.alert('Expense Added!', `₹${amountInINR.toLocaleString('en-IN')} added to ${group.name}`);
+    Alert.alert(
+      t('expenses.expense_added'),
+      t('expenses.expense_added_msg', {
+        amount: amountInINR.toLocaleString('en-IN'),
+        group: group.name,
+      }),
+    );
     navigation.goBack();
   };
 
@@ -166,7 +175,9 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Group Pill Header */}
         <View style={styles.groupPill}>
-          <Text style={styles.groupPillText}>Adding to {group.emoji} {group.name}</Text>
+          <Text style={styles.groupPillText}>
+            {t('expenses.adding_to_group', { emoji: group.emoji, name: group.name })}
+          </Text>
         </View>
 
         {/* Amount Input */}

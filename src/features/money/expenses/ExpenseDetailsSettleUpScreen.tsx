@@ -32,10 +32,10 @@ type Props = StackScreenProps<RootStackParamList, 'ExpenseDetailsSettleUp'>;
 
 type PaymentMethod = 'upi' | 'cash' | 'bank_transfer';
 
-const PAYMENT_METHODS: { key: PaymentMethod; label: string; icon: string }[] = [
-  { key: 'upi', label: 'UPI / GPay', icon: '💳' },
-  { key: 'cash', label: 'Cash', icon: '💵' },
-  { key: 'bank_transfer', label: 'Bank Transfer', icon: '🏦' },
+const PAYMENT_METHODS: { key: PaymentMethod; labelKey: string; icon: string }[] = [
+  { key: 'upi', labelKey: 'expenses.method_upi', icon: '💳' },
+  { key: 'cash', labelKey: 'expenses.method_cash', icon: '💵' },
+  { key: 'bank_transfer', labelKey: 'expenses.method_bank_transfer', icon: '🏦' },
 ];
 
 export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Props) {
@@ -89,9 +89,16 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
     await settlePairwiseDebt(group.id, settlePayerId, settlePayeeId, paymentMethod);
     setSettling(false);
 
+    const pmMeta = PAYMENT_METHODS.find((p) => p.key === paymentMethod);
+    const methodStr = pmMeta ? t(pmMeta.labelKey) : paymentMethod.toUpperCase();
+
     Alert.alert(
-      'Settlement Recorded!',
-      `Payment from ${payerMember?.name} to ${payeeMember?.name} recorded via ${paymentMethod.toUpperCase()}.`,
+      t('expenses.settlement_recorded_title'),
+      t('expenses.settlement_recorded_msg', {
+        payer: payerMember?.name,
+        payee: payeeMember?.name,
+        method: methodStr,
+      }),
     );
     navigation.goBack();
   };
@@ -137,7 +144,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
                       styles.methodText,
                       paymentMethod === pm.key && styles.methodTextActive,
                     ]}>
-                    {pm.label}
+                    {t(pm.labelKey)}
                   </Text>
                   {paymentMethod === pm.key && <CheckCircle2 size={18} color={styles.settleHeroTitle.color} />}
                 </Pressable>
@@ -168,7 +175,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
               </View>
 
               {/* Meta Card */}
-              <Text style={styles.sectionTitle}>Metadata</Text>
+              <Text style={styles.sectionTitle}>{t('expenses.metadata_title')}</Text>
               <View style={styles.card}>
                 <View style={styles.metaRow}>
                   <User size={16} color={styles.placeholder.color} />

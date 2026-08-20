@@ -206,7 +206,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
             <Text style={styles.sectionTitle}>{t('expenses.debt_matrix_title')}</Text>
             {pairwiseDebts.length === 0 ? (
               <View style={styles.emptyStateCard}>
-                <HandCoins size={36} color="#16A34A" />
+                <HandCoins size={36} color={styles.forestColor.color} />
                 <Text style={styles.emptyTitle}>{t('expenses.all_settled_title')}</Text>
                 <Text style={styles.emptySub}>{t('expenses.no_debt_sub')}</Text>
               </View>
@@ -263,9 +263,9 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
                     style={[
                       styles.analyticsCatAmt,
                       b.netBalanceINR > 0
-                        ? { color: '#16A34A' }
+                        ? styles.netPositiveText
                         : b.netBalanceINR < 0
-                        ? { color: '#EA580C' }
+                        ? styles.netNegativeText
                         : {},
                     ]}>
                     {b.netBalanceINR > 0
@@ -321,6 +321,15 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    forestColor: {
+      color: colors.forest,
+    },
+    netPositiveText: {
+      color: colors.forest,
+    },
+    netNegativeText: {
+      color: colors.danger,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -343,14 +352,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingBottom: spacing.xxl,
     },
     groupHeroCard: {
-      backgroundColor: colors.primaryDark,
-      borderRadius: 20,
+      backgroundColor: colors.primary,
+      borderRadius: 24,
       padding: spacing.lg,
-      marginHorizontal: spacing.lg,
-      marginTop: spacing.md,
-      marginBottom: spacing.md,
       alignItems: 'center',
-      ...shadow.medium,
+      marginTop: spacing.sm,
+      marginBottom: spacing.lg,
+      marginHorizontal: spacing.lg,
+      ...shadow.soft,
     },
     groupHeroLabel: {
       fontFamily: fonts.sansMedium,
@@ -363,6 +372,29 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textOnPrimary,
       marginTop: 4,
     },
+    groupEmojiCircle: {
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: 'rgba(255, 255, 255, 0.2)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.xs,
+    },
+    groupEmojiText: {
+      fontSize: 32,
+    },
+    groupTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 20,
+      color: colors.textOnPrimary,
+    },
+    groupSub: {
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      color: colors.textOnPrimaryMuted,
+      marginTop: 2,
+    },
     myNetBadge: {
       marginTop: 10,
       backgroundColor: 'rgba(255, 255, 255, 0.15)',
@@ -370,7 +402,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingVertical: 4,
       borderRadius: 12,
     },
-    myNetGreen: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimaryAccent || '#86EFAC' },
+    myNetGreen: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimary },
     myNetOrange: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimaryMuted },
     myNetSettled: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textOnPrimaryMuted },
 

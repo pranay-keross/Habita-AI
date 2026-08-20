@@ -604,7 +604,22 @@
     "paid_by": "প্রদানকারী",
     "date_logged": "তারিখ",
     "split_mode": "ভাগ করার মোড",
-    "itemized_shares": "ব্যক্তিগত অংশ"
+    "itemized_shares": "ব্যক্তিগত অংশ",
+    "adding_to_group": "{{emoji}} {{name}} এ যোগ করা হচ্ছে",
+    "missing_title": "শিরোনাম অনুপস্থিত",
+    "enter_desc_msg": "অনুগ্রহ করে খরচের বিবরণ লিখুন।",
+    "invalid_amount": "অকার্যকর পরিমাণ",
+    "enter_valid_amount_msg": "অনুগ্রহ করে একটি সঠিক খরচের পরিমাণ লিখুন।",
+    "invalid_percentage": "অকার্যকর শতাংশ",
+    "percentage_sum_msg": "শতাংশের যোগফল ১০০% হতে হবে। বর্তমান যোগফল: {{sum}}%",
+    "expense_added": "খরচ যুক্ত হয়েছে!",
+    "expense_added_msg": "₹{{amount}} {{group}} এ যোগ করা হয়েছে",
+    "settlement_recorded_title": "নিষ্পত্তি রেকর্ড করা হয়েছে!",
+    "settlement_recorded_msg": "{{payer}} থেকে {{payee}} কে {{method}} এর মাধ্যমে প্রদান রেকর্ড করা হয়েছে।",
+    "method_upi": "ইউপিআই / জিপে",
+    "method_cash": "নগদ",
+    "method_bank_transfer": "ব্যাংক ট্রান্সফার",
+    "metadata_title": "মেটাডেটা"
   },
   "doc_hub": {
     "hub_title": "ডকুমেন্ট হাব",

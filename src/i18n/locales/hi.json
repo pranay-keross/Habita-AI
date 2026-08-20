@@ -533,7 +533,22 @@
     "paid_by": "भुगतानकर्ता",
     "date_logged": "दर्ज तिथि",
     "split_mode": "विभाजन प्रकार",
-    "itemized_shares": "व्यक्तिगत हिस्सा"
+    "itemized_shares": "व्यक्तिगत हिस्सा",
+    "adding_to_group": "{{emoji}} {{name}} में जोड़ रहे हैं",
+    "missing_title": "शीर्षक गायब है",
+    "enter_desc_msg": "कृपया खर्च का विवरण दर्ज करें।",
+    "invalid_amount": "अमान्य राशि",
+    "enter_valid_amount_msg": "कृपया एक मान्य खर्च राशि दर्ज करें।",
+    "invalid_percentage": "अमान्य प्रतिशत",
+    "percentage_sum_msg": "प्रतिशत का योग 100% होना चाहिए। वर्तमान योग: {{sum}}%",
+    "expense_added": "खर्च जोड़ा गया!",
+    "expense_added_msg": "₹{{amount}} {{group}} में जोड़ा गया",
+    "settlement_recorded_title": "भुगतान दर्ज किया गया!",
+    "settlement_recorded_msg": "{{payer}} से {{payee}} को {{method}} द्वारा भुगतान दर्ज किया गया।",
+    "method_upi": "यूपीआई / जीपे",
+    "method_cash": "नकद",
+    "method_bank_transfer": "बैंक ट्रांसफर",
+    "metadata_title": "मेटाडेटा"
   },
   "doc_hub": {
     "hub_title": "दस्तावेज़ हब",

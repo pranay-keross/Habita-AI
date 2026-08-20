@@ -571,7 +571,22 @@
     "paid_by": "செலுத்தியவர்",
     "date_logged": "தேதி",
     "split_mode": "பிரிவு முறை",
-    "itemized_shares": "பங்கு விவரங்கள்"
+    "itemized_shares": "பங்கு விவரங்கள்",
+    "adding_to_group": "{{emoji}} {{name}}-இல் சேர்க்கிறது",
+    "missing_title": "தலைப்பு தேவை",
+    "enter_desc_msg": "செலவு பற்றிய விவரத்தை உள்ளிடவும்.",
+    "invalid_amount": "செல்லாத தொகை",
+    "enter_valid_amount_msg": "சரியான செலவுத் தொகையை உள்ளிடவும்.",
+    "invalid_percentage": "செல்லாத சதவீதம்",
+    "percentage_sum_msg": "சதவீதத்தின் கூடுதல் 100% ஆக இருக்க வேண்டும். தற்போதைய கூடுதல்: {{sum}}%",
+    "expense_added": "செலவு சேர்க்கப்பட்டது!",
+    "expense_added_msg": "₹{{amount}} {{group}}-இல் சேர்க்கப்பட்டது",
+    "settlement_recorded_title": "பணம் பதிவு செய்யப்பட்டது!",
+    "settlement_recorded_msg": "{{payer}}-லிருந்து {{payee}}-க்கு {{method}} மூலம் செலுத்தப்பட்ட தொகை பதிவு செய்யப்பட்டது.",
+    "method_upi": "UPI / GPay",
+    "method_cash": "ரொக்கம்",
+    "method_bank_transfer": "வங்கி பரிமாற்றம்",
+    "metadata_title": "மெட்டாடேட்டா"
   },
   "doc_hub": {
     "hub_title": "ஆவண மையம்",

@@ -533,7 +533,22 @@
     "paid_by": "Paid by",
     "date_logged": "Date logged",
     "split_mode": "Split mode",
-    "itemized_shares": "Itemized Shares"
+    "itemized_shares": "Itemized Shares",
+    "adding_to_group": "Adding to {{emoji}} {{name}}",
+    "missing_title": "Missing Title",
+    "enter_desc_msg": "Please enter a description for the expense.",
+    "invalid_amount": "Invalid Amount",
+    "enter_valid_amount_msg": "Please enter a valid expense amount.",
+    "invalid_percentage": "Invalid Percentage",
+    "percentage_sum_msg": "Percentages must sum to 100%. Current sum: {{sum}}%",
+    "expense_added": "Expense Added!",
+    "expense_added_msg": "₹{{amount}} added to {{group}}",
+    "settlement_recorded_title": "Settlement Recorded!",
+    "settlement_recorded_msg": "Payment from {{payer}} to {{payee}} recorded via {{method}}.",
+    "method_upi": "UPI / GPay",
+    "method_cash": "Cash",
+    "method_bank_transfer": "Bank Transfer",
+    "metadata_title": "Metadata"
   },
   "doc_hub": {
     "hub_title": "Document Hub",
