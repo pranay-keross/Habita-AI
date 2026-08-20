@@ -2,7 +2,7 @@
 
 How AI agents work in this repository. Product context is in `AI_CONTEXT.md`; this file is about *process*.
 
-**Last updated:** 2026-08-11 — invite history added to Family (D-024), and every doc reference to the Postman collection corrected to its actual on-disk filename
+**Last updated:** 2026-08-20 — Wellness/CBT and Cycle tracking built in one pass (D-030), closing all of M4 except `M4-T4`; note that this deliberately broke rule 10 below, at the user's explicit request
 
 ---
 
@@ -85,7 +85,10 @@ Full detail in `docs/BACKLOG.md`; this table is the summary.
 | Documentation & prompt library | ✅ M0 complete, 2026-07-30; rebranded to Habita AI 2026-08-07 |
 | Session lifecycle (idle/absolute expiry, re-auth banner) | ❌ Not built — M2-T3's remaining half, M2-T5 |
 | Managed Members (dependents) | ❌ Not built — M2-T9, new since the SRS adoption |
-| Wellness/CBT, Cycle (rest of M4) · Documents, Staff, Resources, Events, Vehicles (M5) · Expenses, Payments (M6) · Pantry, Wardrobe, Voice (M7) | ❌ Not built — see `NEXT_STEPS.md` for build order |
+| Mind & Mood — mood logging, offline CBT coach behind a `CbtCoach` interface, 4 guided meditations | ✅ Built (`M4-T6`/`M4-T7`, D-030) — device-private, deliberately *not* family-shared |
+| Cycle & Life Stage — period logging, pure prediction, 5 life stages with tailored guidance | ✅ Built (`M4-T8`/`M4-T9`, D-030) — device-private; reminders computed but not scheduled (`M4-T4`/`OD-4`) |
+| Responsive layout — `useResponsive()` hook, window-derived scales/columns/max-width | ✅ Built (D-030) — used by the Wellness and Cycle screens only; every earlier screen is still fixed-width |
+| Documents, Staff, Resources, Events, Vehicles (M5) · Expenses, Payments (M6) · Pantry, Wardrobe, Voice (M7) | ❌ Not built — see `NEXT_STEPS.md` for build order |
 | Backend beyond auth/profile, real invites, AI/OCR | ❌ Not built — M8, decisions open |
 
 ---

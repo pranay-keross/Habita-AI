@@ -7,4 +7,5 @@
 //   iOS simulator      -> 'http://localhost:8080/api'
 //   Physical device     -> 'http://<your-machine-LAN-IP>:8080/api'
 //   Real deployed server -> its actual URL
-export const API_BASE_URL = 'http://10.0.2.2:8080/api';
+export const API_BASE_URL = 'https://ikon-vpm.keross.com/saheli/api';
+

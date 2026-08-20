@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "970732121083",
+    "project_id": "habita-ai-97928",
+    "storage_bucket": "habita-ai-97928.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:970732121083:android:50875229f372bc7de6395e",
+        "android_client_info": {
+          "package_name": "com.sahelicli"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCOJmCE_fxis6BWfS6jbujjIX0INwJvDWU"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

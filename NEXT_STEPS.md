@@ -8,6 +8,18 @@ The short, ordered version of "what to build next." For full task detail, accept
 
 The product was renamed Saheli → Habita AI (`docs/DECISIONS.md` D-019, D-020); `Habita AI Software Requirements Specification.md` (repo root) is the full target vision — a 16-module product on an enterprise Spring Boot/PostgreSQL backend. **Most of that backend still doesn't exist in this repo's reach — but a real slice of it does.** What actually exists: a React Native client where onboarding (phone → OTP → profile) calls a real auth backend, and **Family & Managed Members now call the same backend for real** (`docs/DECISIONS.md` D-023, 2026-08-10 — create/invite-and-consent/roles/dependents against `/api/families/**`, superseding `M3`'s local model and closing `M2-T9`); **Medical Chest is built** (`M4-T1`/`T2`/`T3`/`T5` — CRUD, schedule, stock, daily intake log, real 7-day adherence feeding the dashboard, now permission-gated against the real Family backend instead of a local one) as the first of the SRS's 16 feature modules and the template for the rest; theming/localization/dashboard and Medicine's own data are otherwise local-first. Everything else — Pantry, Wardrobe, Cycle tracking, Wellness/CBT, Staff/Caregiver Hub, Resources, Events, Vehicles, Expense Groups, Payments, Document Hub, Voice Command — is still unbuilt, with no backend behind it either.
 
+## Update — 2026-08-20: M4 is effectively done
+
+Wellness/CBT (`M4-T6`/`M4-T7`) and Cycle tracking (`M4-T8`/`M4-T9`) were built in one pass at the user's request (`docs/DECISIONS.md` D-030), which is the option 3 recommendation below, taken. **M4 is now 8/9** — the only row left is `M4-T4` (local notification reminders), which is blocked on `OD-4`'s library decision and not startable without it. Also landed: `src/hooks/useResponsive.ts`, the first responsive-layout mechanism in the codebase, used by those two screens only.
+
+So the honest ordering from here is:
+
+1. **`M2-T3`/`M2-T5` — session lifecycle.** Unchanged, and now the *only* genuinely-open item that isn't blocked on a decision or a backend. Point 1 below still describes it accurately; it has now been deferred three times.
+2. **Answer `OD-4`** (notification library) if `M4-T4` is wanted, since nothing else unblocks it.
+3. **Start M5** (Household Ledger & Assets) — the template is now proven three times over (Medicine, Wellness, Cycle), and none of M5 depends on anything still open.
+
+Two things from this pass worth carrying forward rather than rediscovering: mood and cycle data were deliberately made **device-private, not family-shared** (D-030, decision 3 — a product call, flagged as the one most worth reversing if the product disagrees), and neither new screen has been **run on a device yet** — they pass tsc, lint, 38 new unit tests and a full i18n key-coverage check, which is not the same thing as having been seen.
+
 ## What changed since this file was last written
 
 The previous version of this file recommended finishing session lifecycle (`M2-T3`/`T5`) and Managed Members (`M2-T9`) before anything else, a recommendation the user redirected past twice now: first to build Family and Medicine UI locally (`M3`, `M4`), then to integrate a newly-supplied Family backend (D-023) rather than build Managed Members locally as this file had suggested — it landed for free as part of that integration instead. `M2-T3`/`M2-T5` are still open and still the biggest gap in what's built. Anyone picking up from here should treat session lifecycle as still-owed, not skipped for a reason.

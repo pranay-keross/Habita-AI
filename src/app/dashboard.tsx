@@ -26,6 +26,8 @@ import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import HeartPulse from 'lucide-react-native/icons/heart-pulse';
 import Shirt from 'lucide-react-native/icons/shirt';
 import CalendarDays from 'lucide-react-native/icons/calendar-days';
+import CalendarHeart from 'lucide-react-native/icons/calendar-heart';
+import Smile from 'lucide-react-native/icons/smile';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import type { RootStackParamList } from './_layout';
 import type { ThemeTokens } from '../theme';
@@ -57,8 +59,19 @@ interface ProfileDetailsResponse {
 
 // Stable IDs a translation reword can't break — `handleTilePress`/quick actions
 // route on these, never on the (locale-dependent) label text. See `M1-T7`.
-type TileId = 'scan' | 'pay' | 'family' | 'money' | 'docs' | 'safety' | 'wellness' | 'style' | 'events' | 'medicine';
-type ActionId = 'scan' | 'pay' | 'meds' | 'expense' | 'fuel' | 'premium';
+type TileId =
+  | 'scan'
+  | 'pay'
+  | 'family'
+  | 'money'
+  | 'docs'
+  | 'safety'
+  | 'wellness'
+  | 'cycle'
+  | 'style'
+  | 'events'
+  | 'medicine';
+type ActionId = 'scan' | 'pay' | 'meds' | 'mood' | 'cycle' | 'expense' | 'fuel' | 'premium';
 
 export default function DashboardScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
@@ -75,6 +88,8 @@ export default function DashboardScreen({ navigation }: Props) {
     { id: 'scan', label: t('dashboard.action_scan'), Icon: ScanLine },
     { id: 'pay', label: t('dashboard.action_pay'), Icon: IndianRupee },
     { id: 'meds', label: t('dashboard.action_meds'), Icon: Pill },
+    { id: 'mood', label: t('dashboard.action_mood'), Icon: Smile },
+    { id: 'cycle', label: t('dashboard.action_cycle'), Icon: CalendarHeart },
     { id: 'expense', label: t('dashboard.action_expense'), Icon: Receipt },
     { id: 'fuel', label: t('dashboard.action_fuel'), Icon: Fuel },
     { id: 'premium', label: t('dashboard.action_premium'), Icon: Crown },
@@ -89,6 +104,7 @@ export default function DashboardScreen({ navigation }: Props) {
     { id: 'docs', title: t('dashboard.tile_docs'), Icon: FolderOpen },
     { id: 'safety', title: t('dashboard.tile_safety'), Icon: ShieldCheck },
     { id: 'wellness', title: t('dashboard.tile_wellness'), Icon: HeartPulse },
+    { id: 'cycle', title: t('dashboard.tile_cycle'), Icon: CalendarHeart },
     { id: 'style', title: t('dashboard.tile_style'), Icon: Shirt },
     { id: 'events', title: t('dashboard.tile_events'), Icon: CalendarDays },
   ];
@@ -168,6 +184,10 @@ export default function DashboardScreen({ navigation }: Props) {
       navigation.navigate('Family');
     } else if (id === 'medicine') {
       navigation.navigate('Medicine');
+    } else if (id === 'wellness') {
+      navigation.navigate('Wellness');
+    } else if (id === 'cycle') {
+      navigation.navigate('Cycle');
     }
     // Other tiles have no screen yet — see docs/BACKLOG.md M5-M7.
   };
@@ -175,6 +195,10 @@ export default function DashboardScreen({ navigation }: Props) {
   const handleActionPress = (id: ActionId) => {
     if (id === 'meds') {
       navigation.navigate('Medicine');
+    } else if (id === 'mood') {
+      navigation.navigate('Wellness');
+    } else if (id === 'cycle') {
+      navigation.navigate('Cycle');
     }
     // Other quick actions have no screen yet — see docs/BACKLOG.md M5-M7.
   };
