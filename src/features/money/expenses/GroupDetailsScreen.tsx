@@ -67,7 +67,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color="#004F63" />
+        <ActivityIndicator size="large" color={styles.tabTextActive.color} />
       </View>
     );
   }
@@ -101,7 +101,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
         <Pressable
           onPress={() => navigation.navigate('AddSplitExpense', { groupId: group.id })}
           style={styles.addNavBtn}>
-          <Plus size={20} color="#FFFFFF" />
+          <Plus size={20} color={styles.addNavBtnText.color} />
         </Pressable>
       </View>
 
@@ -127,7 +127,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
         <Pressable
           style={[styles.tabBtn, activeTab === 'expenses' && styles.tabBtnActive]}
           onPress={() => setActiveTab('expenses')}>
-          <Receipt size={16} color={activeTab === 'expenses' ? '#004F63' : styles.placeholder.color} />
+          <Receipt size={16} color={activeTab === 'expenses' ? styles.tabTextActive.color : styles.placeholder.color} />
           <Text style={[styles.tabText, activeTab === 'expenses' && styles.tabTextActive]}>
             {t('expenses.tab_expenses')}
           </Text>
@@ -136,7 +136,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
         <Pressable
           style={[styles.tabBtn, activeTab === 'balances' && styles.tabBtnActive]}
           onPress={() => setActiveTab('balances')}>
-          <Users size={16} color={activeTab === 'balances' ? '#004F63' : styles.placeholder.color} />
+          <Users size={16} color={activeTab === 'balances' ? styles.tabTextActive.color : styles.placeholder.color} />
           <Text style={[styles.tabText, activeTab === 'balances' && styles.tabTextActive]}>
             {t('expenses.tab_balances')}
           </Text>
@@ -145,7 +145,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
         <Pressable
           style={[styles.tabBtn, activeTab === 'summary' && styles.tabBtnActive]}
           onPress={() => setActiveTab('summary')}>
-          <PieChart size={16} color={activeTab === 'summary' ? '#004F63' : styles.placeholder.color} />
+          <PieChart size={16} color={activeTab === 'summary' ? styles.tabTextActive.color : styles.placeholder.color} />
           <Text style={[styles.tabText, activeTab === 'summary' && styles.tabTextActive]}>
             {t('expenses.tab_summary')}
           </Text>
@@ -179,7 +179,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
                     }>
                     <View style={styles.expenseRow}>
                       <View style={styles.expenseIconBadge}>
-                        <Receipt size={20} color="#004F63" />
+                        <Receipt size={20} color={styles.tabTextActive.color} />
                       </View>
                       <View style={{ flex: 1 }}>
                         <Text style={styles.expenseTitle}>{expense.title}</Text>
@@ -330,17 +330,20 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadow.soft,
+    },
+    addNavBtnText: {
+      color: colors.textOnPrimary,
     },
     content: {
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.xxl,
     },
     groupHeroCard: {
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primaryDark,
       borderRadius: 20,
       padding: spacing.lg,
       marginHorizontal: spacing.lg,
@@ -352,12 +355,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     groupHeroLabel: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#99F6E4',
+      color: colors.textOnPrimaryMuted,
     },
     groupHeroTotal: {
       fontFamily: fonts.sansBold,
       fontSize: 26,
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       marginTop: 4,
     },
     myNetBadge: {
@@ -367,9 +370,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingVertical: 4,
       borderRadius: 12,
     },
-    myNetGreen: { fontFamily: fonts.sansBold, fontSize: 12, color: '#86EFAC' },
-    myNetOrange: { fontFamily: fonts.sansBold, fontSize: 12, color: '#FDBA74' },
-    myNetSettled: { fontFamily: fonts.sansMedium, fontSize: 12, color: '#E2E8F0' },
+    myNetGreen: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimaryAccent || '#86EFAC' },
+    myNetOrange: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimaryMuted },
+    myNetSettled: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textOnPrimaryMuted },
 
     segmentedTabRow: {
       flexDirection: 'row',
@@ -392,7 +395,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderRadius: 12,
     },
     tabBtnActive: {
-      backgroundColor: '#E3F2F5',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     tabText: {
       fontFamily: fonts.sansMedium,
@@ -401,7 +406,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     tabTextActive: {
       fontFamily: fonts.sansBold,
-      color: '#004F63',
+      color: colors.primary,
     },
     sectionTitle: {
       fontFamily: fonts.sansBold,
@@ -427,7 +432,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#E3F2F5',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
     },
@@ -472,17 +479,17 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     debtAmount: {
       fontFamily: fonts.sansBold,
       fontSize: 16,
-      color: '#EA580C',
+      color: colors.danger,
       marginTop: 2,
     },
     settleBtn: {
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       paddingHorizontal: 14,
       paddingVertical: 8,
       borderRadius: 12,
     },
     settleBtnText: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
       fontFamily: fonts.sansBold,
       fontSize: 12.5,
     },
@@ -537,5 +544,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     placeholder: {
       color: colors.textMuted,
+    },
+    greenText: {
+      color: colors.forest,
     },
   });

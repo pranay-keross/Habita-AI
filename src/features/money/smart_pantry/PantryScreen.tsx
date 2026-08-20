@@ -214,12 +214,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerTitle: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.textPrimary },
     headerSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted },
     headerAddBtn: {
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       paddingHorizontal: 12,
       paddingVertical: 7,
       borderRadius: radius.pill,
     },
-    headerAddBtnText: { fontFamily: fonts.sansBold, fontSize: 12, color: '#FFFFFF' },
+    headerAddBtnText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimary },
     topTabBar: {
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
@@ -235,8 +235,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    tabChipActive: { backgroundColor: '#004F63', borderColor: '#004F63' },
+    tabChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     tabChipText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary },
-    tabChipTextActive: { fontFamily: fonts.sansBold, color: '#FFFFFF' },
+    tabChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     contentContainer: { paddingHorizontal: spacing.md, paddingBottom: spacing.xxl },
   });

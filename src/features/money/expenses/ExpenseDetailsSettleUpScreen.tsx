@@ -74,7 +74,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
   if (loading || !group) {
     return (
       <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color="#004F63" />
+        <ActivityIndicator size="large" color={styles.settleHeroTitle.color} />
       </View>
     );
   }
@@ -114,7 +114,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
           /* SETTLE UP MODE */
           <View>
             <View style={styles.settleHeroCard}>
-              <HandCoins size={36} color="#004F63" />
+              <HandCoins size={36} color={styles.settleHeroTitle.color} />
               <Text style={styles.settleHeroTitle}>{t('expenses.debt_settlement_title')}</Text>
               <Text style={styles.settleHeroSub}>
                 {t('expenses.is_paying_text', { payer: payerMember?.name, payee: payeeMember?.name })}
@@ -139,7 +139,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
                     ]}>
                     {pm.label}
                   </Text>
-                  {paymentMethod === pm.key && <CheckCircle2 size={18} color="#004F63" />}
+                  {paymentMethod === pm.key && <CheckCircle2 size={18} color={styles.settleHeroTitle.color} />}
                 </Pressable>
               ))}
             </View>
@@ -158,7 +158,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
               {/* Expense Hero Card */}
               <View style={styles.expenseHeroCard}>
                 <View style={styles.iconBadge}>
-                  <Receipt size={28} color="#004F63" />
+                  <Receipt size={28} color={styles.settleHeroTitle.color} />
                 </View>
                 <Text style={styles.expenseTitle}>{expense.title}</Text>
                 <Text style={styles.expenseAmountText}>
@@ -254,10 +254,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingBottom: spacing.xxl,
     },
     settleHeroCard: {
-      backgroundColor: '#E3F2F5',
+      backgroundColor: colors.surface,
       borderRadius: 20,
       borderWidth: 1,
-      borderColor: '#CBE4EA',
+      borderColor: colors.border,
       padding: spacing.lg,
       alignItems: 'center',
       marginTop: spacing.md,
@@ -266,7 +266,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     settleHeroTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
-      color: '#004F63',
+      color: colors.primary,
       marginTop: 8,
     },
     boldText: {
@@ -275,7 +275,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     settleHeroSub: {
       fontFamily: fonts.sans,
       fontSize: 13,
-      color: '#1E293B',
+      color: colors.textSecondary,
       marginTop: 4,
     },
     sectionTitle: {
@@ -302,7 +302,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderRadius: 14,
     },
     methodRowActive: {
-      backgroundColor: '#E3F2F5',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     methodText: {
       fontFamily: fonts.sansMedium,
@@ -312,7 +314,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     methodTextActive: {
       fontFamily: fonts.sansBold,
-      color: '#004F63',
+      color: colors.primary,
     },
     expenseHeroCard: {
       backgroundColor: colors.surface,
@@ -329,7 +331,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 52,
       height: 52,
       borderRadius: 26,
-      backgroundColor: '#E0F2FE',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: 10,
@@ -346,8 +350,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginTop: 4,
     },
     expenseCategoryPill: {
-      backgroundColor: '#E3F2F5',
-      color: '#004F63',
+      backgroundColor: colors.surfaceElevated,
+      borderColor: colors.border,
+      borderWidth: 1,
+      color: colors.primary,
       fontFamily: fonts.sansBold,
       fontSize: 11,
       paddingHorizontal: 10,
