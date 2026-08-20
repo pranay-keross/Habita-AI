@@ -42,11 +42,11 @@ import type {
 type Props = StackScreenProps<RootStackParamList, 'Resources'>;
 
 const UTILITY_TYPES: { type: UtilityType; label: string }[] = [
-  { type: 'electricity', label: 'Electricity' },
-  { type: 'gas', label: 'Gas' },
-  { type: 'internet', label: 'Internet' },
-  { type: 'water', label: 'Water' },
-  { type: 'waste', label: 'Waste collection' },
+  { type: 'electricity', label: 'resources.utility_electricity' },
+  { type: 'gas', label: 'resources.utility_gas' },
+  { type: 'internet', label: 'resources.utility_internet' },
+  { type: 'water', label: 'resources.utility_water' },
+  { type: 'waste', label: 'resources.utility_waste' },
 ];
 
 function startOfToday(): number {
@@ -198,8 +198,8 @@ export default function ResourcesScreen({ navigation }: Props) {
       !dueDate.trim()
     ) {
       Alert.alert(
-        'Complete the details',
-        'Enter a provider, amount, and due date.',
+        t('resources.incomplete_title'),
+        t('resources.utility_incomplete'),
       );
       return;
     }
@@ -382,7 +382,7 @@ export default function ResourcesScreen({ navigation }: Props) {
           style={styles.historyHeader}
         />
         <Button
-          title="Log a delivery"
+          title={t('resources.log_delivery')}
           onPress={() => openLog()}
           disabled={activeItems.length === 0}
         />
@@ -410,13 +410,13 @@ export default function ResourcesScreen({ navigation }: Props) {
           ))
         )}
         <SectionHeader
-          title="Utility bills"
-          subtitle="Track providers, amounts, due dates, and payment status."
+          title={t('resources.utility_bills')}
+          subtitle={t('resources.utility_bills_subtitle')}
           style={styles.historyHeader}
         />
-        <Button title="Add utility bill" onPress={() => openUtility()} />
+        <Button title={t('resources.add_utility_bill')} onPress={() => openUtility()} />
         {utilityBills.length === 0 ? (
-          <Text style={styles.noHistory}>No utility bills added yet.</Text>
+          <Text style={styles.noHistory}>{t('resources.no_utility_bills')}</Text>
         ) : (
           utilityBills.map(bill => (
             <Pressable
@@ -428,11 +428,12 @@ export default function ResourcesScreen({ navigation }: Props) {
                 <Text style={styles.utilityName}>
                   {
                     UTILITY_TYPES.find(option => option.type === bill.type)
-                      ?.label
+                      ? t(UTILITY_TYPES.find(option => option.type === bill.type)!.label)
+                      : t('resources.utility_unknown')
                   }
                 </Text>
                 <Text style={styles.utilityMeta}>
-                  {bill.provider} · Due {formatDueDate(bill.dueDate)}
+                  {bill.provider} · {t('resources.due')} {formatDueDate(bill.dueDate)}
                 </Text>
               </View>
               <View style={styles.utilityStatus}>
@@ -450,7 +451,7 @@ export default function ResourcesScreen({ navigation }: Props) {
                       bill.paid && styles.paidStatusDone,
                     ]}
                   >
-                    {bill.paid ? '✓ Paid' : 'Mark as paid'}
+                    {bill.paid ? t('resources.paid') : t('resources.mark_paid')}
                   </Text>
                 </Pressable>
               </View>
@@ -461,11 +462,10 @@ export default function ResourcesScreen({ navigation }: Props) {
           <Text style={styles.ocrTitle}>{t('resources.ocr_title')}</Text>
           <Text style={styles.ocrText}>{t('resources.ocr_description')}</Text>
           <Text style={styles.ocrTip}>
-            For a clearer scan, photograph the full bill in good light and keep
-            the due date visible.
+            {t('resources.ocr_tip')}
           </Text>
           <Pressable style={styles.ocrAction} onPress={() => openUtility()}>
-            <Text style={styles.ocrActionText}>Add bill manually</Text>
+            <Text style={styles.ocrActionText}>{t('resources.add_bill_manually')}</Text>
           </Pressable>
         </Card>
       </ScrollView>
@@ -540,7 +540,7 @@ export default function ResourcesScreen({ navigation }: Props) {
           value={quantity}
           onChangeText={setQuantity}
           keyboardType="decimal-pad"
-          placeholder="1"
+          placeholder={t('resources.quantity_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
         <Text style={styles.label}>{t('resources.note')}</Text>
@@ -565,9 +565,9 @@ export default function ResourcesScreen({ navigation }: Props) {
       <BottomSheet
         visible={utilitySheet}
         onClose={() => setUtilitySheet(false)}
-        title={editingUtilityId ? 'Edit utility bill' : 'Add utility bill'}
+        title={editingUtilityId ? t('resources.edit_utility_bill') : t('resources.add_utility_bill')}
       >
-        <Text style={styles.label}>Utility type</Text>
+        <Text style={styles.label}>{t('resources.utility_type')}</Text>
         <View style={styles.choiceRow}>
           {UTILITY_TYPES.map(option => (
             <Pressable
@@ -584,35 +584,35 @@ export default function ResourcesScreen({ navigation }: Props) {
                   utilityType === option.type && styles.choiceTextSelected,
                 ]}
               >
-                {option.label}
+                {t(option.label)}
               </Text>
             </Pressable>
           ))}
         </View>
-        <Text style={styles.label}>Provider</Text>
+        <Text style={styles.label}>{t('resources.provider')}</Text>
         <TextInput
           style={styles.input}
           value={provider}
           onChangeText={setProvider}
-          placeholder="e.g., Tata Power"
+          placeholder={t('resources.provider_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
-        <Text style={styles.label}>Bill amount</Text>
+        <Text style={styles.label}>{t('resources.bill_amount')}</Text>
         <TextInput
           style={styles.input}
           value={billAmount}
           onChangeText={setBillAmount}
           keyboardType="decimal-pad"
-          placeholder="e.g., 1200"
+          placeholder={t('resources.bill_amount_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
-        <Text style={styles.label}>Due date</Text>
+        <Text style={styles.label}>{t('resources.due_date')}</Text>
         <Pressable
           style={styles.input}
           onPress={() => setShowDueDatePicker(true)}
         >
           <Text style={dueDate ? styles.dateValue : styles.placeholder}>
-            {dueDate ? formatDueDate(dueDate) : 'Choose a due date'}
+            {dueDate ? formatDueDate(dueDate) : t('resources.due_date_placeholder')}
           </Text>
         </Pressable>
         {showDueDatePicker ? (
@@ -624,7 +624,7 @@ export default function ResourcesScreen({ navigation }: Props) {
           />
         ) : null}
         <Button
-          title="Save utility bill"
+          title={t('resources.save_utility_bill')}
           onPress={saveUtility}
           style={styles.saveButton}
         />

@@ -30,6 +30,7 @@ import Button from '../../components/Button';
 import Card from '../../components/Card';
 import SectionHeader from '../../components/SectionHeader';
 import useThemedStyles from '../../hooks/useThemedStyles';
+import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
 import {
   loadHouseholdAssets,
@@ -49,6 +50,15 @@ const DEFAULT_ASSET_CATEGORIES = [
   'Vehicle accessory',
   'Other',
 ];
+const ASSET_CATEGORY_KEYS: Record<string, string> = {
+  Appliance: 'assets.category_appliance',
+  Furniture: 'assets.category_furniture',
+  Electronics: 'assets.category_electronics',
+  Jewellery: 'assets.category_jewellery',
+  Tools: 'assets.category_tools',
+  'Vehicle accessory': 'assets.category_vehicle_accessory',
+  Other: 'assets.category_other',
+};
 const toDateKey = (date: Date) =>
   `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(
     2,
@@ -83,6 +93,7 @@ export default function VehiclesScreen({ navigation }: Props) {
   const [documentName, setDocumentName] = useState<string | null>(null);
   const [documentReviewed, setDocumentReviewed] = useState(false);
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [localeVersion, setLocaleVersion] = useState(0);
   useEffect(() => {
     let isMounted = true;
 
@@ -105,8 +116,12 @@ export default function VehiclesScreen({ navigation }: Props) {
     };
 
     hydrate();
+    const unsubscribe = subscribeToLanguageChanges(() =>
+      setLocaleVersion(version => version + 1),
+    );
     return () => {
       isMounted = false;
+      unsubscribe();
     };
   }, []);
   const persist = async (next: Vehicle[]) => {
@@ -116,7 +131,7 @@ export default function VehiclesScreen({ navigation }: Props) {
   };
   const saveAsset = async () => {
     if (!assetName.trim() || !assetCategory.trim()) {
-      Alert.alert('Complete the details', 'Enter an asset name and category.');
+      Alert.alert(t('assets.incomplete_title'), t('assets.asset_incomplete'));
       return;
     }
     const next = [
@@ -166,16 +181,16 @@ export default function VehiclesScreen({ navigation }: Props) {
         error.code !== errorCodes.OPERATION_CANCELED
       )
         Alert.alert(
-          'Document not attached',
-          'Please try selecting the vehicle registration or insurance document again.',
+          t('assets.document_not_attached'),
+          t('assets.document_not_attached_message'),
         );
     }
   };
   const save = async () => {
     if (!makeModel.trim() || !registrationNumber.trim() || !insuranceExpiry) {
       Alert.alert(
-        'Complete the details',
-        'Enter the vehicle, registration number, and insurance expiry date.',
+        t('assets.incomplete_title'),
+        t('assets.vehicle_incomplete'),
       );
       return;
     }
@@ -200,12 +215,12 @@ export default function VehiclesScreen({ navigation }: Props) {
   const remove = () => {
     if (!editingId) return;
     Alert.alert(
-      'Delete vehicle?',
-      'This vehicle and its document details will be removed.',
+      t('assets.delete_title'),
+      t('assets.delete_message'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('assets.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('assets.delete'),
           style: 'destructive',
           onPress: async () => {
             await persist(vehicles.filter(vehicle => vehicle.id !== editingId));
@@ -218,8 +233,8 @@ export default function VehiclesScreen({ navigation }: Props) {
   const reviewDocument = async (vehicle: Vehicle) => {
     if (!vehicle.documentName) {
       Alert.alert(
-        'Attach a document first',
-        'Add the registration certificate or insurance document before marking it reviewed.',
+        t('assets.attach_first_title'),
+        t('assets.attach_first_message'),
       );
       return;
     }
@@ -242,14 +257,17 @@ export default function VehiclesScreen({ navigation }: Props) {
   const missingDocs = vehicles.filter(vehicle => !vehicle.documentName).length;
   const vehiclesWithDocs = vehicles.filter(vehicle => !!vehicle.documentName).length;
   const mostCommonAssetCategory = (() => {
-    if (assets.length === 0) return 'No items yet';
+    if (assets.length === 0) return t('assets.no_items');
     const counts = assets.reduce<Record<string, number>>((memo, asset) => {
-      const key = asset.category || 'Other';
+      const key = asset.category || t('assets.category_other');
       memo[key] = (memo[key] ?? 0) + 1;
       return memo;
     }, {});
     const [category, count] = Object.entries(counts).sort((a, b) => b[1] - a[1])[0];
-    return count > 1 ? `${category} (${count})` : category;
+    const categoryLabel = ASSET_CATEGORY_KEYS[category]
+      ? t(ASSET_CATEGORY_KEYS[category])
+      : category;
+    return count > 1 ? `${categoryLabel} (${count})` : categoryLabel;
   })();
   const expiringSoon = vehicles.filter(vehicle => {
     if (!vehicle.insuranceExpiry) return false;
@@ -260,7 +278,7 @@ export default function VehiclesScreen({ navigation }: Props) {
     return diffDays >= 0 && diffDays <= 30;
   }).length;
   return (
-    <View style={styles.screen}>
+    <View key={localeVersion} style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable
           style={styles.backButton}
@@ -268,7 +286,7 @@ export default function VehiclesScreen({ navigation }: Props) {
         >
           <ArrowLeft size={20} color={styles.backIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>Assets & vehicles</Text>
+        <Text style={styles.headerTitle}>{t('assets.header_title')}</Text>
         <Pressable style={styles.addButton} onPress={() => openForm()}>
           <Text style={styles.addText}>+</Text>
         </Pressable>
@@ -284,65 +302,65 @@ export default function VehiclesScreen({ navigation }: Props) {
             <CarFront size={24} color={styles.heroIconColor.color} />
           </View>
           <Text style={styles.heroTitle}>
-            Vehicle details, ready when needed
+            {t('assets.hero_title')}
           </Text>
           <Text style={styles.heroText}>
-            Keep registration, insurance, and document-review status together.
+            {t('assets.hero_description')}
           </Text>
         </Card>
         <SectionHeader
-          title="At a glance"
-          subtitle="A quick view of your vehicle records."
+          title={t('assets.overview_title')}
+          subtitle={t('assets.overview_subtitle')}
         />
         <View style={styles.metrics}>
           <Card style={styles.metric}>
             <Text style={styles.metricValue}>{vehicles.length}</Text>
-            <Text style={styles.metricLabel}>Vehicles</Text>
+            <Text style={styles.metricLabel}>{t('assets.metric_vehicles')}</Text>
           </Card>
           <Card style={styles.metric}>
             <Text style={styles.metricValue}>{vehiclesWithDocs}</Text>
-            <Text style={styles.metricLabel}>Documented</Text>
+            <Text style={styles.metricLabel}>{t('assets.metric_documented')}</Text>
           </Card>
           <Card style={styles.metric}>
             <Text style={styles.metricValue}>{pendingReview}</Text>
-            <Text style={styles.metricLabel}>Needs review</Text>
+            <Text style={styles.metricLabel}>{t('assets.metric_review')}</Text>
           </Card>
         </View>
         <View style={styles.summaryStrip}>
           <View style={[styles.summaryPill, styles.priorityPill]}>
             <View style={styles.summaryPillHeader}>
               <View style={styles.summaryPillIcon}><FileText size={12} color={styles.summaryIconPrimary.color} /></View>
-              <Text style={styles.summaryPillLabel}>Coverage</Text>
+              <Text style={styles.summaryPillLabel}>{t('assets.coverage')}</Text>
             </View>
             <Text style={styles.summaryPillValue}>{vehiclesWithDocs}/{vehicles.length}</Text>
           </View>
           <View style={[styles.summaryPill, styles.warningPill]}>
             <View style={styles.summaryPillHeader}>
               <View style={styles.summaryPillIcon}><ShieldAlert size={12} color={styles.summaryIconWarning.color} /></View>
-              <Text style={styles.summaryPillLabel}>Attention</Text>
+              <Text style={styles.summaryPillLabel}>{t('assets.attention')}</Text>
             </View>
             <Text style={styles.summaryPillValue}>{missingDocs + expiringSoon}</Text>
           </View>
           <View style={[styles.summaryPill, styles.successPill]}>
             <View style={styles.summaryPillHeader}>
               <View style={styles.summaryPillIcon}><Tag size={12} color={styles.summaryIconSuccess.color} /></View>
-              <Text style={styles.summaryPillLabel}>Top category</Text>
+              <Text style={styles.summaryPillLabel}>{t('assets.top_category')}</Text>
             </View>
             <Text style={styles.summaryPillValue}>{mostCommonAssetCategory}</Text>
           </View>
         </View>
         <View style={styles.sectionDivider} />
         <SectionHeader
-          title="Vehicles"
-          subtitle="Tap a vehicle to update its details."
+          title={t('assets.vehicles_title')}
+          subtitle={t('assets.vehicles_subtitle')}
           style={styles.sectionHeader}
         />
-        <Button title="Add vehicle" onPress={() => openForm()} style={styles.primaryAction} />
+        <Button title={t('assets.add_vehicle')} onPress={() => openForm()} style={styles.primaryAction} />
         {vehicles.length === 0 ? (
           <Card style={styles.empty}>
-            <Text style={styles.emptyTitle}>Add your first vehicle</Text>
+            <Text style={styles.emptyTitle}>{t('assets.empty_title')}</Text>
             <Text style={styles.emptyText}>
-              Store its number and attach a registration or insurance document.
+              {t('assets.empty_text')}
             </Text>
           </Card>
         ) : (
@@ -355,11 +373,11 @@ export default function VehiclesScreen({ navigation }: Props) {
               <View style={styles.vehicleCopy}>
                 <Text style={styles.vehicleName}>{vehicle.makeModel}</Text>
                 <Text style={styles.vehicleMeta}>
-                  {vehicle.registrationNumber} · Insurance until{' '}
+                  {vehicle.registrationNumber} · {t('assets.insurance_until')}{' '}
                   {displayDate(vehicle.insuranceExpiry)}
                 </Text>
                 <Text style={styles.documentName}>
-                  {vehicle.documentName ?? 'No document attached'}
+                  {vehicle.documentName ?? t('assets.no_document')}
                 </Text>
               </View>
               <Pressable
@@ -375,7 +393,7 @@ export default function VehiclesScreen({ navigation }: Props) {
                     vehicle.documentReviewed && styles.reviewTextDone,
                   ]}
                 >
-                  {vehicle.documentReviewed ? '✓ Reviewed' : 'Review document'}
+                  {vehicle.documentReviewed ? t('assets.reviewed') : t('assets.review_document')}
                 </Text>
               </Pressable>
             </Pressable>
@@ -383,12 +401,12 @@ export default function VehiclesScreen({ navigation }: Props) {
         )}
         <View style={styles.sectionDivider} />
         <SectionHeader
-          title="Household assets"
-          subtitle="Track appliances and valuables with their category and serial number."
+          title={t('assets.household_assets')}
+          subtitle={t('assets.household_assets_subtitle')}
           style={styles.sectionHeader}
         />
         <Button
-          title="Add household asset"
+          title={t('assets.add_asset')}
           onPress={() => {
             resetAssetForm();
             setAssetSheetVisible(true);
@@ -411,31 +429,31 @@ export default function VehiclesScreen({ navigation }: Props) {
       <BottomSheet
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
-        title={editingId ? 'Edit vehicle' : 'Add vehicle'}
+        title={editingId ? t('assets.edit_vehicle') : t('assets.add_vehicle')}
       >
-        <Text style={styles.label}>Vehicle make and model</Text>
+        <Text style={styles.label}>{t('assets.make_model')}</Text>
         <TextInput
           style={styles.input}
           value={makeModel}
           onChangeText={setMakeModel}
-          placeholder="e.g., Honda City"
+          placeholder={t('assets.make_model_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
-        <Text style={styles.label}>Registration number</Text>
+        <Text style={styles.label}>{t('assets.registration_number')}</Text>
         <TextInput
           style={styles.input}
           value={registrationNumber}
           onChangeText={setRegistrationNumber}
           autoCapitalize="characters"
-          placeholder="e.g., MH 01 AB 1234"
+          placeholder={t('assets.registration_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
-        <Text style={styles.label}>Insurance expiry</Text>
+        <Text style={styles.label}>{t('assets.insurance_expiry')}</Text>
         <Pressable style={styles.input} onPress={() => setShowDatePicker(true)}>
           <Text style={insuranceExpiry ? styles.dateValue : styles.placeholder}>
             {insuranceExpiry
               ? displayDate(insuranceExpiry)
-              : 'Choose expiry date'}
+              : t('assets.insurance_expiry_placeholder')}
           </Text>
         </Pressable>
         {showDatePicker ? (
@@ -450,12 +468,12 @@ export default function VehiclesScreen({ navigation }: Props) {
             onChange={handleDateChange}
           />
         ) : null}
-        <Text style={styles.label}>Vehicle document</Text>
+        <Text style={styles.label}>{t('assets.vehicle_document')}</Text>
         <Pressable style={styles.attachButton} onPress={attachDocument}>
           <Text style={styles.attachText}>
             {documentName
-              ? 'Replace document'
-              : 'Attach registration or insurance document'}
+              ? t('assets.replace_document')
+              : t('assets.attach_document')}
           </Text>
         </Pressable>
         {documentName ? (
@@ -468,46 +486,45 @@ export default function VehiclesScreen({ navigation }: Props) {
             <View style={styles.documentInfoWrap}>
               <Text style={styles.documentPreviewName}>{documentName}</Text>
               <Text style={styles.documentPreviewMeta}>
-                {documentReviewed ? 'Reviewed and saved' : 'Uploaded and pending review'}
+                {documentReviewed ? t('assets.reviewed_saved') : t('assets.pending_review')}
               </Text>
             </View>
           </View>
         ) : null}
         <Text style={styles.documentHelp}>
-          A reviewed document means you have checked the details; it does not
-          verify authenticity with a government service.
+          {t('assets.document_help')}
         </Text>
         <Button
-          title={editingId ? 'Save changes' : 'Save vehicle'}
+          title={editingId ? t('assets.save_changes') : t('assets.save_vehicle')}
           onPress={save}
           style={styles.saveButton}
         />
         {editingId ? (
           <Pressable style={styles.deleteButton} onPress={remove}>
-            <Text style={styles.deleteText}>Delete vehicle</Text>
+            <Text style={styles.deleteText}>{t('assets.delete_vehicle')}</Text>
           </Pressable>
         ) : null}
       </BottomSheet>
       <BottomSheet
         visible={assetSheetVisible}
         onClose={() => setAssetSheetVisible(false)}
-        title="Add household asset"
+        title={t('assets.add_asset')}
       >
-        <Text style={styles.label}>Asset name</Text>
+        <Text style={styles.label}>{t('assets.asset_name')}</Text>
         <TextInput
           style={styles.input}
           value={assetName}
           onChangeText={setAssetName}
-          placeholder="e.g., Washing machine"
+          placeholder={t('assets.asset_name_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
-        <Text style={styles.label}>Category</Text>
+        <Text style={styles.label}>{t('assets.category')}</Text>
         <Pressable
           style={styles.selectInput}
           onPress={() => setShowAssetCategoryList(value => !value)}
         >
           <Text style={assetCategory ? styles.dateValue : styles.placeholder}>
-            {assetCategory || 'Select category'}
+            {assetCategory || t('assets.select_category')}
           </Text>
           <Text style={styles.selectCaret}>
             {showAssetCategoryList ? '▴' : '▾'}
@@ -533,22 +550,22 @@ export default function VehiclesScreen({ navigation }: Props) {
                     assetCategory === option && styles.categoryItemTextSelected,
                   ]}
                 >
-                  {option}
+                  {t(ASSET_CATEGORY_KEYS[option])}
                 </Text>
               </Pressable>
             ))}
           </View>
         ) : null}
-        <Text style={styles.label}>Serial number (optional)</Text>
+        <Text style={styles.label}>{t('assets.serial_number_optional')}</Text>
         <TextInput
           style={styles.input}
           value={assetSerial}
           onChangeText={setAssetSerial}
-          placeholder="Serial number"
+          placeholder={t('assets.serial_number_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
         <Button
-          title="Save asset"
+          title={t('assets.save_asset')}
           onPress={saveAsset}
           style={styles.saveButton}
         />

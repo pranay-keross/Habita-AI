@@ -326,11 +326,11 @@ export default function ProfileScreen({ route, navigation }: Props) {
     } catch (error) {
       console.warn('Native camera launcher unavailable:', error);
       Alert.alert(
-        'Camera Module Notice',
-        'Please rebuild the native iOS app (npx react-native run-ios) after running pod install to link camera native modules. Fallback applied.',
+        t('profile.camera_notice_title'),
+        t('profile.camera_notice_message'),
         [
           {
-            text: 'Use Camera Avatar',
+            text: t('profile.use_camera_avatar'),
             onPress: () => setAvatar('📸'),
           },
         ]
@@ -352,11 +352,11 @@ export default function ProfileScreen({ route, navigation }: Props) {
     } catch (error) {
       console.warn('Native gallery launcher unavailable:', error);
       Alert.alert(
-        'Gallery Module Notice',
-        'Please rebuild the native iOS app (npx react-native run-ios) after running pod install to link gallery native modules. Fallback applied.',
+        t('profile.gallery_notice_title'),
+        t('profile.gallery_notice_message'),
         [
           {
-            text: 'Use Gallery Avatar',
+            text: t('profile.use_gallery_avatar'),
             onPress: () => setAvatar('🖼️'),
           },
         ]
@@ -469,7 +469,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
           style={styles.input}
           value={name}
           onChangeText={setName}
-          placeholder="e.g. Priya Sharma"
+          placeholder={t('profile.name_placeholder')}
           placeholderTextColor={styles.placeholder.color}
           autoFocus={!isEditing}
         />
@@ -481,7 +481,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
           value={phone}
           onChangeText={setPhone}
           keyboardType="phone-pad"
-          placeholder="e.g. +91 98765 43210"
+          placeholder={t('profile.phone_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
 
@@ -596,20 +596,20 @@ export default function ProfileScreen({ route, navigation }: Props) {
       <BottomSheet
         visible={showPhotoModal}
         onClose={() => setShowPhotoModal(false)}
-        title="Profile Photo Options">
+        title={t('profile.photo_options_title')}>
         <Pressable style={styles.photoOptionBtn} onPress={handleCameraCapture}>
           <Text style={styles.photoOptionIcon}>📸</Text>
           <View style={styles.photoOptionContent}>
-            <Text style={styles.photoOptionTitle}>Take Photo (Camera)</Text>
-            <Text style={styles.photoOptionSub}>Open native camera to take picture</Text>
+            <Text style={styles.photoOptionTitle}>{t('profile.take_photo')}</Text>
+            <Text style={styles.photoOptionSub}>{t('profile.take_photo_sub')}</Text>
           </View>
         </Pressable>
 
         <Pressable style={styles.photoOptionBtn} onPress={handleGalleryPick}>
           <Text style={styles.photoOptionIcon}>🖼️</Text>
           <View style={styles.photoOptionContent}>
-            <Text style={styles.photoOptionTitle}>Choose from Gallery</Text>
-            <Text style={styles.photoOptionSub}>Select photo from device library</Text>
+            <Text style={styles.photoOptionTitle}>{t('profile.choose_gallery')}</Text>
+            <Text style={styles.photoOptionSub}>{t('profile.choose_gallery_sub')}</Text>
           </View>
         </Pressable>
 
@@ -620,8 +620,8 @@ export default function ProfileScreen({ route, navigation }: Props) {
           }}>
           <Text style={styles.photoOptionIcon}>🎭</Text>
           <View style={styles.photoOptionContent}>
-            <Text style={styles.photoOptionTitle}>Choose Preset Avatar</Text>
-            <Text style={styles.photoOptionSub}>Select from curated avatar collection</Text>
+            <Text style={styles.photoOptionTitle}>{t('profile.choose_avatar')}</Text>
+            <Text style={styles.photoOptionSub}>{t('profile.choose_avatar_sub')}</Text>
           </View>
         </Pressable>
 

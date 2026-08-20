@@ -21,6 +21,7 @@ import Button from '../../components/Button';
 import Card from '../../components/Card';
 import SectionHeader from '../../components/SectionHeader';
 import useThemedStyles from '../../hooks/useThemedStyles';
+import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
 import { loadFamilyEventBudgets, saveFamilyEventBudgets } from './eventStore';
 import type { FamilyEventBudget } from './types';
@@ -55,9 +56,14 @@ export default function EventBudgetsScreen({ navigation }: Props) {
   const [spent, setSpent] = useState('0');
   const [notes, setNotes] = useState('');
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [localeVersion, setLocaleVersion] = useState(0);
 
   useEffect(() => {
     loadFamilyEventBudgets().then(setItems);
+    const unsubscribe = subscribeToLanguageChanges(() =>
+      setLocaleVersion(version => version + 1),
+    );
+    return unsubscribe;
   }, []);
   const persist = async (next: FamilyEventBudget[]) => {
     setItems(next);
@@ -101,8 +107,8 @@ export default function EventBudgetsScreen({ navigation }: Props) {
       numericSpent < 0
     ) {
       Alert.alert(
-        'Complete the details',
-        'Enter an event name, date, and valid budget amounts.',
+        t('events.incomplete_title'),
+        t('events.incomplete_message'),
       );
       return;
     }
@@ -124,12 +130,12 @@ export default function EventBudgetsScreen({ navigation }: Props) {
   const remove = () => {
     if (!editingId) return;
     Alert.alert(
-      'Delete event?',
-      'This event and its budget summary will be removed.',
+      t('events.delete_title'),
+      t('events.delete_message'),
       [
-        { text: 'Cancel', style: 'cancel' },
+        { text: t('events.cancel'), style: 'cancel' },
         {
-          text: 'Delete',
+          text: t('events.delete'),
           style: 'destructive',
           onPress: async () => {
             await persist(items.filter(item => item.id !== editingId));
@@ -145,18 +151,18 @@ export default function EventBudgetsScreen({ navigation }: Props) {
   };
 
   return (
-    <View style={styles.screen}>
+    <View key={localeVersion} style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
         <Pressable
-          accessibilityLabel="Go back"
+          accessibilityLabel={t('events.back')}
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
           <ArrowLeft size={20} color={styles.backIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>Family events & budgets</Text>
+        <Text style={styles.headerTitle}>{t('events.header_title')}</Text>
         <Pressable
-          accessibilityLabel="Add event"
+          accessibilityLabel={t('events.add_event')}
           style={styles.addButton}
           onPress={() => openForm()}
         >
@@ -175,57 +181,57 @@ export default function EventBudgetsScreen({ navigation }: Props) {
             <CalendarDays size={24} color={styles.heroIconColor.color} />
           </View>
           <Text style={styles.heroTitle}>
-            Every celebration, clearly planned
+            {t('events.hero_title')}
           </Text>
           <Text style={styles.heroText}>
-            Keep event dates, budgets, and spend in one calm overview.
+            {t('events.hero_description')}
           </Text>
         </Card>
         <SectionHeader
-          title="At a glance"
-          subtitle="A quick breakdown across every event."
+          title={t('events.overview_title')}
+          subtitle={t('events.overview_subtitle')}
         />
         <View style={styles.metricGrid}>
           <Card style={styles.metric}>
             <Text style={styles.metricValue}>{items.length}</Text>
-            <Text style={styles.metricLabel}>Events</Text>
+            <Text style={styles.metricLabel}>{t('events.metric_events')}</Text>
           </Card>
           <Card style={styles.metric}>
             <Text style={styles.metricValue}>
               ₹{totals.budget.toLocaleString()}
             </Text>
-            <Text style={styles.metricLabel}>Planned</Text>
+            <Text style={styles.metricLabel}>{t('events.metric_planned')}</Text>
           </Card>
           <Card style={styles.metric}>
             <Text style={styles.metricValue}>
               ₹{totals.spent.toLocaleString()}
             </Text>
-            <Text style={styles.metricLabel}>Spent</Text>
+            <Text style={styles.metricLabel}>{t('events.metric_spent')}</Text>
           </Card>
           <Card style={styles.metric}>
             <Text style={styles.metricValue}>
               ₹{Math.max(totals.budget - totals.spent, 0).toLocaleString()}
             </Text>
-            <Text style={styles.metricLabel}>Remaining</Text>
+            <Text style={styles.metricLabel}>{t('events.metric_remaining')}</Text>
           </Card>
         </View>
         <Card style={styles.upcomingCard}>
           <Text style={styles.upcomingValue}>{upcoming}</Text>
           <Text style={styles.upcomingText}>
-            upcoming {upcoming === 1 ? 'event' : 'events'} to prepare for
+            {t(upcoming === 1 ? 'events.upcoming_one' : 'events.upcoming_many', { count: upcoming })}
           </Text>
         </Card>
         <SectionHeader
-          title="Events"
-          subtitle="Tap an event to update its plan or budget."
+          title={t('events.section_title')}
+          subtitle={t('events.section_subtitle')}
           style={styles.sectionHeader}
         />
-        <Button title="Add family event" onPress={() => openForm()} />
+        <Button title={t('events.add_family_event')} onPress={() => openForm()} />
         {items.length === 0 ? (
           <Card style={styles.empty}>
-            <Text style={styles.emptyTitle}>Start with an event</Text>
+            <Text style={styles.emptyTitle}>{t('events.empty_title')}</Text>
             <Text style={styles.emptyText}>
-              Add a birthday, celebration, trip, or gathering and its budget.
+              {t('events.empty_text')}
             </Text>
           </Card>
         ) : (
@@ -264,8 +270,8 @@ export default function EventBudgetsScreen({ navigation }: Props) {
                       ]}
                     >
                       {overBudget
-                        ? `₹${Math.abs(remaining).toLocaleString()} over budget`
-                        : `₹${remaining.toLocaleString()} remaining`}
+                        ? t('events.over_budget', { amount: Math.abs(remaining).toLocaleString() })
+                        : t('events.remaining', { amount: remaining.toLocaleString() })}
                     </Text>
                   </View>
                 </Pressable>
@@ -276,20 +282,20 @@ export default function EventBudgetsScreen({ navigation }: Props) {
       <BottomSheet
         visible={sheetVisible}
         onClose={() => setSheetVisible(false)}
-        title={editingId ? 'Edit event' : 'Add family event'}
+        title={editingId ? t('events.edit_title') : t('events.add_family_event')}
       >
-        <Text style={styles.label}>Event name</Text>
+        <Text style={styles.label}>{t('events.name_label')}</Text>
         <TextInput
           style={styles.input}
           value={name}
           onChangeText={setName}
-          placeholder="e.g., Diwali dinner"
+          placeholder={t('events.name_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
-        <Text style={styles.label}>Event date</Text>
+        <Text style={styles.label}>{t('events.date_label')}</Text>
         <Pressable style={styles.input} onPress={() => setShowDatePicker(true)}>
           <Text style={date ? styles.dateValue : styles.placeholder}>
-            {date ? displayDate(date) : 'Choose a date'}
+            {date ? displayDate(date) : t('events.date_placeholder')}
           </Text>
         </Pressable>
         {showDatePicker ? (
@@ -300,41 +306,41 @@ export default function EventBudgetsScreen({ navigation }: Props) {
             onChange={handleDateChange}
           />
         ) : null}
-        <Text style={styles.label}>Planned budget</Text>
+        <Text style={styles.label}>{t('events.budget_label')}</Text>
         <TextInput
           style={styles.input}
           value={budget}
           onChangeText={setBudget}
           keyboardType="decimal-pad"
-          placeholder="e.g., 15000"
+          placeholder={t('events.budget_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
-        <Text style={styles.label}>Amount spent</Text>
+        <Text style={styles.label}>{t('events.spent_label')}</Text>
         <TextInput
           style={styles.input}
           value={spent}
           onChangeText={setSpent}
           keyboardType="decimal-pad"
-          placeholder="0"
+          placeholder={t('events.spent_placeholder')}
           placeholderTextColor={styles.placeholder.color}
         />
-        <Text style={styles.label}>Notes (optional)</Text>
+        <Text style={styles.label}>{t('events.notes_label')}</Text>
         <TextInput
           style={[styles.input, styles.notesInput]}
           value={notes}
           onChangeText={setNotes}
-          placeholder="Guests, venue, tasks, or other details"
+          placeholder={t('events.notes_placeholder')}
           placeholderTextColor={styles.placeholder.color}
           multiline
         />
         <Button
-          title={editingId ? 'Save changes' : 'Add event'}
+          title={editingId ? t('events.save_changes') : t('events.add_event')}
           onPress={save}
           style={styles.saveButton}
         />
         {editingId ? (
           <Pressable style={styles.deleteButton} onPress={remove}>
-            <Text style={styles.deleteText}>Delete event</Text>
+            <Text style={styles.deleteText}>{t('events.delete_event')}</Text>
           </Pressable>
         ) : null}
       </BottomSheet>
