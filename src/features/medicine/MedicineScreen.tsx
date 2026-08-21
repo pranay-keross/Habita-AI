@@ -20,6 +20,7 @@ import {
   listFamilyProfiles,
   listMedicines,
   logIntake,
+  normalizeScheduleTimes,
   normalizeStockQuantity,
   parseAdherenceRate,
   parseMedchestError,
@@ -55,6 +56,13 @@ const SLOT_TIME: Record<ScheduleSlot, string> = {
   night: '21:00',
 };
 
+const SLOT_TIME_LABEL: Record<ScheduleSlot, string> = {
+  morning: '08:00 AM',
+  afternoon: '01:00 PM',
+  evening: '06:00 PM',
+  night: '09:00 PM',
+};
+
 function slotToTime(slot: ScheduleSlot): string {
   return SLOT_TIME[slot];
 }
@@ -68,12 +76,13 @@ function timeToSlot(time: string): ScheduleSlot {
 }
 
 function remoteToLocal(remote: RemoteMedicine, liquidFlags: Record<string, boolean>): Medicine {
-  const slots = Array.from(new Set(remote.scheduleTimes.map(timeToSlot)));
+  const times = normalizeScheduleTimes(remote.scheduleTimes);
+  const slots = Array.from(new Set(times.map(timeToSlot)));
   return {
     id: remote.id,
     name: remote.name,
     dosage: remote.dosage,
-    schedule: slots,
+    schedule: slots.length > 0 ? slots : ['morning'],
     stock: normalizeStockQuantity(remote.stockQuantity),
     isLiquid: liquidFlags[remote.id] ?? guessIsLiquid(remote.dosage),
   };
@@ -152,6 +161,25 @@ export default function MedicineScreen({ navigation }: Props) {
   const [stock, setStock] = useState('30');
   const [isLiquid, setIsLiquid] = useState(false);
   const [saving, setSaving] = useState(false);
+
+  // Filter out family members who already have a medicine profile created
+  const availableFamilyMembers = useMemo(() => {
+    return familyMembers.filter((member) => {
+      const hasMemberProfile = profiles.some((p) => p.familyMemberId === member.id);
+      const isSelfMember = member.id === myFamilyMemberId || (!member.managed && profiles.some((p) => p.category === 'SELF' && p.name === member.name));
+      const hasSelfProfile = isSelfMember && profiles.some((p) => p.category === 'SELF');
+      return !hasMemberProfile && !hasSelfProfile;
+    });
+  }, [familyMembers, profiles, myFamilyMemberId]);
+
+  // Filter out 'SELF' category if a SELF profile already exists in the family
+  const availableCategories = useMemo(() => {
+    const hasSelfProfile = profiles.some((p) => p.category === 'SELF');
+    if (hasSelfProfile) {
+      return ALL_CATEGORIES.filter((cat) => cat !== 'SELF');
+    }
+    return ALL_CATEGORIES;
+  }, [profiles]);
 
   const errorMessageKey = (kind: MedchestErrorKind): string => {
     const key: Record<MedchestErrorKind, string> = {
@@ -650,7 +678,7 @@ export default function MedicineScreen({ navigation }: Props) {
                                 markTaken(med, slot);
                               }}>
                               <Text style={[styles.slotChipText, taken && styles.slotChipTextTaken]}>
-                                {t(`medicine.slot_${slot}`)}
+                                {t(`medicine.slot_${slot}`)} ({SLOT_TIME_LABEL[slot]})
                                 {taken ? ` · ${t('medicine.taken_today')}` : ''}
                               </Text>
                             </Pressable>
@@ -715,7 +743,7 @@ export default function MedicineScreen({ navigation }: Props) {
               style={[styles.chip, schedule.includes(slot) && styles.chipActive]}
               onPress={() => toggleScheduleSlot(slot)}>
               <Text style={[styles.chipText, schedule.includes(slot) && styles.chipTextActive]}>
-                {t(`medicine.slot_${slot}`)}
+                {t(`medicine.slot_${slot}`)} ({SLOT_TIME_LABEL[slot]})
               </Text>
             </Pressable>
           ))}
@@ -765,7 +793,7 @@ export default function MedicineScreen({ navigation }: Props) {
               <Text style={styles.sheetInfoIcon}>🩺</Text>
               <Text style={styles.sheetInfoText}>{t('medicine.choose_who_helper')}</Text>
             </View>
-            {familyMembers.map((member) => (
+            {availableFamilyMembers.map((member) => (
               <Pressable key={member.id} style={styles.memberRow} onPress={() => chooseMemberForProfile(member)}>
                 <Text style={styles.memberRowIcon}>{member.managed ? '🧓' : '🧑'}</Text>
                 <View style={styles.memberRowInfo}>
@@ -813,7 +841,7 @@ export default function MedicineScreen({ navigation }: Props) {
 
             <Text style={styles.label}>{t('medicine.label_category')}</Text>
             <View style={styles.chipRow}>
-              {ALL_CATEGORIES.map((cat) => (
+              {availableCategories.map((cat) => (
                 <Pressable
                   key={cat}
                   style={[styles.chip, newProfileCategory === cat && styles.chipActive]}

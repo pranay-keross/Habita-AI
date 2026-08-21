@@ -570,7 +570,14 @@
     "error_generic": "कुछ गलत हो गया। कृपया फिर से प्रयास करें।",
     "error_not_found": "वह दवा या प्रोफ़ाइल अब मौजूद नहीं है।",
     "error_no_permission": "आपको यह करने की अनुमति नहीं है।",
-    "category_other": "अन्य"
+    "category_other": "अन्य",
+    "choose_camera": "कैमरा",
+    "choose_gallery": "गैलरी",
+    "choose_document": "PDF / वर्ड दस्तावेज़",
+    "view_fullscreen": "फुलस्क्रीन में देखें",
+    "delete_document": "दस्तावेज़ हटाएं",
+    "delete_doc_confirm_title": "दस्तावेज़ हटाएं",
+    "delete_doc_confirm_msg": "क्या आप वाकई इस दस्तावेज़ को हटाना चाहते हैं?"
   },
   "wellness": {
     "header_title": "मन और मूड",

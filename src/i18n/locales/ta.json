@@ -635,7 +635,14 @@
     "confirm_quantity_save": "சேமித்துத் தொடரவும்",
     "confirm_quantity_skip": "இப்போதைக்குத் தவிர்",
     "confirm_quantity_invalid_msg": "சரியான அளவை உள்ளிடவும்.",
-    "profile_incomplete_msg": "தொடர்வதற்கு முன் ஒவ்வொரு புலத்தையும் நிரப்பவும்."
+    "profile_incomplete_msg": "தொடர்வதற்கு முன் ஒவ்வொரு புலத்தையும் நிரப்பவும்.",
+    "choose_camera": "கேமரா",
+    "choose_gallery": "கேலரி",
+    "choose_document": "PDF / Word ஆவணம்",
+    "view_fullscreen": "முழுத்திரையில் காண்",
+    "delete_document": "ஆவணத்தை நீக்கு",
+    "delete_doc_confirm_title": "ஆவணத்தை நீக்கு",
+    "delete_doc_confirm_msg": "இந்த ஆவணத்தை நிச்சயமாக நீக்க விரும்புகிறீர்களா?"
   },
   "smart_pantry": {
     "header_title": "à®¸à¯�à®®à®¾à®°à¯�à®Ÿà¯� à®ªà¯‡à®©à¯�à®Ÿà¯�à®°à®¿ ðŸ¥—",

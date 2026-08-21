@@ -36,7 +36,7 @@ export interface RemoteMedicine {
   id: string;
   name: string;
   dosage: string;
-  scheduleTimes: string[]; // "HH:MM", 24-hour — not this app's local slot enum
+  scheduleTimes: string[] | Record<string, string>; // "HH:MM", 24-hour array or slot-time map object
   // Nullable defensively — see `normalizeStockQuantity` below. A medicine just
   // auto-created from a parsed prescription may have no confirmed count yet.
   stockQuantity: number | null;
@@ -51,6 +51,16 @@ export interface RemoteMedicine {
   // raw.
   lowStock: boolean;
   adherenceRate: string;
+}
+
+// Normalizes `scheduleTimes` whether returned as an array `["08:00", "21:00"]` or an object `{"morning": "08:00", "night": "21:00"}`
+export function normalizeScheduleTimes(raw: string[] | Record<string, string> | null | undefined): string[] {
+  if (!raw) return [];
+  if (Array.isArray(raw)) return raw;
+  if (typeof raw === 'object') {
+    return Object.values(raw).filter((v): v is string => typeof v === 'string');
+  }
+  return [];
 }
 
 // Guards against a `stockQuantity` that's missing entirely on the wire — unconfirmed
@@ -216,6 +226,18 @@ export async function uploadMedicalDocument(
 
 export async function listMedicalDocuments(familyProfileId: string, token: string): Promise<MedicalDocument[]> {
   return apiFetch<MedicalDocument[]>(`/profiles/${familyProfileId}/documents`, { method: 'GET', token });
+}
+
+export async function deleteMedicalDocument(
+  familyProfileId: string,
+  documentIds: string[],
+  token: string,
+): Promise<void> {
+  await apiFetch<void>(`/profiles/${familyProfileId}/documents`, {
+    method: 'DELETE',
+    body: documentIds,
+    token,
+  });
 }
 
 export type MedchestErrorKind = 'network' | 'not_found' | 'no_permission' | 'unknown';

@@ -63,7 +63,9 @@ export default function EventBudgetsScreen({ navigation }: Props) {
     const unsubscribe = subscribeToLanguageChanges(() =>
       setLocaleVersion(version => version + 1),
     );
-    return unsubscribe;
+    return () => {
+      unsubscribe();
+    };
   }, []);
   const persist = async (next: FamilyEventBudget[]) => {
     setItems(next);

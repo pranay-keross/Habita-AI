@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert, ActivityIndicator, Linking } from 'react-native';
-import { pick, isErrorWithCode, errorCodes, types as documentTypes } from '@react-native-documents/picker';
+import { View, Text, ScrollView, StyleSheet, Pressable, Alert, ActivityIndicator, Image, Modal } from 'react-native';
+import { pick, keepLocalCopy, isErrorWithCode, errorCodes, types as documentTypes } from '@react-native-documents/picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import BottomSheet from '../../components/BottomSheet';
+import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../app/_layout';
 import type { ThemeTokens } from '../../theme';
@@ -9,8 +11,10 @@ import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import useAuth from '../../hooks/useAuth';
 import {
+  deleteMedicalDocument,
   listMedicalDocuments,
   listMedicines,
+  normalizeScheduleTimes,
   normalizeStockQuantity,
   parseMedchestError,
   updateMedicine,
@@ -42,6 +46,10 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
   const [loading, setLoading] = useState(true);
   const [documents, setDocuments] = useState<MedicalDocument[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
+  const [showUploadSheet, setShowUploadSheet] = useState(false);
+  const [selectedDocForOptions, setSelectedDocForOptions] = useState<MedicalDocument | null>(null);
+  const [showDocOptionsSheet, setShowDocOptionsSheet] = useState(false);
+  const [fullscreenDoc, setFullscreenDoc] = useState<MedicalDocument | null>(null);
   const [localeVersion, setLocaleVersion] = useState(0);
 
   // After a prescription is parsed, any medicines it auto-created come back with no
@@ -85,15 +93,48 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const handleOpenDocument = async (doc: MedicalDocument) => {
-    if (!doc.documentPath) {
-      return;
+  const handleSelectDocOptions = (doc: MedicalDocument) => {
+    setSelectedDocForOptions(doc);
+    setShowDocOptionsSheet(true);
+  };
+
+  const handleViewFullscreen = () => {
+    setShowDocOptionsSheet(false);
+    if (selectedDocForOptions) {
+      setFullscreenDoc(selectedDocForOptions);
     }
-    try {
-      await Linking.openURL(doc.documentPath);
-    } catch {
-      Alert.alert(t('onboarding.error_title'), t('medicine.error_generic'));
-    }
+  };
+
+  const handleDeleteDocument = () => {
+    setShowDocOptionsSheet(false);
+    const docToDelete = selectedDocForOptions;
+    if (!docToDelete) return;
+
+    Alert.alert(
+      t('medicine.delete_doc_confirm_title'),
+      t('medicine.delete_doc_confirm_msg'),
+      [
+        { text: t('onboarding.cancel') || 'Cancel', style: 'cancel' },
+        {
+          text: t('medicine.delete_document'),
+          style: 'destructive',
+          onPress: async () => {
+            setUploadingDoc(true);
+            try {
+              const token = await getAccessToken();
+              if (token) {
+                await deleteMedicalDocument(familyProfileId, [docToDelete.id], token);
+                await refreshDocuments(token);
+              }
+            } catch (err) {
+              showRemoteError(err);
+            } finally {
+              setUploadingDoc(false);
+            }
+          },
+        },
+      ],
+    );
   };
 
   const startQuantityQueue = async (matched: RemoteMedicine[]) => {
@@ -103,13 +144,55 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
         id: m.id,
         name: m.name,
         dosage: m.dosage,
-        scheduleTimes: m.scheduleTimes,
+        scheduleTimes: normalizeScheduleTimes(m.scheduleTimes),
         lowStockThreshold: m.lowStockThreshold,
         stock: normalizeStockQuantity(m.stockQuantity) !== null ? String(m.stockQuantity) : '',
         isLiquid: liquidFlags[m.id] ?? guessIsLiquid(m.dosage),
       })),
     );
     setQueueIndex(0);
+  };
+
+  const processUploadedDocument = async (
+    uploaded: MedicalDocument,
+    token: string,
+    existingMedicines: RemoteMedicine[],
+  ) => {
+    await refreshDocuments(token);
+
+    if (uploaded.ocrStatus === 'FAILED') {
+      Alert.alert(t('medicine.prescription_failed_title'), t('medicine.prescription_failed_msg'));
+      return;
+    }
+
+    const remoteMedicines = await listMedicines(familyProfileId, token);
+
+    // 1. Identify medicines newly added to the remote list since before the upload
+    const newlyAdded = remoteMedicines.filter((m) => !existingMedicines.some((e) => e.id === m.id));
+
+    // 2. Identify medicines matching extracted names (fuzzy/case-insensitive substring matching)
+    const extractedNames = uploaded.extractedMedicineNames ?? [];
+    const matchedByName = extractedNames.flatMap((rawName) => {
+      const cleanName = rawName.trim().toLowerCase();
+      if (!cleanName) return [];
+      return remoteMedicines.filter((m) => {
+        const medName = m.name.trim().toLowerCase();
+        return medName === cleanName || medName.includes(cleanName) || cleanName.includes(medName);
+      });
+    });
+
+    // Combine newly added medicines and matched-by-name medicines, deduplicating by ID
+    const combinedMap = new Map<string, RemoteMedicine>();
+    for (const m of [...newlyAdded, ...matchedByName]) {
+      combinedMap.set(m.id, m);
+    }
+    const matched = Array.from(combinedMap.values());
+
+    if (matched.length > 0) {
+      await startQuantityQueue(matched);
+    } else {
+      Alert.alert(t('medicine.prescription_processed_title'), t('medicine.prescription_empty_msg'));
+    }
   };
 
   const handlePickDocument = async () => {
@@ -122,39 +205,106 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
       if (!token) {
         return;
       }
+      // On iOS the picker can return asset URIs (ph:// / assets-library://). Copy a
+      // local cache copy first so the upload can read a file:// uri.
+      let uploadUri = result.uri;
+      try {
+        // Only call keepLocalCopy on iOS-like asset URIs; keepLocalCopy will return
+        // a `localUri` pointing into the app cache/document dir when successful.
+        if (uploadUri && (uploadUri.startsWith('ph://') || uploadUri.startsWith('assets-library://')))
+        {
+          const copies = await keepLocalCopy({
+            files: [{ uri: uploadUri, fileName: result.name ?? 'document' }],
+            destination: 'cachesDirectory',
+          });
+          if (copies && copies[0] && copies[0].status === 'success') {
+            uploadUri = copies[0].localUri;
+          }
+        }
+      } catch (copyErr) {
+        // If copying fails, fall back to the original URI and let the upload error
+        // surface to the user; don't block the flow.
+        // eslint-disable-next-line no-console
+        console.warn('keepLocalCopy failed', copyErr);
+      }
+
+      const existingMedicines = await listMedicines(familyProfileId, token);
       const uploaded = await uploadMedicalDocument(
         familyProfileId,
-        { uri: result.uri, name: result.name ?? 'document', type: result.type ?? 'application/octet-stream' },
+        { uri: uploadUri, name: result.name ?? 'document', type: result.type ?? 'application/octet-stream' },
         'PRESCRIPTION',
         token,
       );
-      await refreshDocuments(token);
-
-      if (uploaded.ocrStatus === 'FAILED') {
-        Alert.alert(t('medicine.prescription_failed_title'), t('medicine.prescription_failed_msg'));
-        return;
-      }
-
-      const extractedNames = uploaded.extractedMedicineNames ?? [];
-      if (extractedNames.length === 0) {
-        Alert.alert(t('medicine.prescription_processed_title'), t('medicine.prescription_empty_msg'));
-        return;
-      }
-
-      const remoteMedicines = await listMedicines(familyProfileId, token);
-      const matched = extractedNames
-        .map((name) => remoteMedicines.find((m) => m.name.trim().toLowerCase() === name.trim().toLowerCase()))
-        .filter((m): m is RemoteMedicine => !!m);
-
-      if (matched.length === 0) {
-        Alert.alert(t('medicine.prescription_processed_title'), t('medicine.prescription_processed_msg'));
-        return;
-      }
-      await startQuantityQueue(matched);
+      await processUploadedDocument(uploaded, token, existingMedicines);
     } catch (err) {
       if (isErrorWithCode(err) && err.code === errorCodes.OPERATION_CANCELED) {
         return;
       }
+      showRemoteError(err);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handleTakePhoto = async () => {
+    setShowUploadSheet(false);
+    try {
+      const res = await launchCamera({ mediaType: 'photo', cameraType: 'back', quality: 0.8, saveToPhotos: false });
+      if (res.didCancel) return;
+      const asset = res.assets && res.assets[0];
+      if (!asset || !asset.uri) return;
+      setUploadingDoc(true);
+      const token = await getAccessToken();
+      if (!token) return;
+
+      let uploadUri = asset.uri;
+      try {
+        if (uploadUri.startsWith('ph://') || uploadUri.startsWith('assets-library://')) {
+          const copies = await keepLocalCopy({ files: [{ uri: uploadUri, fileName: asset.fileName ?? 'photo.jpg' }], destination: 'cachesDirectory' });
+          if (copies && copies[0] && copies[0].status === 'success') uploadUri = copies[0].localUri;
+        }
+      } catch (e) {
+        // ignore copy errors and fallback to original uri
+        // eslint-disable-next-line no-console
+        console.warn('keepLocalCopy failed', e);
+      }
+
+      const existingMedicines = await listMedicines(familyProfileId, token);
+      const uploaded = await uploadMedicalDocument(familyProfileId, { uri: uploadUri, name: asset.fileName ?? 'photo.jpg', type: asset.type ?? 'image/jpeg' }, 'PRESCRIPTION', token);
+      await processUploadedDocument(uploaded, token, existingMedicines);
+    } catch (err) {
+      showRemoteError(err);
+    } finally {
+      setUploadingDoc(false);
+    }
+  };
+
+  const handlePickFromGallery = async () => {
+    setShowUploadSheet(false);
+    try {
+      const res = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.8 });
+      if (res.didCancel) return;
+      const asset = res.assets && res.assets[0];
+      if (!asset || !asset.uri) return;
+      setUploadingDoc(true);
+      const token = await getAccessToken();
+      if (!token) return;
+
+      let uploadUri = asset.uri;
+      try {
+        if (uploadUri.startsWith('ph://') || uploadUri.startsWith('assets-library://')) {
+          const copies = await keepLocalCopy({ files: [{ uri: uploadUri, fileName: asset.fileName ?? 'photo.jpg' }], destination: 'cachesDirectory' });
+          if (copies && copies[0] && copies[0].status === 'success') uploadUri = copies[0].localUri;
+        }
+      } catch (e) {
+        // eslint-disable-next-line no-console
+        console.warn('keepLocalCopy failed', e);
+      }
+
+      const existingMedicines = await listMedicines(familyProfileId, token);
+      const uploaded = await uploadMedicalDocument(familyProfileId, { uri: uploadUri, name: asset.fileName ?? 'photo.jpg', type: asset.type ?? 'image/jpeg' }, 'PRESCRIPTION', token);
+      await processUploadedDocument(uploaded, token, existingMedicines);
+    } catch (err) {
       showRemoteError(err);
     } finally {
       setUploadingDoc(false);
@@ -192,7 +342,7 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
         {
           name: item.name,
           dosage: item.dosage,
-          scheduleTimes: item.scheduleTimes,
+          scheduleTimes: normalizeScheduleTimes(item.scheduleTimes),
           stockQuantity: qty,
           lowStockThreshold: item.lowStockThreshold,
         },
@@ -230,7 +380,7 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
           <>
             <Text style={styles.sectionSub}>{t('medicine.documents_sub')}</Text>
 
-            <Pressable style={styles.uploadBanner} onPress={handlePickDocument} disabled={uploadingDoc}>
+            <Pressable style={styles.uploadBanner} onPress={() => setShowUploadSheet(true)} disabled={uploadingDoc}>
               {uploadingDoc ? (
                 <ActivityIndicator color={styles.uploadBannerArrow.color} />
               ) : (
@@ -249,7 +399,7 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
               <Text style={styles.documentsEmptyText}>{t('medicine.documents_empty')}</Text>
             ) : (
               documents.map((doc) => (
-                <Pressable key={doc.id} style={styles.documentRow} onPress={() => handleOpenDocument(doc)}>
+                <Pressable key={doc.id} style={styles.documentRow} onPress={() => handleSelectDocOptions(doc)}>
                   <Text style={styles.documentIcon}>📄</Text>
                   <View style={styles.documentInfo}>
                     <Text style={styles.documentName} numberOfLines={1}>
@@ -260,9 +410,34 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
                       {t(`medicine.ocr_status_${doc.ocrStatus.toLowerCase()}`)}
                     </Text>
                   </View>
+                  <Text style={styles.documentMoreIcon}>⋮</Text>
                 </Pressable>
               ))
             )}
+            <BottomSheet visible={showUploadSheet} onClose={() => setShowUploadSheet(false)} title={t('medicine.upload_document_btn')}>
+              <Pressable style={styles.sheetOption} onPress={handleTakePhoto}>
+                <Text style={styles.sheetOptionText}>{t('medicine.choose_camera')}</Text>
+              </Pressable>
+              <Pressable style={styles.sheetOption} onPress={handlePickFromGallery}>
+                <Text style={styles.sheetOptionText}>{t('medicine.choose_gallery')}</Text>
+              </Pressable>
+              <Pressable style={styles.sheetOption} onPress={async () => { setShowUploadSheet(false); await handlePickDocument(); }}>
+                <Text style={styles.sheetOptionText}>{t('medicine.choose_document')}</Text>
+              </Pressable>
+            </BottomSheet>
+
+            <BottomSheet
+              visible={showDocOptionsSheet}
+              onClose={() => setShowDocOptionsSheet(false)}
+              title={selectedDocForOptions?.originalFilename ?? t('medicine.prescriptions_header_title')}
+            >
+              <Pressable style={styles.sheetOption} onPress={handleViewFullscreen}>
+                <Text style={styles.sheetOptionText}>👁️ {t('medicine.view_fullscreen')}</Text>
+              </Pressable>
+              <Pressable style={styles.sheetOption} onPress={handleDeleteDocument}>
+                <Text style={[styles.sheetOptionText, styles.destructiveText]}>🗑️ {t('medicine.delete_document')}</Text>
+              </Pressable>
+            </BottomSheet>
           </>
         )}
       </ScrollView>
@@ -282,6 +457,41 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
           onSkip={advanceQueue}
           onClose={advanceQueue}
         />
+      )}
+
+      {fullscreenDoc && (
+        <Modal
+          visible
+          animationType="slide"
+          onRequestClose={() => setFullscreenDoc(null)}
+          statusBarTranslucent
+        >
+          <View style={[styles.fullscreenContainer, { paddingTop: insets.top + 8 }]}>
+            <View style={styles.fullscreenHeader}>
+              <Pressable onPress={() => setFullscreenDoc(null)} style={styles.fullscreenCloseBtn}>
+                <Text style={styles.fullscreenCloseIcon}>✕</Text>
+              </Pressable>
+              <Text style={styles.fullscreenTitle} numberOfLines={1}>
+                {fullscreenDoc.originalFilename}
+              </Text>
+              <View style={styles.fullscreenPlaceholder} />
+            </View>
+
+            <View style={styles.fullscreenBody}>
+              {fullscreenDoc.documentPath ? (
+                <Image
+                  source={{ uri: fullscreenDoc.documentPath }}
+                  style={styles.fullscreenImage}
+                  resizeMode="contain"
+                />
+              ) : (
+                <Text style={styles.documentsEmptyText}>
+                  {fullscreenDoc.originalFilename}
+                </Text>
+              )}
+            </View>
+          </View>
+        </Modal>
       )}
     </View>
   );
@@ -372,6 +582,17 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     color: colors.primary,
     fontFamily: fonts.sansBold,
   },
+  sheetOption: {
+    paddingVertical: spacing.md,
+    paddingHorizontal: spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  sheetOptionText: {
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    color: colors.textPrimary,
+  },
   documentsEmptyText: {
     fontFamily: fonts.sans,
     fontSize: 12,
@@ -404,5 +625,54 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     fontSize: 11,
     color: colors.textMuted,
     marginTop: 2,
+  },
+  documentMoreIcon: {
+    fontSize: 18,
+    color: colors.textMuted,
+    paddingLeft: spacing.xs,
+  },
+  destructiveText: {
+    color: colors.danger || '#E53935',
+  },
+  fullscreenContainer: {
+    flex: 1,
+    backgroundColor: '#000000',
+  },
+  fullscreenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    backgroundColor: '#121212',
+  },
+  fullscreenCloseBtn: {
+    padding: spacing.xs,
+  },
+  fullscreenCloseIcon: {
+    fontSize: 22,
+    color: '#FFFFFF',
+    fontFamily: fonts.sansBold,
+  },
+  fullscreenTitle: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 15,
+    color: '#FFFFFF',
+    flex: 1,
+    textAlign: 'center',
+    marginHorizontal: spacing.sm,
+  },
+  fullscreenPlaceholder: {
+    width: 32,
+  },
+  fullscreenBody: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000000',
+  },
+  fullscreenImage: {
+    width: '100%',
+    height: '100%',
   },
 });

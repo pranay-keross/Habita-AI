@@ -570,7 +570,14 @@
     "error_generic": "حدث خطأ ما. حاول مرة أخرى.",
     "error_not_found": "هذا الدواء أو الملف الشخصي لم يعد موجودًا.",
     "error_no_permission": "ليس لديك إذن للقيام بذلك.",
-    "category_other": "أخرى"
+    "category_other": "أخرى",
+    "choose_camera": "الكاميرا",
+    "choose_gallery": "معرض الصور",
+    "choose_document": "مستند PDF / Word",
+    "view_fullscreen": "عرض ملء الشاشة",
+    "delete_document": "حذف المستند",
+    "delete_doc_confirm_title": "حذف المستند",
+    "delete_doc_confirm_msg": "هل أنت تأكد من أنك تريد حذف هذا المستند؟"
   },
   "wellness": {
     "header_title": "الذهن والمزاج",

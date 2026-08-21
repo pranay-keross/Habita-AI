@@ -570,7 +570,14 @@
     "error_generic": "কিছু ভুল হয়েছে। আবার চেষ্টা করুন।",
     "error_not_found": "সেই ওষুধ বা প্রোফাইল আর নেই।",
     "error_no_permission": "আপনার এটি করার অনুমতি নেই।",
-    "category_other": "অন্যান্য"
+    "category_other": "অন্যান্য",
+    "choose_camera": "ক্যামেরা",
+    "choose_gallery": "গ্যালারি",
+    "choose_document": "PDF / ওয়ার্ড নথি",
+    "view_fullscreen": "ফুলস্ক্রিনে দেখুন",
+    "delete_document": "নথি মুছুন",
+    "delete_doc_confirm_title": "নথি মুছুন",
+    "delete_doc_confirm_msg": "আপনি কি নিশ্চিত যে আপনি এই নথিটি মুছতে চান?"
   },
   "wellness": {
     "header_title": "মন ও মেজাজ",

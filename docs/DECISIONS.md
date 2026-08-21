@@ -697,6 +697,46 @@ The other two questions are real product decisions, not deployment facts, so the
 
 ---
 
+## D-040 — Document picker bottom sheet i18n alignment and prescription document parsing fix
+
+**Status:** Accepted · **Date:** 2026-08-21
+
+**Context.** Direct user report: in the Prescriptions screen, option labels in the document picker bottom sheet failed to display translated text in non-English languages, and uploading a prescription document via camera or gallery only listed the file without running OCR extraction or prompting the quantity confirmation queue.
+
+**Decision.**
+- **Frontend, i18n:** Added `medicine.choose_camera`, `medicine.choose_gallery`, and `medicine.choose_document` in lockstep across all 6 locale files (`en.json`, `bn.json`, `hi.json`, `ta.json`, `es.json`, `ar.json`).
+- **Frontend, medicine:** Extracted common upload parsing logic into `processUploadedDocument(uploaded: MedicalDocument, token: string)` in `PrescriptionsScreen.tsx`. `handleTakePhoto` and `handlePickFromGallery` now process the `uploaded` response from `uploadMedicalDocument()` (evaluating `ocrStatus`, extracting medicine names, matching existing remote medicines, and triggering `startQuantityQueue` / `MedicineQuantitySheet`), ensuring consistent behavior across PDF/Word, Camera photo, and Gallery photo options.
+
+**Consequences.** All 6 locale files updated with identical key sets. `PrescriptionsScreen.tsx` updated to use localized translation keys for all upload sheet options.
+
+---
+
+## D-041 — Prescription document options bottom sheet, in-app fullscreen viewer, and document deletion
+
+**Status:** Accepted · **Date:** 2026-08-21
+
+**Context.** Direct user request: in the Prescriptions screen, tapping a document should open a options bottom sheet with choices to "View Fullscreen" inside the app (rather than opening an external browser) and "Delete Document" using the backend API.
+
+**Decision.**
+- **Frontend, API:** Added `deleteMedicalDocument(documentId, token)` to `src/features/medicine/api.ts` calling `/documents/${documentId}` (with fallback to `/document/${documentId}`).
+- **Frontend, UI:** Updated `PrescriptionsScreen.tsx` so tapping a document opens a Document Options BottomSheet (`showDocOptionsSheet`). Selecting "View Fullscreen" opens an in-app `Modal` viewer displaying the document image inside the app. Selecting "Delete Document" prompts confirmation and deletes the document via API.
+- **Frontend, i18n:** Added `medicine.view_fullscreen`, `medicine.delete_document`, `medicine.delete_doc_confirm_title`, and `medicine.delete_doc_confirm_msg` in lockstep across all 6 locale files.
+
+---
+
+## D-042 — Document deletion API Postman spec alignment & profile uniqueness guards
+
+**Status:** Accepted · **Date:** 2026-08-21
+
+**Context.** Postman collection inspection revealed that the `DeleteMedicineDocument` endpoint contract uses `DELETE /api/profiles/${familyProfileId}/documents` with body `string[]` (JSON array of document IDs to delete). Additionally, creating a profile in `MedicineScreen.tsx` previously allowed picking family members or categories (such as `SELF`) that already had profiles created.
+
+**Decision.**
+- **Frontend, API:** Aligned `deleteMedicalDocument(familyProfileId, documentIds, token)` in `src/features/medicine/api.ts` to execute `DELETE /profiles/${familyProfileId}/documents` with body `documentIds`.
+- **Frontend, UI:** Updated `PrescriptionsScreen.tsx` to pass `familyProfileId` and `[docToDelete.id]` array to `deleteMedicalDocument`.
+- **Frontend, UI:** Updated `MedicineScreen.tsx` to filter out family members who already have a profile created (`availableFamilyMembers`) and filter out the `SELF` category if a `SELF` profile already exists (`availableCategories`), preventing duplicate profile creation for `SELF` or existing members.
+
+---
+
 ## Open decisions
 
 Tracked in `docs/BACKLOG.md` → Open questions. Move each here once answered.

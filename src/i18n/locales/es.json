@@ -570,7 +570,14 @@
     "error_generic": "Algo salió mal. Inténtalo de nuevo.",
     "error_not_found": "Esa medicina o perfil ya no existe.",
     "error_no_permission": "No tienes permiso para hacer eso.",
-    "category_other": "Otro"
+    "category_other": "Otro",
+    "choose_camera": "Cámara",
+    "choose_gallery": "Galería",
+    "choose_document": "Documento PDF / Word",
+    "view_fullscreen": "Ver en pantalla completa",
+    "delete_document": "Eliminar documento",
+    "delete_doc_confirm_title": "Eliminar documento",
+    "delete_doc_confirm_msg": "¿Estás seguro de que deseas eliminar este documento?"
   },
   "wellness": {
     "header_title": "Mente y ánimo",

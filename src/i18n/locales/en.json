@@ -597,7 +597,14 @@
     "error_generic": "Something went wrong. Please try again.",
     "error_not_found": "That medicine or profile no longer exists.",
     "error_no_permission": "You don't have permission to do that.",
-    "category_other": "Other"
+    "category_other": "Other",
+    "choose_camera": "Camera",
+    "choose_gallery": "Gallery",
+    "choose_document": "PDF / Word Document",
+    "view_fullscreen": "View Fullscreen",
+    "delete_document": "Delete Document",
+    "delete_doc_confirm_title": "Delete Document",
+    "delete_doc_confirm_msg": "Are you sure you want to delete this document?"
   },
   "wellness": {
     "header_title": "Mind & Mood",
