@@ -16,20 +16,17 @@ import {
   ChevronRight,
   CreditCard,
   Crown,
-  FileText,
   FolderOpen,
   Fuel,
   HeartPulse,
   House,
   IndianRupee,
-  Mic,
   Pill,
   Receipt,
   ScanLine,
   ScanSearch,
   ShieldCheck,
   Shirt,
-  ShoppingCart,
   Smile,
   TrendingUp,
   Users,
@@ -81,7 +78,7 @@ interface ProfileDetailsResponse {
 //   | 'style'
 //   | 'events'
 //   | 'medicine';
-type ActionId = 'scan' | 'pay' | 'meds' | 'mood' | 'cycle' | 'expense' | 'fuel' | 'premium';
+type ActionId = 'scan' | 'pay' | 'meds' | 'mood' | 'cycle' | 'expense' | 'fuel' | 'premium' | 'smartLife';
 type TileId = 'scan' | 'pay' | 'family' | 'money' | 'docs' | 'safety' | 'wellness' | 'style' | 'events'|   'cycle'
  | 'medicine' | 'household';
 // type ActionId = 'scan' | 'pay' | 'meds' | 'expense' | 'fuel' | 'premium';
@@ -119,6 +116,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
     { id: 'expense', label: t('dashboard.action_expense'), Icon: Receipt },
     { id: 'fuel', label: t('dashboard.action_fuel'), Icon: Fuel },
     { id: 'premium', label: t('dashboard.action_premium'), Icon: Crown },
+    { id: 'smartLife', label: t('dashboard.action_smart_life'), Icon: House },
   ];
 
   const tiles: { id: TileId; title: string; Icon: LucideIcon }[] = [
@@ -247,8 +245,6 @@ export default function DashboardScreen({ navigation, route }: Props) {
       navigation.navigate('Staff');
     } else if (id === 'style') {
       navigation.navigate('Wardrobe');
-    } else if (id === 'scan' || id === 'pay') {
-      navigation.navigate('Voice');
     }
   };
 
@@ -261,8 +257,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
       navigation.navigate('Cycle');
     } else if (id === 'expense') {
       navigation.navigate('ExpenseGroups');
-    } else if (id === 'scan' || id === 'pay') {
-      navigation.navigate('Voice');
+    } else if (id === 'smartLife') {
+      navigation.navigate('SmartLife');
     }
   };
 
@@ -357,82 +353,6 @@ export default function DashboardScreen({ navigation, route }: Props) {
                 </Pressable>
               </View>
             ))}
-          </View>
-        </View>
-
-        {/* Household Operating Hub Container Box */}
-        <View style={styles.operatingHubContainer}>
-          <View style={styles.operatingHubHeader}>
-            <Text style={styles.operatingHubTitle}>{t('expenses.operating_hub_title')}</Text>
-            <Text style={styles.operatingHubSubTitle}>{t('expenses.operating_hub_sub')}</Text>
-          </View>
-
-          <View style={styles.operatingHubDivider} />
-
-          <View style={styles.modulesGrid}>
-            {/* Box 1: Document Hub */}
-            <Pressable
-              style={({ pressed }) => [styles.moduleBox, pressed && styles.moduleBoxPressed]}
-              onPress={() => navigation.navigate('DocHub')}>
-              <View style={styles.moduleBoxHeader}>
-                <View style={styles.moduleBoxBadge}>
-                  <FileText size={20} color={styles.operatingHubSubTitle.color} />
-                </View>
-                <View style={styles.moduleStatusTag}>
-                  <Text style={styles.moduleStatusTagText}>{t('expenses.vaulted_count')}</Text>
-                </View>
-              </View>
-              <Text style={styles.moduleBoxTitle}>{t('expenses.doc_hub_title')}</Text>
-              <Text style={styles.moduleBoxSub}>{t('expenses.doc_hub_sub')}</Text>
-            </Pressable>
-
-            {/* Box 2: Smart Pantry */}
-            <Pressable
-              style={({ pressed }) => [styles.moduleBox, pressed && styles.moduleBoxPressed]}
-              onPress={() => navigation.navigate('Pantry')}>
-              <View style={styles.moduleBoxHeader}>
-                <View style={styles.moduleBoxBadge}>
-                  <ShoppingCart size={20} color={styles.operatingHubSubTitle.color} />
-                </View>
-                <View style={styles.moduleStatusTag}>
-                  <Text style={styles.moduleStatusTagText}>{t('expenses.radar_active')}</Text>
-                </View>
-              </View>
-              <Text style={styles.moduleBoxTitle}>{t('expenses.pantry_title')}</Text>
-              <Text style={styles.moduleBoxSub}>{t('expenses.pantry_sub')}</Text>
-            </Pressable>
-
-            {/* Box 3: Voice Command Engine */}
-            <Pressable
-              style={({ pressed }) => [styles.moduleBox, pressed && styles.moduleBoxPressed]}
-              onPress={() => navigation.navigate('Voice')}>
-              <View style={styles.moduleBoxHeader}>
-                <View style={styles.moduleBoxBadge}>
-                  <Mic size={20} color={styles.operatingHubSubTitle.color} />
-                </View>
-                <View style={styles.moduleStatusTag}>
-                  <Text style={styles.moduleStatusTagText}>{t('expenses.ai_copilot')}</Text>
-                </View>
-              </View>
-              <Text style={styles.moduleBoxTitle}>{t('expenses.voice_engine_title')}</Text>
-              <Text style={styles.moduleBoxSub}>{t('expenses.voice_engine_sub')}</Text>
-            </Pressable>
-
-            {/* Box 4: Style Mirror */}
-            <Pressable
-              style={({ pressed }) => [styles.moduleBox, pressed && styles.moduleBoxPressed]}
-              onPress={() => navigation.navigate('Wardrobe')}>
-              <View style={styles.moduleBoxHeader}>
-                <View style={styles.moduleBoxBadge}>
-                  <Shirt size={20} color={styles.operatingHubSubTitle.color} />
-                </View>
-                <View style={styles.moduleStatusTag}>
-                  <Text style={styles.moduleStatusTagText}>{t('expenses.weather_fit')}</Text>
-                </View>
-              </View>
-              <Text style={styles.moduleBoxTitle}>{t('expenses.style_mirror_title')}</Text>
-              <Text style={styles.moduleBoxSub}>{t('expenses.style_mirror_sub')}</Text>
-            </Pressable>
           </View>
         </View>
 
@@ -722,101 +642,5 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     fontSize: 11,
     color: colors.textMuted,
     marginTop: 4,
-  },
-  operatingHubContainer: {
-    backgroundColor: colors.surface,
-    borderRadius: 22,
-    padding: 14,
-    borderWidth: 1,
-    borderColor: colors.border,
-    marginHorizontal: spacing.lg,
-    marginTop: spacing.md,
-    marginBottom: spacing.md,
-  },
-  operatingHubHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 2,
-  },
-  operatingHubTitle: {
-    fontFamily: fonts.sansBold,
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-  operatingHubSubTitle: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 12,
-    color: colors.primary,
-  },
-  operatingHubDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 12,
-  },
-  modulesGrid: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 10,
-  },
-  moduleBox: {
-    width: '48.5%',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: 18,
-    padding: 12,
-    minHeight: 112,
-    justifyContent: 'space-between',
-    borderWidth: 1,
-    borderColor: colors.border,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 3,
-    elevation: 1,
-  },
-  moduleBoxPressed: {
-    opacity: 0.9,
-    transform: [{ scale: 0.98 }],
-  },
-  moduleBoxBadge: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  moduleBoxHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 10,
-  },
-  moduleStatusTag: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 7,
-    paddingVertical: 3,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  moduleStatusTagText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 10,
-    color: colors.primary,
-  },
-  moduleBoxTitle: {
-    fontFamily: fonts.sansBold,
-    fontSize: 13,
-    color: colors.textPrimary,
-    marginBottom: 2,
-  },
-  moduleBoxSub: {
-    fontFamily: fonts.sans,
-    fontSize: 11,
-    color: colors.textSecondary,
-    lineHeight: 14,
   },
 });

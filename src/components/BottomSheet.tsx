@@ -9,6 +9,7 @@ import {
   ScrollView,
   Text,
   Dimensions,
+  Keyboard,
   KeyboardAvoidingView,
   Platform,
   NativeSyntheticEvent,
@@ -27,15 +28,6 @@ interface BottomSheetProps {
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
 
-// Safe Blur import fallback handling
-let BlurViewComponent: any = null;
-try {
-  const blurPkg = require('@react-native-community/blur');
-  BlurViewComponent = blurPkg.BlurView;
-} catch {
-  BlurViewComponent = null;
-}
-
 export default function BottomSheet({
   visible,
   onClose,
@@ -47,6 +39,29 @@ export default function BottomSheet({
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const [scrollOffset, setScrollOffset] = useState(0);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
+
+  // Android's Modal is its own Dialog window that never inherits the Activity's
+  // `windowSoftInputMode`, so `KeyboardAvoidingView`'s height-shrink math (which
+  // assumes it's shrinking a normal in-tree view) doesn't reliably free up room
+  // inside a `justifyContent: 'flex-end'` sheet — shrinking the *sheet's own*
+  // `maxHeight` directly by the actual keyboard height is what makes every field,
+  // including one at the very bottom, end up above the keyboard.
+  useEffect(() => {
+    if (Platform.OS !== 'android') {
+      return;
+    }
+    const showSub = Keyboard.addListener('keyboardDidShow', (e) => {
+      setKeyboardHeight(e.endCoordinates.height);
+    });
+    const hideSub = Keyboard.addListener('keyboardDidHide', () => {
+      setKeyboardHeight(0);
+    });
+    return () => {
+      showSub.remove();
+      hideSub.remove();
+    };
+  }, []);
 
   // PanResponder to handle drag down gestures on handle header or top scroll position
   const panResponder = useRef(
@@ -127,67 +142,72 @@ export default function BottomSheet({
 
   if (!visible) return null;
 
+  const sheetContent = (
+    <>
+      {/* Pure Neutral Dark Backdrop Layer with Frosted Blur */}
+      <Animated.View style={[styles.backdrop, { opacity }]}>
+        <View style={[StyleSheet.absoluteFill, styles.backdropDarkDim]} />
+        <Pressable style={StyleSheet.absoluteFill} onPress={dismissSheet} />
+      </Animated.View>
+
+      {/* Draggable Sheet Surface */}
+      <Animated.View
+        style={[
+          styles.sheet,
+          {
+            maxHeight: SCREEN_HEIGHT * maxHeightPercent - keyboardHeight,
+            transform: [{ translateY }],
+          },
+        ]}>
+        {/* Top Handle Bar */}
+        <View style={styles.handleContainer} {...panResponder.panHandlers}>
+          <View style={styles.handle} />
+        </View>
+
+        {/* Header Bar */}
+        {title ? (
+          <View style={styles.header}>
+            <Text style={styles.title}>{title}</Text>
+            <Pressable onPress={dismissSheet} style={styles.closeBtn}>
+              <Text style={styles.closeText}>✕</Text>
+            </Pressable>
+          </View>
+        ) : null}
+
+        {/* Scrollable Content */}
+        <ScrollView
+          style={styles.content}
+          contentContainerStyle={styles.contentContainer}
+          onScroll={handleScroll}
+          scrollEventThrottle={16}
+          showsVerticalScrollIndicator={true}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="interactive"
+          automaticallyAdjustKeyboardInsets={Platform.OS === 'ios'}>
+          {children}
+        </ScrollView>
+      </Animated.View>
+    </>
+  );
+
   return (
     <Modal visible={visible} transparent animationType="none" onRequestClose={dismissSheet} statusBarTranslucent>
-      {/* RN's Modal renders as its own native Dialog window on Android, which does not
-          inherit the Activity's `android:windowSoftInputMode="adjustResize"` — without
-          this, the keyboard simply overlaid the bottom of the screen, covering any
-          TextInput sitting in the lower portion of the sheet instead of the sheet
-          shrinking to make room. `padding` on iOS, `height` on Android (the standard
-          pairing for a `justifyContent: 'flex-end'` container like `styles.container`). */}
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        style={styles.container}>
-        {/* Pure Neutral Dark Backdrop Layer with Frosted Blur */}
-        <Animated.View style={[styles.backdrop, { opacity }]}>
-          <View style={[StyleSheet.absoluteFill, styles.backdropDarkDim]} />
-          {BlurViewComponent && (
-            <BlurViewComponent
-              style={StyleSheet.absoluteFill}
-              blurType="dark"
-              blurAmount={12}
-              reducedTransparencyFallbackColor="rgba(0, 0, 0, 0.5)"
-            />
-          )}
-          <Pressable style={StyleSheet.absoluteFill} onPress={dismissSheet} />
-        </Animated.View>
-
-        {/* Draggable Sheet Surface */}
-        <Animated.View
-          style={[
-            styles.sheet,
-            {
-              maxHeight: SCREEN_HEIGHT * maxHeightPercent,
-              transform: [{ translateY }],
-            },
-          ]}>
-          {/* Top Handle Bar */}
-          <View style={styles.handleContainer} {...panResponder.panHandlers}>
-            <View style={styles.handle} />
-          </View>
-
-          {/* Header Bar */}
-          {title ? (
-            <View style={styles.header}>
-              <Text style={styles.title}>{title}</Text>
-              <Pressable onPress={dismissSheet} style={styles.closeBtn}>
-                <Text style={styles.closeText}>✕</Text>
-              </Pressable>
-            </View>
-          ) : null}
-
-          {/* Scrollable Content */}
-          <ScrollView
-            style={styles.content}
-            contentContainerStyle={styles.contentContainer}
-            onScroll={handleScroll}
-            scrollEventThrottle={16}
-            showsVerticalScrollIndicator={true}
-            keyboardShouldPersistTaps="handled">
-            {children}
-          </ScrollView>
-        </Animated.View>
-      </KeyboardAvoidingView>
+      {/* RN's Modal renders as its own native Dialog window on Android, which never
+          inherits the Activity's `windowSoftInputMode` — `KeyboardAvoidingView`'s
+          height-shrink math doesn't reliably free up room inside a
+          `justifyContent: 'flex-end'` sheet there, so Android instead pads the
+          container by the tracked keyboard height directly (see the `keyboardHeight`
+          effect above) while the sheet's own `maxHeight` shrinks by the same amount.
+          iOS keeps the standard `KeyboardAvoidingView` `padding` behavior. */}
+      {Platform.OS === 'ios' ? (
+        <KeyboardAvoidingView behavior="padding" style={styles.container}>
+          {sheetContent}
+        </KeyboardAvoidingView>
+      ) : (
+        <View style={[styles.container, { paddingBottom: keyboardHeight }]}>
+          {sheetContent}
+        </View>
+      )}
     </Modal>
   );
 }

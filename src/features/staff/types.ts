@@ -18,3 +18,13 @@ export interface CaregiverTransaction {
   reason: string;
   createdAt: number;
 }
+
+export type AttendanceStatus = 'present' | 'absent' | 'leave';
+
+export interface AttendanceEntry {
+  id: string;
+  caregiverId: string;
+  date: string; // "YYYY-MM-DD", local calendar day
+  status: AttendanceStatus;
+  markedAt: number;
+}

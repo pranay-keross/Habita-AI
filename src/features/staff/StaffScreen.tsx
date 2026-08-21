@@ -9,6 +9,9 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Phone from 'lucide-react-native/icons/phone';
 import UsersRound from 'lucide-react-native/icons/users-round';
+import Check from 'lucide-react-native/icons/check';
+import X from 'lucide-react-native/icons/x';
+import CalendarClock from 'lucide-react-native/icons/calendar-clock';
 import type { RootStackParamList } from '../../app/_layout';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
@@ -17,8 +20,31 @@ import SectionHeader from '../../components/SectionHeader';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
-import { loadCaregivers, loadCaregiverTransactions, saveCaregivers, saveCaregiverTransactions } from './staffStore';
-import type { Caregiver, CaregiverRateType, CaregiverTransaction } from './types';
+import {
+  loadAttendanceEntries,
+  loadCaregivers,
+  loadCaregiverTransactions,
+  saveAttendanceEntries,
+  saveCaregivers,
+  saveCaregiverTransactions,
+} from './staffStore';
+import type { AttendanceEntry, AttendanceStatus, Caregiver, CaregiverRateType, CaregiverTransaction } from './types';
+
+// Local calendar day, not UTC — attendance is "today" from the caregiver's/household's
+// own clock, same reasoning as medicine's `formatDob`.
+function todayKey(): string {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
+const ATTENDANCE_STATUS_COLOR: Record<AttendanceStatus, { tint: string; soft: string }> = {
+  present: { tint: '#2E7D5B', soft: '#E3F3EA' },
+  absent: { tint: '#C0392B', soft: '#FBE7E4' },
+  leave: { tint: '#C7791E', soft: '#FBEBDA' },
+};
 
 type Props = StackScreenProps<RootStackParamList, 'Staff'>;
 const CAREGIVER_SERVICE_OPTIONS = [
@@ -57,12 +83,59 @@ export default function StaffScreen({ navigation }: Props) {
   const [editingExtraPaymentId, setEditingExtraPaymentId] = useState<string | null>(null);
   const [extraAmount, setExtraAmount] = useState('');
   const [extraReason, setExtraReason] = useState('');
+  const [attendance, setAttendance] = useState<AttendanceEntry[]>([]);
+  const [historyCaregiverId, setHistoryCaregiverId] = useState<string | null>(null);
 
   useEffect(() => {
-    Promise.all([loadCaregivers(), loadCaregiverTransactions()]).then(([items, savedTransactions]) => { setCaregivers(items); setTransactions(savedTransactions); setLoading(false); });
+    Promise.all([loadCaregivers(), loadCaregiverTransactions(), loadAttendanceEntries()]).then(
+      ([items, savedTransactions, savedAttendance]) => {
+        setCaregivers(items);
+        setTransactions(savedTransactions);
+        setAttendance(savedAttendance);
+        setLoading(false);
+      },
+    );
     const unsubscribe = subscribeToLanguageChanges(() => setLocaleVersion((version) => version + 1));
     return () => { unsubscribe(); };
   }, []);
+
+  const persistAttendance = async (entries: AttendanceEntry[]) => {
+    setAttendance(entries);
+    await saveAttendanceEntries(entries);
+  };
+
+  const todaysStatus = (caregiverId: string): AttendanceStatus | null =>
+    attendance.find((e) => e.caregiverId === caregiverId && e.date === todayKey())?.status ?? null;
+
+  const markAttendance = async (caregiverId: string, status: AttendanceStatus) => {
+    const date = todayKey();
+    const existing = attendance.find((e) => e.caregiverId === caregiverId && e.date === date);
+    if (existing) {
+      if (existing.status === status) {
+        // Tapping the already-active status again clears it back to unmarked.
+        await persistAttendance(attendance.filter((e) => e.id !== existing.id));
+        return;
+      }
+      await persistAttendance(attendance.map((e) => (e.id === existing.id ? { ...e, status, markedAt: Date.now() } : e)));
+      return;
+    }
+    await persistAttendance([
+      ...attendance,
+      { id: `${caregiverId}-${date}`, caregiverId, date, status, markedAt: Date.now() },
+    ]);
+  };
+
+  // Present count over the last 30 calendar days, inclusive of today.
+  const monthlyPresentCount = (caregiverId: string): number => {
+    const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
+    return attendance.filter((e) => e.caregiverId === caregiverId && e.status === 'present' && e.markedAt >= cutoff).length;
+  };
+
+  const historyFor = (caregiverId: string): AttendanceEntry[] =>
+    attendance
+      .filter((e) => e.caregiverId === caregiverId)
+      .sort((a, b) => b.date.localeCompare(a.date))
+      .slice(0, 14);
 
   const persist = async (items: Caregiver[]) => {
     setCaregivers(items);
@@ -148,6 +221,83 @@ export default function StaffScreen({ navigation }: Props) {
           <Text style={styles.heroDescription}>{t('staff.hero_description')}</Text>
           <Text style={styles.count}>{t('staff.count', { count: caregivers.length })}</Text>
         </Card>
+
+        {!loading && caregivers.length > 0 ? (
+          <>
+            <SectionHeader title={t('staff.attendance_title')} subtitle={t('staff.attendance_subtitle')} />
+            <Card style={styles.attendanceCard}>
+              {caregivers.map((caregiver, idx) => {
+                const status = todaysStatus(caregiver.id);
+                return (
+                  <View
+                    key={caregiver.id}
+                    style={[styles.attendanceRow, idx === caregivers.length - 1 && styles.attendanceRowLast]}
+                  >
+                    <Pressable style={styles.attendanceIdentity} onPress={() => setHistoryCaregiverId(caregiver.id)}>
+                      <View style={styles.attendanceAvatar}>
+                        <Text style={styles.attendanceAvatarText}>{caregiver.name.slice(0, 1).toUpperCase()}</Text>
+                      </View>
+                      <View style={styles.attendanceIdentityText}>
+                        <Text style={styles.attendanceName} numberOfLines={1}>{caregiver.name}</Text>
+                        <View style={styles.attendanceMonthlyRow}>
+                          <CalendarClock size={11} color={styles.attendanceMonthlyIcon.color} strokeWidth={2} />
+                          <Text style={styles.attendanceMonthly}>
+                            {t('staff.attendance_present_days', { count: monthlyPresentCount(caregiver.id) })}
+                          </Text>
+                        </View>
+                      </View>
+                    </Pressable>
+                    <View style={styles.attendanceActions}>
+                      <Pressable
+                        onPress={() => markAttendance(caregiver.id, 'present')}
+                        style={[
+                          styles.attendanceBtn,
+                          status === 'present' && { backgroundColor: ATTENDANCE_STATUS_COLOR.present.tint },
+                        ]}
+                      >
+                        <Check
+                          size={16}
+                          strokeWidth={2.6}
+                          color={status === 'present' ? '#fff' : ATTENDANCE_STATUS_COLOR.present.tint}
+                        />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => markAttendance(caregiver.id, 'absent')}
+                        style={[
+                          styles.attendanceBtn,
+                          status === 'absent' && { backgroundColor: ATTENDANCE_STATUS_COLOR.absent.tint },
+                        ]}
+                      >
+                        <X
+                          size={16}
+                          strokeWidth={2.6}
+                          color={status === 'absent' ? '#fff' : ATTENDANCE_STATUS_COLOR.absent.tint}
+                        />
+                      </Pressable>
+                      <Pressable
+                        onPress={() => markAttendance(caregiver.id, 'leave')}
+                        style={[
+                          styles.attendanceLeaveBtn,
+                          status === 'leave' && { backgroundColor: ATTENDANCE_STATUS_COLOR.leave.tint },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.attendanceLeaveText,
+                            status === 'leave' && styles.attendanceLeaveTextActive,
+                          ]}
+                        >
+                          {t('staff.attendance_leave')}
+                        </Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                );
+              })}
+            </Card>
+          </>
+        ) : null}
+
         <SectionHeader title={t('staff.section_title')} subtitle={t('staff.section_subtitle')} />
         {!loading && caregivers.length === 0 ? (
           <Card style={styles.empty}><Text style={styles.emptyTitle}>{t('staff.empty_title')}</Text><Text style={styles.emptyText}>{t('staff.empty_text')}</Text><Button title={t('staff.add_first')} onPress={openAdd} style={styles.emptyButton} /></Card>
@@ -204,6 +354,26 @@ export default function StaffScreen({ navigation }: Props) {
         <TextInput value={extraReason} onChangeText={setExtraReason} placeholder={t('staff.extra_reason_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
         <Button title={t('staff.save_extra')} onPress={saveExtraPayment} style={styles.saveButton} />
       </BottomSheet>
+      <BottomSheet
+        visible={historyCaregiverId !== null}
+        onClose={() => setHistoryCaregiverId(null)}
+        title={t('staff.attendance_history_title', { name: caregivers.find((c) => c.id === historyCaregiverId)?.name ?? '' })}
+      >
+        {historyCaregiverId && historyFor(historyCaregiverId).length === 0 ? (
+          <Text style={styles.historyEmpty}>{t('staff.attendance_history_empty')}</Text>
+        ) : (
+          historyCaregiverId && historyFor(historyCaregiverId).map((entry) => (
+            <View key={entry.id} style={styles.historyRow}>
+              <Text style={styles.historyDate}>{entry.date}</Text>
+              <View style={[styles.historyBadge, { backgroundColor: ATTENDANCE_STATUS_COLOR[entry.status].soft }]}>
+                <Text style={[styles.historyBadgeText, { color: ATTENDANCE_STATUS_COLOR[entry.status].tint }]}>
+                  {t(`staff.attendance_status_${entry.status}`)}
+                </Text>
+              </View>
+            </View>
+          ))
+        )}
+      </BottomSheet>
     </View>
   );
 }
@@ -214,4 +384,25 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) => StyleShe
   content: { padding: spacing.lg, gap: spacing.md }, hero: { backgroundColor: colors.surfaceElevated, marginBottom: spacing.md }, heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blush, marginBottom: spacing.md }, heroIconColor: { color: colors.primary }, heroTitle: { fontFamily: fonts.serif, fontSize: 25, color: colors.textPrimary, marginBottom: 5 }, heroDescription: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, count: { marginTop: spacing.md, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary },
   empty: { alignItems: 'flex-start' }, emptyTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.textPrimary, marginBottom: 5 }, emptyText: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, emptyButton: { marginTop: spacing.lg, alignSelf: 'stretch' }, caregiverCard: { padding: spacing.lg }, cardTop: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }, avatarText: { fontFamily: fonts.serif, fontSize: 19, color: colors.primary }, cardTitleWrap: { flex: 1 }, name: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.textPrimary }, service: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary, marginTop: 2 }, rate: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.primary, marginTop: spacing.md }, paymentSummary: { marginTop: 4 }, extraTotal: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.forest }, extraReason: { marginTop: 2, fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary }, totalPayable: { marginTop: 3, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, phoneRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm }, phoneIcon: { color: colors.textMuted }, phone: { marginLeft: spacing.xs, fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary },
   label: { marginTop: spacing.md, marginBottom: spacing.xs, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface }, placeholder: { color: colors.textMuted }, serviceSelect: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surface }, serviceValue: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary }, customServiceInput: { marginTop: spacing.sm }, selectCaret: { marginLeft: spacing.sm, fontSize: 15, color: colors.textMuted }, serviceOptions: { marginTop: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, overflow: 'hidden' }, serviceOption: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }, serviceOptionSelected: { backgroundColor: colors.blush }, serviceOptionText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, serviceOptionTextSelected: { color: colors.primary }, notesInput: { minHeight: 86, textAlignVertical: 'top' }, choiceRow: { flexDirection: 'row', gap: spacing.sm }, choice: { flex: 1, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingVertical: spacing.sm, alignItems: 'center' }, choiceSelected: { backgroundColor: colors.blush, borderColor: colors.primary }, choiceText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary }, choiceTextSelected: { color: colors.primary }, saveButton: { marginTop: spacing.lg }, extraButton: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.sm, borderWidth: 1, borderColor: colors.primary, borderRadius: radius.md }, extraButtonText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.primary }, removeButton: { alignItems: 'center', paddingVertical: spacing.md, marginTop: spacing.xs }, removeText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.danger }, extraHelp: { marginTop: spacing.sm, fontFamily: fonts.sans, fontSize: 13, lineHeight: 19, color: colors.textSecondary }, reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm }, reasonChip: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.blush }, reasonText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.primary },
+  attendanceCard: { padding: spacing.sm },
+  attendanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm, paddingHorizontal: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
+  attendanceRowLast: { borderBottomWidth: 0 },
+  attendanceIdentity: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: spacing.sm },
+  attendanceAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
+  attendanceAvatarText: { fontFamily: fonts.serif, fontSize: 16, color: colors.primary },
+  attendanceIdentityText: { flex: 1 },
+  attendanceName: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.textPrimary },
+  attendanceMonthlyRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 },
+  attendanceMonthlyIcon: { color: colors.textMuted },
+  attendanceMonthly: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted },
+  attendanceActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  attendanceBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  attendanceLeaveBtn: { paddingHorizontal: 10, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  attendanceLeaveText: { fontFamily: fonts.sansBold, fontSize: 11, color: ATTENDANCE_STATUS_COLOR.leave.tint },
+  attendanceLeaveTextActive: { color: '#fff' },
+  historyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  historyDate: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.textPrimary },
+  historyBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
+  historyBadgeText: { fontFamily: fonts.sansBold, fontSize: 12 },
+  historyEmpty: { marginTop: spacing.md, fontFamily: fonts.sans, fontSize: 13, color: colors.textMuted, textAlign: 'center' },
 });

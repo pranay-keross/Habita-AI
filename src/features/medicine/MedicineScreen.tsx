@@ -10,7 +10,7 @@ import { subscribeToLanguageChanges, t } from '../../i18n';
 import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
 import useAuth from '../../hooks/useAuth';
-import { getMyPrimaryFamily, getMyProfileName, resolveMyMembership } from '../family/api';
+import { createFamily, getMyPrimaryFamily, getMyProfileName, resolveMyMembership } from '../family/api';
 import type { FamilyMember } from '../family/types';
 import {
   createFamilyProfileForMember,
@@ -45,10 +45,9 @@ import { SCHEDULE_SLOTS, type IntakeLogEntry, type Medicine, type ScheduleSlot }
 
 type Props = StackScreenProps<RootStackParamList, 'Medicine'>;
 
-// Maps this screen's local slot enum to/from the backend's `scheduleTimes: "HH:MM"[]`
-// (docs/DECISIONS.md D-035) — a representative time per slot, not a real schedule
-// picker, so the existing chip-based UI didn't need to change shape. Multiple backend
-// times landing in the same bucket collapse to one slot on the way back in.
+// Default time per slot, used when a medicine has no custom time saved for that slot
+// yet (docs/DECISIONS.md D-035 — backend just wants `scheduleTimes: "HH:MM"[]`, so a
+// user-picked time per slot is sent as-is).
 const SLOT_TIME: Record<ScheduleSlot, string> = {
   morning: '08:00',
   afternoon: '13:00',
@@ -56,15 +55,22 @@ const SLOT_TIME: Record<ScheduleSlot, string> = {
   night: '21:00',
 };
 
-const SLOT_TIME_LABEL: Record<ScheduleSlot, string> = {
-  morning: '08:00 AM',
-  afternoon: '01:00 PM',
-  evening: '06:00 PM',
-  night: '09:00 PM',
+const SLOT_ICON: Record<ScheduleSlot, string> = {
+  morning: '🌅',
+  afternoon: '☀️',
+  evening: '🌇',
+  night: '🌙',
 };
 
-function slotToTime(slot: ScheduleSlot): string {
-  return SLOT_TIME[slot];
+function formatTimeLabel(time: string): string {
+  const [h, m] = time.split(':').map(Number);
+  const period = h >= 12 ? 'PM' : 'AM';
+  const hour12 = h % 12 === 0 ? 12 : h % 12;
+  return `${String(hour12).padStart(2, '0')}:${String(m).padStart(2, '0')} ${period}`;
+}
+
+function medicineSlotTimeLabel(med: Medicine, slot: ScheduleSlot): string {
+  return formatTimeLabel(med.scheduleTimes?.[slot] ?? SLOT_TIME[slot]);
 }
 
 function timeToSlot(time: string): ScheduleSlot {
@@ -75,14 +81,25 @@ function timeToSlot(time: string): ScheduleSlot {
   return 'night';
 }
 
+// One backend time per slot: the earliest time landing in a slot's bucket becomes
+// that slot's custom time, and any additional backend times in the same bucket are
+// dropped on the way back in (the existing chip-based UI is one time per slot).
 function remoteToLocal(remote: RemoteMedicine, liquidFlags: Record<string, boolean>): Medicine {
   const times = normalizeScheduleTimes(remote.scheduleTimes);
+  const scheduleTimes: Partial<Record<ScheduleSlot, string>> = {};
+  for (const time of times) {
+    const slot = timeToSlot(time);
+    if (!scheduleTimes[slot]) {
+      scheduleTimes[slot] = time;
+    }
+  }
   const slots = Array.from(new Set(times.map(timeToSlot)));
   return {
     id: remote.id,
     name: remote.name,
     dosage: remote.dosage,
     schedule: slots.length > 0 ? slots : ['morning'],
+    scheduleTimes,
     stock: normalizeStockQuantity(remote.stockQuantity),
     isLiquid: liquidFlags[remote.id] ?? guessIsLiquid(remote.dosage),
   };
@@ -158,9 +175,11 @@ export default function MedicineScreen({ navigation }: Props) {
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [schedule, setSchedule] = useState<ScheduleSlot[]>(['morning']);
+  const [scheduleTimes, setScheduleTimes] = useState<Partial<Record<ScheduleSlot, string>>>({});
   const [stock, setStock] = useState('30');
   const [isLiquid, setIsLiquid] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [timePickerSlot, setTimePickerSlot] = useState<ScheduleSlot | null>(null);
 
   // Filter out family members who already have a medicine profile created
   const availableFamilyMembers = useMemo(() => {
@@ -322,6 +341,7 @@ export default function MedicineScreen({ navigation }: Props) {
     setName('');
     setDosage('');
     setSchedule(['morning']);
+    setScheduleTimes({});
     setStock('30');
     setIsLiquid(false);
     setShowSheet(true);
@@ -346,6 +366,19 @@ export default function MedicineScreen({ navigation }: Props) {
   };
 
   const openAddProfileSheet = () => {
+    // No family yet — there's no member list to choose from, and this flow is
+    // "myself only" per the empty-state CTA, so skip straight to details with
+    // SELF preselected.
+    if (!familyId) {
+      setAddProfileStep('details');
+      setSelectedMemberId(null);
+      setIsOtherMode(false);
+      setOtherName('');
+      setNewProfileCategory('SELF');
+      setNewProfileDob(null);
+      setShowAddProfileSheet(true);
+      return;
+    }
     setAddProfileStep('choose_who');
     setSelectedMemberId(null);
     setIsOtherMode(false);
@@ -384,20 +417,34 @@ export default function MedicineScreen({ navigation }: Props) {
       Alert.alert(t('medicine.incomplete_title'), t('medicine.profile_incomplete_msg'));
       return;
     }
-    if (!familyId) {
-      return;
-    }
     setCreatingProfile(true);
     try {
       const token = await getAccessToken();
       if (!token) {
         return;
       }
+      // No family yet: profiles only exist under a family on the backend, so create
+      // one behind the scenes (named after the user) before the SELF profile itself —
+      // the "create my profile" CTA never exposed this as a separate family-creation
+      // step to the user.
+      let activeFamilyId = familyId;
+      let ownerMemberId = selectedMemberId;
+      if (!activeFamilyId) {
+        const profileName = (await getMyProfileName()) ?? t('medicine.default_family_name');
+        const family = await createFamily(profileName, token);
+        const [, userId] = await Promise.all([Promise.resolve(), getUserId()]);
+        const membership = resolveMyMembership(family, userId, profileName);
+        activeFamilyId = family.id;
+        ownerMemberId = membership.member?.id ?? null;
+        setFamilyId(family.id);
+        setFamilyMembers(family.members);
+        setMyFamilyMemberId(membership.member?.id ?? null);
+      }
       const dob = formatDob(newProfileDob);
       const profile = isOtherMode
-        ? await createFamilyProfileOther(familyId, otherName.trim(), newProfileCategory, dob, token)
-        : await createFamilyProfileForMember(familyId, selectedMemberId as string, newProfileCategory, dob, token);
-      setProfiles(await listFamilyProfiles(familyId, token));
+        ? await createFamilyProfileOther(activeFamilyId, otherName.trim(), newProfileCategory, dob, token)
+        : await createFamilyProfileForMember(activeFamilyId, ownerMemberId as string, newProfileCategory, dob, token);
+      setProfiles(await listFamilyProfiles(activeFamilyId, token));
       setFamilyProfileId(profile.id);
       await refreshRemoteMedicines(profile.id, token);
       setShowAddProfileSheet(false);
@@ -416,6 +463,7 @@ export default function MedicineScreen({ navigation }: Props) {
     setName(med.name);
     setDosage(med.dosage);
     setSchedule(med.schedule);
+    setScheduleTimes(med.scheduleTimes ?? {});
     setStock(med.stock !== null ? String(med.stock) : '');
     setIsLiquid(med.isLiquid);
     setShowSheet(true);
@@ -423,6 +471,20 @@ export default function MedicineScreen({ navigation }: Props) {
 
   const toggleScheduleSlot = (slot: ScheduleSlot) => {
     setSchedule((prev) => (prev.includes(slot) ? prev.filter((s) => s !== slot) : [...prev, slot]));
+  };
+
+  const slotTime = (slot: ScheduleSlot): string => scheduleTimes[slot] ?? SLOT_TIME[slot];
+
+  const slotTimeLabel = (slot: ScheduleSlot): string => formatTimeLabel(slotTime(slot));
+
+  const handleSlotTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
+    const slot = timePickerSlot;
+    setTimePickerSlot(null);
+    if (event.type === 'set' && selectedDate && slot) {
+      const hh = String(selectedDate.getHours()).padStart(2, '0');
+      const mm = String(selectedDate.getMinutes()).padStart(2, '0');
+      setScheduleTimes((prev) => ({ ...prev, [slot]: `${hh}:${mm}` }));
+    }
   };
 
   const handleSave = async () => {
@@ -442,7 +504,7 @@ export default function MedicineScreen({ navigation }: Props) {
         const input = {
           name: name.trim(),
           dosage: dosage.trim(),
-          scheduleTimes: schedule.map(slotToTime),
+          scheduleTimes: schedule.map(slotTime),
           stockQuantity: stockNum,
           lowStockThreshold: editingId ? (lowStockThresholds[editingId] ?? 3) : 3,
         };
@@ -465,7 +527,7 @@ export default function MedicineScreen({ navigation }: Props) {
     if (editingId) {
       const updated = medicines.map((m) =>
         m.id === editingId
-          ? { ...m, name: name.trim(), dosage: dosage.trim(), schedule, stock: stockNum, isLiquid }
+          ? { ...m, name: name.trim(), dosage: dosage.trim(), schedule, scheduleTimes, stock: stockNum, isLiquid }
           : m,
       );
       await persistMedicines(updated);
@@ -475,6 +537,7 @@ export default function MedicineScreen({ navigation }: Props) {
         name: name.trim(),
         dosage: dosage.trim(),
         schedule,
+        scheduleTimes,
         stock: stockNum,
         isLiquid,
       };
@@ -601,12 +664,12 @@ export default function MedicineScreen({ navigation }: Props) {
               </View>
             </View>
 
-            {familyId && (
-              <View style={styles.sectionMargin}>
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>{t('medicine.profiles_title')}</Text>
-                  <Text style={styles.sectionSub}>{t('medicine.profiles_sub')}</Text>
-                </View>
+            <View style={styles.sectionMargin}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>{t('medicine.profiles_title')}</Text>
+                <Text style={styles.sectionSub}>{t('medicine.profiles_sub')}</Text>
+              </View>
+              {familyId ? (
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileRow}>
                   {profiles.map((profile) => {
                     const active = profile.id === familyProfileId;
@@ -628,10 +691,16 @@ export default function MedicineScreen({ navigation }: Props) {
                     <Text style={styles.addProfileChipText}>{t('medicine.add_profile_chip')}</Text>
                   </Pressable>
                 </ScrollView>
-              </View>
-            )}
+              ) : (
+                <View style={styles.emptyState}>
+                  <Text style={styles.emptyTitle}>{t('medicine.no_profiles_title')}</Text>
+                  <Text style={styles.emptySub}>{t('medicine.no_profiles_sub')}</Text>
+                  <Button title={t('medicine.create_my_profile_btn')} onPress={openAddProfileSheet} style={styles.modalCta} />
+                </View>
+              )}
+            </View>
 
-            {!familyId || familyProfileId ? (
+            {familyProfileId ? (
               <>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>{t('medicine.section_title')}</Text>
@@ -678,7 +747,7 @@ export default function MedicineScreen({ navigation }: Props) {
                                 markTaken(med, slot);
                               }}>
                               <Text style={[styles.slotChipText, taken && styles.slotChipTextTaken]}>
-                                {t(`medicine.slot_${slot}`)} ({SLOT_TIME_LABEL[slot]})
+                                {t(`medicine.slot_${slot}`)} ({medicineSlotTimeLabel(med, slot)})
                                 {taken ? ` · ${t('medicine.taken_today')}` : ''}
                               </Text>
                             </Pressable>
@@ -689,13 +758,7 @@ export default function MedicineScreen({ navigation }: Props) {
                   ))
                 )}
               </>
-            ) : (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyTitle}>{t('medicine.no_profiles_title')}</Text>
-                <Text style={styles.emptySub}>{t('medicine.no_profiles_sub')}</Text>
-                <Button title={t('medicine.create_profile_btn')} onPress={openAddProfileSheet} style={styles.modalCta} />
-              </View>
-            )}
+            ) : null}
 
             {familyProfileId && (
               <Pressable
@@ -736,18 +799,49 @@ export default function MedicineScreen({ navigation }: Props) {
         />
 
         <Text style={styles.label}>{t('medicine.label_schedule')}</Text>
-        <View style={styles.chipRow}>
-          {SCHEDULE_SLOTS.map((slot) => (
-            <Pressable
-              key={slot}
-              style={[styles.chip, schedule.includes(slot) && styles.chipActive]}
-              onPress={() => toggleScheduleSlot(slot)}>
-              <Text style={[styles.chipText, schedule.includes(slot) && styles.chipTextActive]}>
-                {t(`medicine.slot_${slot}`)} ({SLOT_TIME_LABEL[slot]})
-              </Text>
-            </Pressable>
-          ))}
+        <View style={styles.slotList}>
+          {SCHEDULE_SLOTS.map((slot) => {
+            const active = schedule.includes(slot);
+            return (
+              <View key={slot} style={[styles.slotRow2, active && styles.slotRow2Active]}>
+                <Pressable
+                  style={styles.slotRow2Main}
+                  onPress={() => toggleScheduleSlot(slot)}
+                  hitSlop={4}>
+                  <View style={[styles.slotCheckbox, active && styles.slotCheckboxActive]}>
+                    {active && <Text style={styles.slotCheckboxTick}>✓</Text>}
+                  </View>
+                  <Text style={styles.slotIcon}>{SLOT_ICON[slot]}</Text>
+                  <Text style={[styles.slotRow2Label, active && styles.slotRow2LabelActive]}>
+                    {t(`medicine.slot_${slot}`)}
+                  </Text>
+                </Pressable>
+                {active && (
+                  <Pressable
+                    onPress={() => setTimePickerSlot(slot)}
+                    style={styles.slotTimeBtn2}
+                    hitSlop={6}>
+                    <Text style={styles.slotTimeBtn2Text}>{slotTimeLabel(slot)}</Text>
+                    <Text style={styles.slotTimeBtn2Icon}>✎</Text>
+                  </Pressable>
+                )}
+              </View>
+            );
+          })}
         </View>
+        {timePickerSlot && (
+          <DateTimePicker
+            value={(() => {
+              const [h, m] = slotTime(timePickerSlot).split(':').map(Number);
+              const d = new Date();
+              d.setHours(h, m, 0, 0);
+              return d;
+            })()}
+            mode="time"
+            display="default"
+            onChange={handleSlotTimeChange}
+          />
+        )}
 
         <Text style={styles.label}>{t('medicine.label_medicine_type')}</Text>
         <View style={styles.chipRow}>
@@ -814,9 +908,11 @@ export default function MedicineScreen({ navigation }: Props) {
           </>
         ) : (
           <>
-            <Pressable onPress={() => setAddProfileStep('choose_who')}>
-              <Text style={styles.backLink}>{t('medicine.back_btn')}</Text>
-            </Pressable>
+            {familyId && (
+              <Pressable onPress={() => setAddProfileStep('choose_who')}>
+                <Text style={styles.backLink}>{t('medicine.back_btn')}</Text>
+              </Pressable>
+            )}
 
             {!isOtherMode && selectedMemberId && (
               <Text style={styles.forMemberText}>
@@ -1292,6 +1388,78 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     color: colors.textPrimary,
   },
   chipTextActive: {
+    color: colors.textOnPrimary,
+  },
+  slotList: {
+    gap: 8,
+  },
+  slotRow2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingVertical: 10,
+    paddingHorizontal: 12,
+  },
+  slotRow2Active: {
+    backgroundColor: colors.primary,
+    borderColor: colors.primary,
+  },
+  slotRow2Main: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  slotCheckbox: {
+    width: 20,
+    height: 20,
+    borderRadius: 6,
+    borderWidth: 1.5,
+    borderColor: colors.borderStrong,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  slotCheckboxActive: {
+    backgroundColor: colors.textOnPrimary,
+    borderColor: colors.textOnPrimary,
+  },
+  slotCheckboxTick: {
+    fontSize: 12,
+    fontFamily: fonts.sansBold,
+    color: colors.primary,
+  },
+  slotIcon: {
+    fontSize: 16,
+    marginRight: 8,
+  },
+  slotRow2Label: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 14,
+    color: colors.textPrimary,
+  },
+  slotRow2LabelActive: {
+    color: colors.textOnPrimary,
+  },
+  slotTimeBtn2: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(255,255,255,0.18)',
+    borderRadius: radius.pill,
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    gap: 4,
+  },
+  slotTimeBtn2Text: {
+    fontFamily: fonts.sansBold,
+    fontSize: 12,
+    color: colors.textOnPrimary,
+  },
+  slotTimeBtn2Icon: {
+    fontSize: 11,
     color: colors.textOnPrimary,
   },
   modalCta: {

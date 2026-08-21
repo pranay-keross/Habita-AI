@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Alert, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { LucideIcon } from 'lucide-react-native';
@@ -8,9 +8,8 @@ import Droplets from 'lucide-react-native/icons/droplets';
 import PartyPopper from 'lucide-react-native/icons/party-popper';
 import CarFront from 'lucide-react-native/icons/car-front';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
-import Sparkles from 'lucide-react-native/icons/sparkles';
+import Info from 'lucide-react-native/icons/info';
 import type { RootStackParamList } from '../../app/_layout';
-import Card from '../../components/Card';
 import SectionHeader from '../../components/SectionHeader';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
@@ -38,6 +37,8 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
     description: string;
     highlights: string[];
     Icon: LucideIcon;
+    tint: string;
+    tintSoft: string;
   }[] = [
     {
       id: 'caregiver',
@@ -49,6 +50,8 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
         t('household.caregiver_highlight_pay'),
       ],
       Icon: UsersRound,
+      tint: '#2E7D5B',
+      tintSoft: '#E3F3EA',
     },
     {
       id: 'resources',
@@ -60,6 +63,8 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
         t('household.resources_highlight_bills'),
       ],
       Icon: Droplets,
+      tint: '#1D7FBF',
+      tintSoft: '#E1F1FB',
     },
     {
       id: 'events',
@@ -71,6 +76,8 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
         t('household.events_highlight_calendar'),
       ],
       Icon: PartyPopper,
+      tint: '#C24F8E',
+      tintSoft: '#FAE6F0',
     },
     {
       id: 'assets',
@@ -82,6 +89,8 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
         t('household.assets_highlight_maintenance'),
       ],
       Icon: CarFront,
+      tint: '#C7791E',
+      tintSoft: '#FBEBDA',
     },
   ];
 
@@ -110,30 +119,16 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
         ]}
         showsVerticalScrollIndicator={false}
       >
-        <View style={styles.hero}>
-          <View style={styles.heroIcon}>
-            <Sparkles
-              size={22}
-              color={styles.heroIconColor.color}
-              strokeWidth={1.8}
-            />
-          </View>
-          <Text style={styles.heroTitle}>{t('household.hero_title')}</Text>
-          <Text style={styles.heroDescription}>
-            {t('household.hero_description')}
-          </Text>
-        </View>
-
         <SectionHeader
           title={t('household.sections_title')}
           subtitle={t('household.sections_subtitle')}
         />
 
-        <View style={styles.cards}>
-          {sections.map(({ id, title, description, highlights, Icon }) => (
-            <Card
+        <View style={styles.grid}>
+          {sections.map(({ id, title, description, highlights, Icon, tint, tintSoft }) => (
+            <Pressable
               key={id}
-              style={styles.card}
+              style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
               onPress={() =>
                 id === 'caregiver'
                   ? navigation.navigate('Staff')
@@ -146,29 +141,32 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
                   : navigation.navigate('HouseholdArea', { area: id })
               }
             >
-              <View style={styles.cardTopRow}>
-                <View style={styles.sectionIcon}>
-                  <Icon
-                    size={21}
-                    color={styles.sectionIconColor.color}
-                    strokeWidth={1.8}
-                  />
+              <View style={styles.tileTopRow}>
+                <View style={[styles.tileIcon, { backgroundColor: tintSoft }]}>
+                  <Icon size={26} color={tint} strokeWidth={2.4} />
                 </View>
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityLabel={title}
+                  hitSlop={10}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    Alert.alert(title, [description, ...highlights.map((h) => `• ${h}`)].join('\n'));
+                  }}
+                  style={styles.infoButton}
+                >
+                  <Info size={16} color={styles.infoIconColor.color} strokeWidth={2} />
+                </Pressable>
               </View>
-              <Text style={styles.cardTitle}>{title}</Text>
-              <Text style={styles.cardDescription}>{description}</Text>
-              <View style={styles.highlightList}>
-                {highlights.map(highlight => (
-                  <View key={highlight} style={styles.highlightRow}>
-                    <View style={styles.highlightDot} />
-                    <Text style={styles.highlightText}>{highlight}</Text>
-                  </View>
-                ))}
-              </View>
-              <Text style={styles.openWorkspace}>
-                {t('household.open_workspace')}
+              <Text style={styles.tileTitle} numberOfLines={2}>
+                {title}
               </Text>
-            </Card>
+              <View style={[styles.tileOpenBtn, { backgroundColor: tintSoft }]}>
+                <Text style={[styles.tileOpenBtnText, { color: tint }]}>
+                  {t('household.open_workspace')}
+                </Text>
+              </View>
+            </Pressable>
           ))}
         </View>
       </ScrollView>
@@ -206,76 +204,71 @@ const makeStyles = ({ colors, fonts, spacing }: ThemeTokens) =>
       color: colors.textPrimary,
     },
     content: { padding: spacing.lg },
-    hero: { marginBottom: spacing.xl },
-    heroIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: colors.blush,
-      marginBottom: spacing.md,
-    },
-    heroIconColor: { color: colors.primary },
-    heroTitle: {
-      fontFamily: fonts.serif,
-      fontSize: 28,
-      color: colors.textPrimary,
-      marginBottom: 6,
-    },
-    heroDescription: {
-      fontFamily: fonts.sans,
-      fontSize: 14,
-      lineHeight: 21,
-      color: colors.textSecondary,
-    },
-    cards: { gap: spacing.md },
-    card: { padding: spacing.lg },
-    cardTopRow: {
+    grid: {
       flexDirection: 'row',
-      alignItems: 'center',
+      flexWrap: 'wrap',
+      gap: spacing.md,
+    },
+    tile: {
+      width: '47%',
+      minHeight: 168,
+      backgroundColor: colors.surface,
+      borderRadius: 20,
+      padding: spacing.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.04,
+      shadowRadius: 6,
+      elevation: 1,
+      justifyContent: 'space-between',
+    },
+    tilePressed: {
+      opacity: 0.9,
+      transform: [{ scale: 0.98 }],
+    },
+    tileTopRow: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      justifyContent: 'space-between',
       marginBottom: spacing.md,
     },
-    sectionIcon: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+    tileIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.blush,
     },
-    sectionIconColor: { color: colors.primary },
-    cardTitle: {
-      fontFamily: fonts.serif,
-      fontSize: 20,
-      color: colors.textPrimary,
-      marginBottom: 4,
+    infoButton: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.surfaceElevated,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
-    cardDescription: {
-      fontFamily: fonts.sans,
-      fontSize: 14,
-      lineHeight: 20,
-      color: colors.textSecondary,
-    },
-    highlightList: { marginTop: spacing.md, gap: 7 },
-    highlightRow: { flexDirection: 'row', alignItems: 'center' },
-    highlightDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: colors.turmeric,
-      marginRight: spacing.sm,
-    },
-    highlightText: {
+    infoIconColor: { color: colors.textMuted },
+    tileTitle: {
       flex: 1,
-      fontFamily: fonts.sansMedium,
-      fontSize: 12,
+      fontFamily: fonts.serif,
+      fontWeight: '700',
+      fontSize: 17,
       color: colors.textPrimary,
     },
-    openWorkspace: {
+    tileOpenBtn: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderRadius: 12,
+      paddingVertical: 9,
       marginTop: spacing.md,
-      fontFamily: fonts.sansMedium,
+    },
+    tileOpenBtnText: {
+      fontFamily: fonts.sansBold,
+      fontWeight: '700',
       fontSize: 13,
-      color: colors.primary,
     },
   });

@@ -43,6 +43,7 @@ import {
   type OutfitRecommendation,
 } from '../features/style_pantry';
 import VoiceScreen from '../features/money/voice_assistant/VoiceScreen';
+import SmartLifeScreen from '../features/smart_life/SmartLifeScreen';
 import VoiceSettingsScreen from '../features/money/voice_assistant/VoiceSettingsScreen';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
@@ -92,6 +93,7 @@ export type RootStackParamList = {
   OutfitDetails: { outfit: OutfitRecommendation };
   Voice: undefined;
   VoiceSettings: undefined;
+  SmartLife: undefined;
 };
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
@@ -162,6 +164,7 @@ const AppLayout = () => {
           <Stack.Screen name="OutfitDetails" component={OutfitDetailsScreen} />
           <Stack.Screen name="Voice" component={VoiceScreen} />
           <Stack.Screen name="VoiceSettings" component={VoiceSettingsScreen} />
+          <Stack.Screen name="SmartLife" component={SmartLifeScreen} />
         </Stack.Navigator >
       </NavigationContainer >
     </SafeAreaProvider >

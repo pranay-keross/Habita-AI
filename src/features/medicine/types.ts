@@ -7,6 +7,9 @@ export interface Medicine {
   name: string;
   dosage: string;
   schedule: ScheduleSlot[];
+  // Custom "HH:MM" time per selected slot, overriding that slot's default
+  // representative time. Missing entries fall back to the slot's default.
+  scheduleTimes?: Partial<Record<ScheduleSlot, string>>;
   // `null` means the backend has no confirmed count for this medicine yet — the case
   // right after prescription-parsing auto-creates it, before the user has confirmed how
   // much they actually have.
