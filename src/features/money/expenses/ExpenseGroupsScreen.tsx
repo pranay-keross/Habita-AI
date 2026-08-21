@@ -166,7 +166,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
         <Text style={styles.sectionTitle}>{t('expenses.your_groups', { count: groups.length })}</Text>
 
         {loading ? (
-          <ActivityIndicator color={styles.operatingHubSubTitle.color} style={{ marginTop: 24 }} />
+          <ActivityIndicator color={styles.memberChipText.color} style={{ marginTop: 24 }} />
         ) : (
           groups.map((group) => {
             const { balances } = calculateGroupBalances(group, expenses, settlements);
