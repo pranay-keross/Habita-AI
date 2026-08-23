@@ -299,10 +299,13 @@ export default function ProfileScreen({ route, navigation }: Props) {
 
     if (isEditing) {
       Alert.alert(t('profile.header_title'), t('profile.save_success'));
+      navigation.navigate('Dashboard', { profileUpdated: true });
+    } else {
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Dashboard' }],
+      });
     }
-    // `profileUpdated: true` only on an actual edit save — first-time setup already gets
-    // a fresh fetch from Dashboard's own mount effect, no signal needed for that path.
-    navigation.navigate('Dashboard', isEditing ? { profileUpdated: true } : undefined);
   };
 
   const handleLangChange = async (langCode: string) => {
@@ -374,7 +377,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
           await logout();
           navigation.reset({
             index: 0,
-            routes: [{ name: 'Language' }],
+            routes: [{ name: 'Phone' }],
           });
         },
       },
@@ -392,7 +395,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
       }
       const body = err.body;
       const message = body && typeof body === 'object' && 'message' in body ? (body as { message?: unknown }).message : null;
-      if (message === 'Deletion Request already being sent') {
+      if (message === 'Deletion Request already being sent' || (typeof message === 'string' && /delet(ion|e)/i.test(message))) {
         return t('profile.delete_account_already_pending');
       }
     }
@@ -423,7 +426,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
           await clearAll();
           navigation.reset({
             index: 0,
-            routes: [{ name: 'Language' }],
+            routes: [{ name: 'Phone' }],
           });
         },
       },

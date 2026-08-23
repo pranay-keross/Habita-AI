@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, Pressable, StyleSheet, Image } from 'react-native';
+import { View, Text, Pressable, StyleSheet, Image, BackHandler, ToastAndroid, Platform } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import Animated, {
   FadeInDown,
   useAnimatedScrollHandler,
@@ -105,6 +106,30 @@ export default function DashboardScreen({ navigation, route }: Props) {
   const [localeVersion, setLocaleVersion] = useState(0);
   const [adherence, setAdherence] = useState<number | null>(null);
   const [resourceItems, setResourceItems] = useState<QuickTapItem[]>([]);
+
+  useFocusEffect(
+    useCallback(() => {
+      let lastBackPress = 0;
+      const onBackPress = () => {
+        const now = Date.now();
+        if (now - lastBackPress < 2000) {
+          BackHandler.exitApp();
+          return true;
+        }
+        lastBackPress = now;
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(
+            t('dashboard.press_back_again_to_exit') || 'Press back again to exit',
+            ToastAndroid.SHORT,
+          );
+        }
+        return true;
+      };
+
+      const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+      return () => subscription.remove();
+    }, [])
+  );
 
   // Dynamic translated arrays evaluated on render
   const quickActions: { id: ActionId; label: string; Icon: LucideIcon }[] = [

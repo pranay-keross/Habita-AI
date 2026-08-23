@@ -91,6 +91,7 @@ export type AuthErrorKind =
   | 'already_registered'  // register: this phone is already a verified user
   | 'invalid_phone'       // register/login/verify-otp: fails the 10-digit-India validator
   | 'invalid_code'        // verify-otp: wrong code, expired, no pending OTP, or too many attempts
+  | 'deletion_pending'    // account is pending deletion / deletion request already sent
   | 'network'
   | 'unknown';
 
@@ -110,6 +111,13 @@ export function parseAuthError(err: unknown): AuthErrorKind {
   }
 
   const message = extractMessage(err.body);
+
+  if (
+    message === 'Deletion Request already being sent' ||
+    (typeof message === 'string' && /delet(ion|e)/i.test(message))
+  ) {
+    return 'deletion_pending';
+  }
 
   if (err.status === 400) {
     if (message === 'Phone number is not registered') {

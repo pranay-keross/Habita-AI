@@ -42,6 +42,7 @@
     "setting_up": "सेटअप हो रहा है..."
   },
   "dashboard": {
+    "press_back_again_to_exit": "बाहर निकलने के लिए फिर से वापस दबाएं",
     "greeting_morning": "शुभ प्रभात, Habita AI",
     "greeting_afternoon": "शुभ दोपहर, Habita AI",
     "greeting_evening": "शुभ संध्या, Habita AI",

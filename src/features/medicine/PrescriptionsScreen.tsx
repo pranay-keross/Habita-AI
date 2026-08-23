@@ -12,6 +12,7 @@ import { subscribeToLanguageChanges, t } from '../../i18n';
 import useAuth from '../../hooks/useAuth';
 import {
   deleteMedicalDocument,
+  extractMedchestErrorMessage,
   listMedicalDocuments,
   listMedicines,
   normalizeScheduleTimes,
@@ -25,6 +26,7 @@ import {
 } from './api';
 import { guessIsLiquid, loadLiquidFlags, saveLiquidFlags } from './medicineStore';
 import MedicineQuantitySheet from './MedicineQuantitySheet';
+import { timeToSlot } from './types';
 
 type Props = StackScreenProps<RootStackParamList, 'Prescriptions'>;
 
@@ -60,13 +62,18 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
   const [savingQuantity, setSavingQuantity] = useState(false);
 
   const showRemoteError = (err: unknown) => {
-    const key: Record<MedchestErrorKind, string> = {
-      network: 'onboarding.network_error',
-      not_found: 'medicine.error_not_found',
-      no_permission: 'medicine.error_no_permission',
-      unknown: 'medicine.error_generic',
-    };
-    Alert.alert(t('onboarding.error_title'), t(key[parseMedchestError(err)]));
+    const detail = extractMedchestErrorMessage(err);
+    if (detail) {
+      Alert.alert(t('onboarding.error_title'), detail);
+    } else {
+      const key: Record<MedchestErrorKind, string> = {
+        network: 'onboarding.network_error',
+        not_found: 'medicine.error_not_found',
+        no_permission: 'medicine.error_no_permission',
+        unknown: 'medicine.error_generic',
+      };
+      Alert.alert(t('onboarding.error_title'), t(key[parseMedchestError(err)]));
+    }
   };
 
   const refreshDocuments = async (token: string) => {
@@ -143,11 +150,11 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
       matched.map((m) => ({
         id: m.id,
         name: m.name,
-        dosage: m.dosage,
+        dosage: m.dosage ?? '',
         scheduleTimes: normalizeScheduleTimes(m.scheduleTimes),
-        lowStockThreshold: m.lowStockThreshold,
+        lowStockThreshold: m.lowStockThreshold ?? 3,
         stock: normalizeStockQuantity(m.stockQuantity) !== null ? String(m.stockQuantity) : '',
-        isLiquid: liquidFlags[m.id] ?? guessIsLiquid(m.dosage),
+        isLiquid: liquidFlags[m.id] ?? guessIsLiquid(m.dosage ?? ''),
       })),
     );
     setQueueIndex(0);
@@ -337,14 +344,24 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
       if (!token) {
         return;
       }
+      const scheduleTimesMap: Record<string, string> = {};
+      const times = normalizeScheduleTimes(item.scheduleTimes);
+      if (times.length > 0) {
+        for (const time of times) {
+          const slot = timeToSlot(time);
+          scheduleTimesMap[slot] = time;
+        }
+      } else {
+        scheduleTimesMap.morning = '08:00';
+      }
       await updateMedicine(
         item.id,
         {
           name: item.name,
           dosage: item.dosage,
-          scheduleTimes: normalizeScheduleTimes(item.scheduleTimes),
+          scheduleTimes: scheduleTimesMap,
           stockQuantity: qty,
-          lowStockThreshold: item.lowStockThreshold,
+          lowStockThreshold: item.lowStockThreshold ?? 3,
         },
         token,
       );

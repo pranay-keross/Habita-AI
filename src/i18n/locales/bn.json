@@ -42,6 +42,7 @@
     "setting_up": "সেটআপ হচ্ছে..."
   },
   "dashboard": {
+    "press_back_again_to_exit": "প্রস্থান করতে আবার ব্যাক টিপুন",
     "greeting_morning": "শুভ সকাল, Habita AI",
     "greeting_afternoon": "শুভ দুপুর, Habita AI",
     "greeting_evening": "শুভ সন্ধ্যা, Habita AI",

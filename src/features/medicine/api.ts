@@ -40,25 +40,23 @@ export interface RemoteMedicine {
   // Nullable defensively — see `normalizeStockQuantity` below. A medicine just
   // auto-created from a parsed prescription may have no confirmed count yet.
   stockQuantity: number | null;
-  lowStockThreshold: number;
+  lowStockThreshold: number | null;
   // `lowStock`/`adherenceRate` are computed server-side and returned on every
   // create/list/update response — unlike the local model's `calculateAdherence`, these
   // are not meant to be derived client-side once this is wired up for real.
-  // `adherenceRate` is a *string* on the wire (`MedicineSummaryResponse.adherenceRate`
-  // in the backend, confirmed by reading its source directly), not a number — either a
-  // decimal like `"42.86"` or the literal `"No logs being recorded"` when there's no
-  // intake history yet. Parse with `parseAdherenceRate` below rather than using this
-  // raw.
+  // `adherenceRate` is either a number, decimal string like `"42.86"`, or `"No logs being recorded"`.
   lowStock: boolean;
-  adherenceRate: string;
+  adherenceRate: string | number | null;
 }
 
 // Normalizes `scheduleTimes` whether returned as an array `["08:00", "21:00"]` or an object `{"morning": "08:00", "night": "21:00"}`
 export function normalizeScheduleTimes(raw: string[] | Record<string, string> | null | undefined): string[] {
   if (!raw) return [];
-  if (Array.isArray(raw)) return raw;
+  if (Array.isArray(raw)) {
+    return raw.filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
+  }
   if (typeof raw === 'object') {
-    return Object.values(raw).filter((v): v is string => typeof v === 'string');
+    return Object.values(raw).filter((v): v is string => typeof v === 'string' && v.trim().length > 0);
   }
   return [];
 }
@@ -74,18 +72,20 @@ export function normalizeStockQuantity(raw: number | null | undefined): number |
   return raw;
 }
 
-// `null` means "no data yet" (the backend's own `"No logs being recorded"` sentinel),
-// distinct from `0` (logged doses, all missed) — mirrors `calculateAdherence`'s local
-// `| null` shape so both modes' adherence stat handle "no data" the same way.
-export function parseAdherenceRate(raw: string): number | null {
-  const parsed = Number(raw);
+// `null` means "no data yet" (the backend's own `"No logs being recorded"` sentinel,
+// null, or empty string), distinct from `0` (logged doses, all missed).
+export function parseAdherenceRate(raw: string | number | null | undefined): number | null {
+  if (raw === null || raw === undefined || raw === '' || raw === 'No logs being recorded') {
+    return null;
+  }
+  const parsed = typeof raw === 'number' ? raw : Number(raw);
   return Number.isFinite(parsed) ? parsed : null;
 }
 
 export interface CreateOrUpdateMedicineInput {
   name: string;
   dosage: string;
-  scheduleTimes: string[];
+  scheduleTimes: Record<string, string>;
   stockQuantity: number;
   lowStockThreshold: number;
 }
@@ -278,3 +278,26 @@ export function parseMedchestError(err: unknown): MedchestErrorKind {
   }
   return 'unknown';
 }
+
+// Extracts detailed validation/error message from Spring Boot backend error response
+// (e.g. details array ["name: must not be blank"] or structured message).
+export function extractMedchestErrorMessage(err: unknown): string | null {
+  if (!(err instanceof ApiError) || !err.body || typeof err.body !== 'object') {
+    return null;
+  }
+  const body = err.body as { message?: unknown; details?: unknown; error?: unknown };
+  if (Array.isArray(body.details) && body.details.length > 0) {
+    const details = body.details.filter((d): d is string => typeof d === 'string');
+    if (details.length > 0) {
+      return details.join('\n');
+    }
+  }
+  if (typeof body.message === 'string' && body.message.trim().length > 0 && body.message !== 'Validation failed') {
+    return body.message;
+  }
+  if (typeof body.error === 'string' && body.error.trim().length > 0 && body.error !== 'Bad Request') {
+    return body.error;
+  }
+  return null;
+}
+

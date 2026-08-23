@@ -46,10 +46,16 @@ const PhoneScreen = ({ navigation }: Props) => {
     } catch (err) {
       const kind = parseAuthError(err);
       console.warn('Phone submit failed:', kind, err);
-      Alert.alert(
-        t('onboarding.error_title'),
-        kind === 'network' ? t('onboarding.network_error') : t('onboarding.phone_invalid'),
-      );
+      if (kind === 'deletion_pending') {
+        Alert.alert(
+          t('profile.delete_account_confirm_title') || t('onboarding.error_title'),
+          t('profile.delete_account_already_pending'),
+        );
+      } else if (kind === 'network') {
+        Alert.alert(t('onboarding.error_title'), t('onboarding.network_error'));
+      } else {
+        Alert.alert(t('onboarding.error_title'), t('onboarding.phone_invalid'));
+      }
     } finally {
       setSubmitting(false);
     }

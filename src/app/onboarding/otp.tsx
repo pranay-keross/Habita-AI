@@ -55,10 +55,16 @@ const OtpScreen = ({ navigation, route }: Props) => {
     } catch (err) {
       const kind = parseAuthError(err);
       console.warn('OTP resend failed:', kind, err);
-      Alert.alert(
-        t('onboarding.error_title'),
-        kind === 'network' ? t('onboarding.network_error') : t('onboarding.phone_invalid'),
-      );
+      if (kind === 'deletion_pending') {
+        Alert.alert(
+          t('profile.delete_account_confirm_title') || t('onboarding.error_title'),
+          t('profile.delete_account_already_pending'),
+        );
+      } else if (kind === 'network') {
+        Alert.alert(t('onboarding.error_title'), t('onboarding.network_error'));
+      } else {
+        Alert.alert(t('onboarding.error_title'), t('onboarding.phone_invalid'));
+      }
     } finally {
       setResending(false);
     }
@@ -75,15 +81,26 @@ const OtpScreen = ({ navigation, route }: Props) => {
       const phone = await getItem('habita.user_phone', '');
       await verify(phone, code);
       // A returning user (login succeeded directly, isNewUser: false) already has a
-      // profile — send them straight to the Dashboard instead of back through Profile
-      // setup. Defaults to Profile if this param is somehow missing, since that's the
-      // safe side: it only costs an extra screen, never strands anyone mid-setup.
+      // profile — reset stack straight to Dashboard so back button cannot return to login/OTP.
+      // Defaults to Profile if this param is missing (first-time onboarding).
       const isNewUser = route.params?.isNewUser ?? true;
-      navigation.navigate(isNewUser ? 'Profile' : 'Dashboard');
+      if (isNewUser) {
+        navigation.navigate('Profile');
+      } else {
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Dashboard' }],
+        });
+      }
     } catch (err) {
       const kind = parseAuthError(err);
       console.warn('OTP verify failed:', kind, err);
-      if (kind === 'network') {
+      if (kind === 'deletion_pending') {
+        Alert.alert(
+          t('profile.delete_account_confirm_title') || t('onboarding.error_title'),
+          t('profile.delete_account_already_pending'),
+        );
+      } else if (kind === 'network') {
         Alert.alert(t('onboarding.error_title'), t('onboarding.network_error'));
       } else {
         setError(t('onboarding.otp_invalid'));

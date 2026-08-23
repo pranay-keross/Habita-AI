@@ -737,6 +737,34 @@ The other two questions are real product decisions, not deployment facts, so the
 
 ---
 
+## D-043 — Medicine creation & update payload normalization, nullable lowStockThreshold handling, scheduleTimes object/array preservation, adherence rate parsing, and profile state UX fix
+
+**Status:** Accepted · **Date:** 2026-08-22
+
+**Context.** Users reported errors when adding medicines and encountering failures or getting blocked in the medicine section. Investigation against `Saheli Backend — Auth, Profile & Family.postman_collection.json` and client implementation revealed:
+1. `POST /api/profiles/{familyProfileId}/medicines` requires `name` (not blank), `scheduleTimes` (non-null string array, 24h format), `dosage` (string), `stockQuantity` (number), and `lowStockThreshold` (number, defaults to 3).
+2. When listed via `GET /api/profiles/{familyProfileId}/medicines`, OCR-created medicines return `lowStockThreshold: null` and `stockQuantity: null`. Passing `null` lowStockThreshold back to `PUT /api/medicines/{medicineId}` (or during OCR quantity confirmation in `PrescriptionsScreen.tsx`) resulted in 400 Bad Request.
+3. In `listMedicines` responses, `scheduleTimes` is often serialized as a slot-keyed map/object `{"night": "21:00", "morning": "08:00"}`. `remoteToLocal` now properly checks and maps slot keys (`morning`, `afternoon`, `evening`, `night`) directly rather than re-bucketing and misassigning custom times.
+4. `parseAdherenceRate` now safely ignores `"No logs being recorded"`, empty string, and `null`, preventing false 0% adherence display.
+5. Detailed backend validation error messages (from `details: [...]` or `message`) are extracted and surfaced to the user via `extractMedchestErrorMessage`.
+6. When a user has a family but no medicine profile yet, `MedicineScreen` now displays a clear empty state with a "Create Profile" button and allows the header "+ Add" button to seamlessly trigger profile creation, preventing blank screens and blocked state.
+7. `handleCreateProfile` safely falls back if `ownerMemberId` is unmapped, preventing 400 Bad Request.
+
+**Decision.**
+- **Frontend, API (`src/features/medicine/api.ts`):** `RemoteMedicine.lowStockThreshold` marked nullable (`number | null`). `parseAdherenceRate` updated to handle numbers, numeric strings, and `"No logs being recorded"` / `null` returning `null`. Added `extractMedchestErrorMessage` to extract Spring Boot validation `details` or error `message`. `normalizeScheduleTimes` filters out empty values.
+- **Frontend, MedicineScreen (`src/features/medicine/MedicineScreen.tsx`):**
+  - Updated `showRemoteError` to show backend validation details directly.
+  - Updated `openAddSheet` to open the Add Profile sheet if no profile exists yet.
+  - Updated `handleCreateProfile` to gracefully fallback to Other profile with user's name if `ownerMemberId` cannot be resolved.
+  - Updated `handleSave` to guarantee non-null integer `lowStockThreshold` (default 3).
+  - Updated `remoteToLocal` to preserve slot keys when `scheduleTimes` is an object from backend.
+  - Updated JSX rendering: when in a family with no profiles, renders `emptyState` with "Create Profile" CTA instead of blank screen.
+- **Frontend, PrescriptionsScreen (`src/features/medicine/PrescriptionsScreen.tsx`):**
+  - Updated `startQuantityQueue` and `handleSaveQuantity` to default `lowStockThreshold` to 3 and sanitize `scheduleTimes` / `dosage`.
+  - Updated `showRemoteError` to display specific backend validation messages.
+
+---
+
 ## Open decisions
 
 Tracked in `docs/BACKLOG.md` → Open questions. Move each here once answered.

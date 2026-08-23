@@ -17,6 +17,7 @@ import {
   createFamilyProfileOther,
   createMedicine,
   deleteMedicine as deleteRemoteMedicine,
+  extractMedchestErrorMessage,
   listFamilyProfiles,
   listMedicines,
   logIntake,
@@ -41,7 +42,7 @@ import {
   saveLiquidFlags,
   saveMedicines,
 } from './medicineStore';
-import { SCHEDULE_SLOTS, type IntakeLogEntry, type Medicine, type ScheduleSlot } from './types';
+import { SCHEDULE_SLOTS, timeToSlot, type IntakeLogEntry, type Medicine, type ScheduleSlot } from './types';
 
 type Props = StackScreenProps<RootStackParamList, 'Medicine'>;
 
@@ -73,35 +74,47 @@ function medicineSlotTimeLabel(med: Medicine, slot: ScheduleSlot): string {
   return formatTimeLabel(med.scheduleTimes?.[slot] ?? SLOT_TIME[slot]);
 }
 
-function timeToSlot(time: string): ScheduleSlot {
-  const hour = parseInt(time.split(':')[0], 10);
-  if (hour >= 5 && hour < 12) return 'morning';
-  if (hour >= 12 && hour < 17) return 'afternoon';
-  if (hour >= 17 && hour < 21) return 'evening';
-  return 'night';
-}
-
-// One backend time per slot: the earliest time landing in a slot's bucket becomes
-// that slot's custom time, and any additional backend times in the same bucket are
-// dropped on the way back in (the existing chip-based UI is one time per slot).
+// Maps remote scheduleTimes (array or slot-keyed object) into client slots and custom times.
 function remoteToLocal(remote: RemoteMedicine, liquidFlags: Record<string, boolean>): Medicine {
   const times = normalizeScheduleTimes(remote.scheduleTimes);
   const scheduleTimes: Partial<Record<ScheduleSlot, string>> = {};
-  for (const time of times) {
-    const slot = timeToSlot(time);
-    if (!scheduleTimes[slot]) {
-      scheduleTimes[slot] = time;
+  const slots: ScheduleSlot[] = [];
+
+  if (
+    remote.scheduleTimes &&
+    typeof remote.scheduleTimes === 'object' &&
+    !Array.isArray(remote.scheduleTimes)
+  ) {
+    for (const [key, val] of Object.entries(remote.scheduleTimes)) {
+      if (typeof val === 'string' && val.trim().length > 0) {
+        const lowerKey = key.toLowerCase() as ScheduleSlot;
+        const validSlot = SCHEDULE_SLOTS.includes(lowerKey) ? lowerKey : timeToSlot(val);
+        scheduleTimes[validSlot] = val;
+        if (!slots.includes(validSlot)) {
+          slots.push(validSlot);
+        }
+      }
+    }
+  } else {
+    for (const time of times) {
+      const slot = timeToSlot(time);
+      if (!scheduleTimes[slot]) {
+        scheduleTimes[slot] = time;
+      }
+      if (!slots.includes(slot)) {
+        slots.push(slot);
+      }
     }
   }
-  const slots = Array.from(new Set(times.map(timeToSlot)));
+
   return {
     id: remote.id,
-    name: remote.name,
-    dosage: remote.dosage,
+    name: remote.name ?? '',
+    dosage: remote.dosage ?? '',
     schedule: slots.length > 0 ? slots : ['morning'],
     scheduleTimes,
     stock: normalizeStockQuantity(remote.stockQuantity),
-    isLiquid: liquidFlags[remote.id] ?? guessIsLiquid(remote.dosage),
+    isLiquid: liquidFlags[remote.id] ?? guessIsLiquid(remote.dosage ?? ''),
   };
 }
 
@@ -156,7 +169,7 @@ export default function MedicineScreen({ navigation }: Props) {
   // `lowStockThreshold` has no field in this screen's UI at all, but `PUT /medicines/{id}`
   // is a full replace, not a patch — has to be resent on every edit. Carried here,
   // keyed by medicine id, from whatever `listMedicines`/`createMedicine` last returned.
-  const [lowStockThresholds, setLowStockThresholds] = useState<Record<string, number>>({});
+  const [lowStockThresholds, setLowStockThresholds] = useState<Record<string, number | null>>({});
   const [adherenceRates, setAdherenceRates] = useState<Record<string, number>>({});
 
   // "Add Profile" — a two-step sheet: pick who it's for (an existing family
@@ -211,7 +224,12 @@ export default function MedicineScreen({ navigation }: Props) {
   };
 
   const showRemoteError = (err: unknown) => {
-    Alert.alert(t('onboarding.error_title'), t(errorMessageKey(parseMedchestError(err))));
+    const detail = extractMedchestErrorMessage(err);
+    if (detail) {
+      Alert.alert(t('onboarding.error_title'), detail);
+    } else {
+      Alert.alert(t('onboarding.error_title'), t(errorMessageKey(parseMedchestError(err))));
+    }
   };
 
   const refreshRemoteMedicines = async (profileId: string, token: string) => {
@@ -331,10 +349,12 @@ export default function MedicineScreen({ navigation }: Props) {
   };
 
   const openAddSheet = () => {
-    // Nothing to attach a medicine to yet — the "Profiles" switcher's own empty state
-    // (or its "+" chip) is how a first/another profile gets created now; this button no
-    // longer triggers that flow itself.
     if (familyId && !familyProfileId) {
+      if (profiles.length === 0) {
+        openAddProfileSheet();
+      } else {
+        Alert.alert(t('medicine.no_profiles_title'), t('medicine.profiles_sub'));
+      }
       return;
     }
     setEditingId(null);
@@ -441,10 +461,17 @@ export default function MedicineScreen({ navigation }: Props) {
         setMyFamilyMemberId(membership.member?.id ?? null);
       }
       const dob = formatDob(newProfileDob);
-      const profile = isOtherMode
-        ? await createFamilyProfileOther(activeFamilyId, otherName.trim(), newProfileCategory, dob, token)
-        : await createFamilyProfileForMember(activeFamilyId, ownerMemberId as string, newProfileCategory, dob, token);
-      setProfiles(await listFamilyProfiles(activeFamilyId, token));
+      let profile: FamilyProfile;
+      if (isOtherMode) {
+        profile = await createFamilyProfileOther(activeFamilyId, otherName.trim(), newProfileCategory, dob, token);
+      } else if (ownerMemberId) {
+        profile = await createFamilyProfileForMember(activeFamilyId, ownerMemberId, newProfileCategory, dob, token);
+      } else {
+        const profileName = (await getMyProfileName()) || 'Myself';
+        profile = await createFamilyProfileOther(activeFamilyId, profileName, newProfileCategory, dob, token);
+      }
+      const updatedProfiles = await listFamilyProfiles(activeFamilyId, token);
+      setProfiles(updatedProfiles);
       setFamilyProfileId(profile.id);
       await refreshRemoteMedicines(profile.id, token);
       setShowAddProfileSheet(false);
@@ -501,12 +528,16 @@ export default function MedicineScreen({ navigation }: Props) {
         if (!token) {
           return;
         }
+        const scheduleTimesMap: Record<string, string> = {};
+        for (const slot of schedule) {
+          scheduleTimesMap[slot] = slotTime(slot);
+        }
         const input = {
           name: name.trim(),
           dosage: dosage.trim(),
-          scheduleTimes: schedule.map(slotTime),
+          scheduleTimes: scheduleTimesMap,
           stockQuantity: stockNum,
-          lowStockThreshold: editingId ? (lowStockThresholds[editingId] ?? 3) : 3,
+          lowStockThreshold: (editingId && lowStockThresholds[editingId] != null) ? lowStockThresholds[editingId] : 3,
         };
         const saved = editingId
           ? await updateMedicine(editingId, input, token)
@@ -625,7 +656,7 @@ export default function MedicineScreen({ navigation }: Props) {
           <Text style={styles.backIcon}>←</Text>
         </Pressable>
         <Text style={styles.headerTitle}>{t('medicine.header_title')}</Text>
-        {canEdit && (!familyId || familyProfileId) ? (
+        {canEdit ? (
           <Pressable onPress={openAddSheet} style={styles.addBtn}>
             <Text style={styles.addBtnText}>{t('medicine.add_btn')}</Text>
           </Pressable>
@@ -670,27 +701,35 @@ export default function MedicineScreen({ navigation }: Props) {
                 <Text style={styles.sectionSub}>{t('medicine.profiles_sub')}</Text>
               </View>
               {familyId ? (
-                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileRow}>
-                  {profiles.map((profile) => {
-                    const active = profile.id === familyProfileId;
-                    return (
-                      <Pressable
-                        key={profile.id}
-                        style={[styles.profileChip, active && styles.profileChipActive]}
-                        onPress={() => handleSelectProfile(profile.id)}>
-                        <Text style={styles.profileChipIcon}>{CATEGORY_ICON[profile.category] ?? '👤'}</Text>
-                        <Text
-                          style={[styles.profileChipText, active && styles.profileChipTextActive]}
-                          numberOfLines={1}>
-                          {profile.name}
-                        </Text>
-                      </Pressable>
-                    );
-                  })}
-                  <Pressable style={styles.addProfileChip} onPress={openAddProfileSheet}>
-                    <Text style={styles.addProfileChipText}>{t('medicine.add_profile_chip')}</Text>
-                  </Pressable>
-                </ScrollView>
+                profiles.length === 0 ? (
+                  <View style={styles.emptyState}>
+                    <Text style={styles.emptyTitle}>{t('medicine.no_profiles_title')}</Text>
+                    <Text style={styles.emptySub}>{t('medicine.no_profiles_sub')}</Text>
+                    <Button title={t('medicine.create_profile_btn')} onPress={openAddProfileSheet} style={styles.modalCta} />
+                  </View>
+                ) : (
+                  <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.profileRow}>
+                    {profiles.map((profile) => {
+                      const active = profile.id === familyProfileId;
+                      return (
+                        <Pressable
+                          key={profile.id}
+                          style={[styles.profileChip, active && styles.profileChipActive]}
+                          onPress={() => handleSelectProfile(profile.id)}>
+                          <Text style={styles.profileChipIcon}>{CATEGORY_ICON[profile.category] ?? '👤'}</Text>
+                          <Text
+                            style={[styles.profileChipText, active && styles.profileChipTextActive]}
+                            numberOfLines={1}>
+                            {profile.name}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                    <Pressable style={styles.addProfileChip} onPress={openAddProfileSheet}>
+                      <Text style={styles.addProfileChipText}>{t('medicine.add_profile_chip')}</Text>
+                    </Pressable>
+                  </ScrollView>
+                )
               ) : (
                 <View style={styles.emptyState}>
                   <Text style={styles.emptyTitle}>{t('medicine.no_profiles_title')}</Text>
@@ -758,6 +797,11 @@ export default function MedicineScreen({ navigation }: Props) {
                   ))
                 )}
               </>
+            ) : profiles.length > 0 ? (
+              <View style={styles.emptyState}>
+                <Text style={styles.emptyTitle}>{t('medicine.no_profiles_title')}</Text>
+                <Text style={styles.emptySub}>{t('medicine.profiles_sub')}</Text>
+              </View>
             ) : null}
 
             {familyProfileId && (
@@ -1194,6 +1238,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     borderStyle: 'dashed',
     padding: spacing.xl,
     alignItems: 'center',
+    marginBottom: spacing.lg,
   },
   emptyTitle: {
     fontFamily: fonts.serif,
