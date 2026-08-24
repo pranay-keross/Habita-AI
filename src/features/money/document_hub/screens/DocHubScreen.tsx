@@ -18,7 +18,6 @@ import useResponsive from '../../../../hooks/useResponsive';
 import { SkeletonCard } from '../../../../components/Skeleton';
 import ModernBottomNav, { type BottomNavTab } from '../../../../components/ModernBottomNav';
 import {
-  ArrowLeft,
   Search,
   Plus,
   AlertTriangle,
@@ -161,9 +160,6 @@ export default function DocHubScreen({ navigation }: Props) {
       {/* Header Bar */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <View style={[styles.headerContent, maxContentStyle]}>
-          <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
-            <ArrowLeft size={20} color={styles.headerIcon.color} />
-          </Pressable>
           <Text style={styles.headerTitle}>{t('doc_hub.hub_title')}</Text>
           <Pressable
             onPress={() => navigation.navigate('AddDoc')}
@@ -361,19 +357,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       justifyContent: 'space-between',
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.sm,
-    },
-    headerBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.glassSurface || colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    headerIcon: {
-      color: colors.textPrimary,
     },
     primaryIcon: {
       color: colors.primary,

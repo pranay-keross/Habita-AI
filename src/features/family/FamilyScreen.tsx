@@ -12,7 +12,6 @@ import ModernBottomNav, { type BottomNavTab } from '../../components/ModernBotto
 import { SkeletonCard, SkeletonHeroCard } from '../../components/Skeleton';
 import useAuth from '../../hooks/useAuth';
 import {
-  ArrowLeft,
   ChevronRight,
   UserPlus,
   HeartHandshake,
@@ -434,9 +433,6 @@ export default function FamilyScreen({ navigation }: Props) {
   return (
     <View style={styles.root} key={localeVersion}>
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityLabel="Back">
-          <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
-        </Pressable>
         <View style={styles.headerTitleWrap}>
           <Text style={styles.headerTitle}>{t('family.header_title')}</Text>
           <View style={styles.headerSubtitleRow}>
@@ -903,7 +899,7 @@ const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleShe
     borderColor: '#EAEAEA',
   },
   headerTitleWrap: {
-    alignItems: 'center',
+    alignItems: 'flex-start',
   },
   headerTitle: {
     fontFamily: fonts.sans,
