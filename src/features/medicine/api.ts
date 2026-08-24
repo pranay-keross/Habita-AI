@@ -218,8 +218,21 @@ export async function uploadMedicalDocument(
   documentType: string,
   token: string,
 ): Promise<MedicalDocument> {
-  const fileName = file.name || (file.type?.includes('pdf') ? 'prescription.pdf' : 'prescription.jpg');
-  const fileType = file.type || (fileName.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+  let fileName = file.name || 'prescription.jpg';
+  let fileType = file.type || 'image/jpeg';
+
+  if (fileType.includes('pdf') || fileName.toLowerCase().endsWith('.pdf')) {
+    fileType = 'application/pdf';
+    if (!fileName.toLowerCase().endsWith('.pdf')) fileName += '.pdf';
+  } else if (fileType.includes('png') || fileName.toLowerCase().endsWith('.png')) {
+    fileType = 'image/png';
+    if (!fileName.toLowerCase().endsWith('.png')) fileName += '.png';
+  } else {
+    fileType = 'image/jpeg';
+    if (!fileName.toLowerCase().endsWith('.jpg') && !fileName.toLowerCase().endsWith('.jpeg')) {
+      fileName += '.jpg';
+    }
+  }
 
   const form = new FormData();
   form.append('file', {
@@ -229,19 +242,7 @@ export async function uploadMedicalDocument(
   } as unknown as Blob);
   form.append('documentType', { string: JSON.stringify(documentType), type: 'application/json' } as unknown as Blob);
 
-  try {
-    return await postMultipart<MedicalDocument>(`/profiles/${familyProfileId}/documents`, form, token);
-  } catch {
-    // If JSON-typed part is rejected by certain server configurations, retry with direct string field
-    const fallbackForm = new FormData();
-    fallbackForm.append('file', {
-      uri: file.uri,
-      name: fileName,
-      type: fileType,
-    } as unknown as Blob);
-    fallbackForm.append('documentType', documentType);
-    return await postMultipart<MedicalDocument>(`/profiles/${familyProfileId}/documents`, fallbackForm, token);
-  }
+  return postMultipart<MedicalDocument>(`/profiles/${familyProfileId}/documents`, form, token);
 }
 
 export async function listMedicalDocuments(familyProfileId: string, token: string): Promise<MedicalDocument[]> {

@@ -3,7 +3,7 @@ import { View, Text, Pressable, StyleSheet, StyleProp, ViewStyle } from 'react-n
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   House,
-  Sparkles,
+  Users,
   HeartPulse,
   FolderOpen,
   Mic,
@@ -14,7 +14,7 @@ import useThemedStyles from '../hooks/useThemedStyles';
 import useResponsive from '../hooks/useResponsive';
 import { t } from '../i18n';
 
-export type BottomNavTab = 'home' | 'life' | 'center' | 'health' | 'vault';
+export type BottomNavTab = 'home' | 'family' | 'center' | 'health' | 'vault';
 
 interface ModernBottomNavProps {
   activeTab?: BottomNavTab;
@@ -35,7 +35,7 @@ export default function ModernBottomNav({
 
   const tabs: { id: BottomNavTab; label: string; Icon: LucideIcon }[] = [
     { id: 'home', label: t('nav.home') || 'Home', Icon: House },
-    { id: 'life', label: t('nav.life') || 'Life OS', Icon: Sparkles },
+    { id: 'family', label: t('nav.family') || 'Family', Icon: Users },
     { id: 'center', label: t('nav.ai') || 'Habita AI', Icon: Mic },
     { id: 'health', label: t('nav.health') || 'Health', Icon: HeartPulse },
     { id: 'vault', label: t('nav.vault') || 'Vault', Icon: FolderOpen },

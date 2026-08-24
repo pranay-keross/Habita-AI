@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, StyleSheet, LayoutChangeEvent } from 'react-native';
+import { View, StyleSheet, LayoutChangeEvent, Pressable } from 'react-native';
 import Svg, {
   Path,
   Defs,
@@ -7,6 +7,7 @@ import Svg, {
   Stop,
   Circle,
   Line,
+  Rect,
   Text as SvgText,
 } from 'react-native-svg';
 import type { ThemeTokens } from '../theme';
@@ -20,6 +21,7 @@ interface StatWaveChartProps {
   onSelectIndex?: (index: number) => void;
   accentColor?: string;
   showLabels?: boolean;
+  valueFormatter?: (val: number, idx: number) => string;
 }
 
 export default function StatWaveChart({
@@ -27,8 +29,10 @@ export default function StatWaveChart({
   labels = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'],
   height = 120,
   selectedIndex = 5,
+  onSelectIndex,
   accentColor,
   showLabels = true,
+  valueFormatter,
 }: StatWaveChartProps) {
   const styles = useThemedStyles(makeStyles);
   const [containerWidth, setContainerWidth] = React.useState(320);
@@ -42,7 +46,7 @@ export default function StatWaveChart({
 
   const chartHeight = height - (showLabels ? 22 : 0);
   const paddingX = 14;
-  const paddingY = 12;
+  const paddingY = 16;
   const usableWidth = Math.max(containerWidth - paddingX * 2, 100);
   const usableHeight = Math.max(chartHeight - paddingY * 2, 40);
 
@@ -84,6 +88,14 @@ export default function StatWaveChart({
   const lineColor = accentColor || styles.chartTokens.color;
   const gridColor = styles.gridLine.color;
   const labelColor = styles.labelText.color;
+  const selectedPt = points[selectedIndex] ?? null;
+  const selectedVal = selectedPt ? selectedPt.val : null;
+  const formattedVal =
+    selectedVal !== null
+      ? valueFormatter
+        ? valueFormatter(selectedVal, selectedIndex)
+        : `${selectedVal}`
+      : null;
 
   return (
     <View style={[styles.container, { height }]} onLayout={onLayout}>
@@ -138,6 +150,19 @@ export default function StatWaveChart({
           />
         ) : null}
 
+        {/* Vertical cursor indicator line for selected day */}
+        {selectedPt ? (
+          <Line
+            x1={selectedPt.x}
+            y1={paddingY}
+            x2={selectedPt.x}
+            y2={chartHeight}
+            stroke="rgba(0, 0, 0, 0.15)"
+            strokeDasharray="2 2"
+            strokeWidth={1}
+          />
+        ) : null}
+
         {/* Data points */}
         {points.map((pt, idx) => {
           const isSelected = idx === selectedIndex;
@@ -148,8 +173,9 @@ export default function StatWaveChart({
                   <Circle
                     cx={pt.x}
                     cy={pt.y}
-                    r={7}
+                    r={8}
                     fill="rgba(0, 0, 0, 0.08)"
+                    onPress={() => onSelectIndex?.(idx)}
                   />
                   <Circle
                     cx={pt.x}
@@ -158,14 +184,16 @@ export default function StatWaveChart({
                     fill="#000000"
                     stroke="#FFFFFF"
                     strokeWidth={1.5}
+                    onPress={() => onSelectIndex?.(idx)}
                   />
                 </>
               ) : (
                 <Circle
                   cx={pt.x}
                   cy={pt.y}
-                  r={2}
+                  r={2.5}
                   fill="#888888"
+                  onPress={() => onSelectIndex?.(idx)}
                 />
               )}
 
@@ -177,14 +205,55 @@ export default function StatWaveChart({
                   fontSize="9.5"
                   fontWeight={isSelected ? '600' : '400'}
                   fill={isSelected ? '#000000' : labelColor}
-                  textAnchor="middle">
+                  textAnchor="middle"
+                  onPress={() => onSelectIndex?.(idx)}>
                   {labels[idx]}
                 </SvgText>
               ) : null}
             </React.Fragment>
           );
         })}
+
+        {/* Floating Tooltip Pill Badge above selected point */}
+        {selectedPt && formattedVal ? (
+          <>
+            <Rect
+              x={Math.max(6, Math.min(containerWidth - 54, selectedPt.x - 24))}
+              y={Math.max(2, selectedPt.y - 20)}
+              width={48}
+              height={16}
+              rx={8}
+              fill="#000000"
+            />
+            <SvgText
+              x={Math.max(6, Math.min(containerWidth - 54, selectedPt.x - 24)) + 24}
+              y={Math.max(2, selectedPt.y - 20) + 11.5}
+              fontSize="9"
+              fontWeight="600"
+              fill="#FFFFFF"
+              textAnchor="middle">
+              {formattedVal}
+            </SvgText>
+          </>
+        ) : null}
       </Svg>
+
+      {/* Invisible Interactive Pressable Columns for seamless tapping on mobile */}
+      {onSelectIndex && (
+        <View style={styles.touchOverlay} pointerEvents="box-none">
+          <View style={styles.touchColumnsRow}>
+            {points.map((_, idx) => (
+              <Pressable
+                key={idx}
+                accessibilityRole="button"
+                accessibilityLabel={labels[idx] || `Day ${idx + 1}`}
+                style={styles.touchColumn}
+                onPress={() => onSelectIndex(idx)}
+              />
+            ))}
+          </View>
+        </View>
+      )}
     </View>
   );
 }
@@ -194,6 +263,23 @@ const makeStyles = ({ colors, fonts }: ThemeTokens) =>
     container: {
       width: '100%',
       justifyContent: 'center',
+      position: 'relative',
+    },
+    touchOverlay: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+    },
+    touchColumnsRow: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'stretch',
+    },
+    touchColumn: {
+      flex: 1,
+      height: '100%',
     },
     chartTokens: {
       color: colors.chartLine || '#000000',

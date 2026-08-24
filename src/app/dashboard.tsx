@@ -9,35 +9,28 @@ import {
   ToastAndroid,
   Platform,
   ScrollView,
-  TextInput,
   RefreshControl,
 } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import {
-  CalendarDays,
   CalendarHeart,
-  ChevronDown,
+  CarFront,
   ChevronRight,
-  ChevronUp,
-  FileText,
-  FolderOpen,
+  Droplets,
   Fuel,
-  House,
-  IndianRupee,
+  Info,
+  PartyPopper,
   Pill,
-  Plus,
   Receipt,
-  ScanLine,
-  Search,
   ShieldCheck,
   Shirt,
   ShoppingCart,
   Smile,
   Sparkles,
   User,
-  Users,
+  UsersRound,
   type LucideIcon,
 } from 'lucide-react-native';
 import type { RootStackParamList } from './_layout';
@@ -48,6 +41,7 @@ import StatWaveChart from '../components/StatWaveChart';
 import QuickActionTile from '../components/QuickActionTile';
 import SearchPill from '../components/SearchPill';
 import ModernBottomNav, { type BottomNavTab } from '../components/ModernBottomNav';
+import BottomSheet from '../components/BottomSheet';
 import Button from '../components/Button';
 import HabitaLogo from '../components/HabitaLogo';
 import { SkeletonBox, SkeletonCircle, SkeletonText } from '../components/Skeleton';
@@ -56,9 +50,6 @@ import { getItem, setItem } from '../utils/storage';
 import { calculateAdherence, loadIntakeLog, loadMedicines } from '../features/medicine/medicineStore';
 import { loadQuickTapItems, saveResourceLogs } from '../features/resources/resourceStore';
 import type { QuickTapItem, ResourceLog } from '../features/resources/types';
-import { loadDocuments, getDocStatus } from '../features/money/document_hub/docStore';
-import type { DocHubEntry, DocCategory } from '../features/money/document_hub/types';
-import type { Medicine } from '../features/medicine/types';
 import useAuth from '../hooks/useAuth';
 import { apiFetch } from '../features/auth/api';
 
@@ -78,38 +69,23 @@ interface ProfileDetailsResponse {
 }
 
 type ActionId =
-  | 'scan'
-  | 'pay'
   | 'meds'
   | 'mood'
   | 'cycle'
   | 'expense'
-  | 'smartLife'
-  | 'fuel'
-  | 'wardrobe';
-
-type TileId =
-  | 'medicine'
-  | 'docs'
-  | 'family'
-  | 'money'
-  | 'household'
   | 'safety'
-  | 'wellness'
-  | 'cycle'
-  | 'style'
-  | 'events'
-  | 'vehicles'
-  | 'pantry'
-  | 'pay'
-  | 'scan';
+  | 'fuel';
+
+type LifeOsId = 'pantry' | 'style';
+type HomeOpId = 'caregiver' | 'resources' | 'events' | 'assets';
 
 type InsightsTab = 'adherence' | 'spend' | 'activity';
 
 interface BentoModule {
-  id: TileId;
+  id: LifeOsId | HomeOpId;
   title: string;
   subtitle: string;
+  description: string;
   tag: string;
   tagColor: string;
   Icon: LucideIcon;
@@ -130,29 +106,21 @@ export default function DashboardScreen({ navigation, route }: Props) {
   const { isExpanded, contentMaxWidth } = useResponsive();
   const { getAccessToken } = useAuth();
 
-  const [activeNavTab, setActiveNavTab] = useState<BottomNavTab>('home');
   const [initialLoading, setInitialLoading] = useState(true);
   const [userName, setUserName] = useState('Pranay');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [localeVersion, setLocaleVersion] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [adherence, setAdherence] = useState<number | null>(null);
-  const [medicinesList, setMedicinesList] = useState<Medicine[]>([]);
-  const [vaultDocs, setVaultDocs] = useState<DocHubEntry[]>([]);
   const [resourceItems, setResourceItems] = useState<QuickTapItem[]>([]);
   const [selectedInsightsTab, setSelectedInsightsTab] = useState<InsightsTab>('adherence');
-  const [docSearch, setDocSearch] = useState('');
-  const [selectedDocCategory, setSelectedDocCategory] = useState<DocCategory | 'all'>('all');
-  const [showAllWorkspaces, setShowAllWorkspaces] = useState(false);
+  const [selectedDayIndex, setSelectedDayIndex] = useState(5);
+  const [infoModule, setInfoModule] = useState<BentoModule | null>(null);
 
   useFocusEffect(
     useCallback(() => {
       let lastBackPress = 0;
       const onBackPress = () => {
-        if (activeNavTab !== 'home') {
-          setActiveNavTab('home');
-          return true;
-        }
         const now = Date.now();
         if (now - lastBackPress < 2000) {
           BackHandler.exitApp();
@@ -170,136 +138,91 @@ export default function DashboardScreen({ navigation, route }: Props) {
 
       const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
       return () => subscription.remove();
-    }, [activeNavTab])
+    }, [])
   );
 
   const quickActions: { id: ActionId; label: string; Icon: LucideIcon }[] = [
-    { id: 'scan', label: t('dashboard.action_scan'), Icon: ScanLine },
-    { id: 'pay', label: t('dashboard.action_pay'), Icon: IndianRupee },
     { id: 'meds', label: t('dashboard.action_meds'), Icon: Pill },
     { id: 'mood', label: t('dashboard.action_mood'), Icon: Smile },
     { id: 'cycle', label: t('dashboard.action_cycle'), Icon: CalendarHeart },
     { id: 'expense', label: t('dashboard.action_expense'), Icon: Receipt },
-    { id: 'smartLife', label: t('dashboard.action_smart_life'), Icon: Sparkles },
+    { id: 'safety', label: t('dashboard.action_safety') || 'SOS Alert', Icon: ShieldCheck },
     { id: 'fuel', label: t('dashboard.action_fuel'), Icon: Fuel },
   ];
 
-  const bentoModules: BentoModule[] = [
+  const lifeOsModules: BentoModule[] = [
     {
-      id: 'medicine',
-      title: t('dashboard.tile_medicine'),
-      subtitle: 'Cabinet & Adherence',
-      tag: adherence !== null ? `${adherence}% on-time` : 'Active',
+      id: 'pantry',
+      title: t('expenses.pantry_title'),
+      subtitle: t('expenses.pantry_sub'),
+      description: 'Track food stock, grocery lists, expiry dates, and automated low-stock refill reminders for your kitchen.',
+      tag: 'Active',
       tagColor: '#10B981',
-      Icon: Pill,
-    },
-    {
-      id: 'docs',
-      title: t('dashboard.tile_docs'),
-      subtitle: 'Vault & Expiry Radar',
-      tag: 'Encrypted',
-      tagColor: '#0070F3',
-      Icon: FolderOpen,
-    },
-    {
-      id: 'family',
-      title: t('dashboard.tile_family'),
-      subtitle: 'Kin & Care Circle',
-      tag: 'Circle',
-      tagColor: '#8B5CF6',
-      Icon: Users,
-    },
-    {
-      id: 'money',
-      title: t('dashboard.tile_money'),
-      subtitle: 'Passbook & Ledgers',
-      tag: 'Tracked',
-      tagColor: '#EC4899',
-      Icon: IndianRupee,
-    },
-    {
-      id: 'household',
-      title: t('dashboard.tile_household') || 'Home Operations',
-      subtitle: 'Staff & Areas',
-      tag: 'Operations',
-      tagColor: '#F59E0B',
-      Icon: House,
-    },
-    {
-      id: 'safety',
-      title: t('dashboard.tile_safety'),
-      subtitle: 'Emergency SOS',
-      tag: 'Ready',
-      tagColor: '#EF4444',
-      Icon: ShieldCheck,
-    },
-    {
-      id: 'wellness',
-      title: t('dashboard.tile_wellness') || 'Wellness',
-      subtitle: 'Mind & Mood Coach',
-      tag: 'Mind & Mood',
-      tagColor: '#6366F1',
-      Icon: Smile,
-    },
-    {
-      id: 'cycle',
-      title: t('dashboard.tile_cycle') || 'Cycle',
-      subtitle: 'Period & Life Stage',
-      tag: 'Tracker',
-      tagColor: '#FF2E93',
-      Icon: CalendarHeart,
+      Icon: ShoppingCart,
     },
     {
       id: 'style',
-      title: t('dashboard.tile_style') || 'Style',
-      subtitle: 'Wardrobe & Mirror',
-      tag: 'Closet',
-      tagColor: '#14B8A6',
+      title: t('expenses.style_mirror_title'),
+      subtitle: t('expenses.style_mirror_sub'),
+      description: 'AI-curated daily outfit recommendations, digital wardrobe organizer, and weather-synchronized clothing suggestions.',
+      tag: 'Mirror',
+      tagColor: '#FF2E93',
       Icon: Shirt,
-    },
-    {
-      id: 'events',
-      title: t('dashboard.tile_events') || 'Events',
-      subtitle: 'Celebrations & Budgets',
-      tag: 'Planner',
-      tagColor: '#F97316',
-      Icon: CalendarDays,
-    },
-    {
-      id: 'vehicles',
-      title: t('dashboard.tile_vehicles') || 'Vehicles & Fuel',
-      subtitle: 'Mileage & Logs',
-      tag: 'Garage',
-      tagColor: '#EAB308',
-      Icon: Fuel,
-    },
-    {
-      id: 'pantry',
-      title: t('dashboard.tile_pantry') || 'Smart Pantry',
-      subtitle: 'Kitchen & Groceries',
-      tag: 'Pantry',
-      tagColor: '#22C55E',
-      Icon: ShoppingCart,
     },
   ];
 
-  const filteredVaultDocs = useMemo(() => {
-    return vaultDocs.filter((doc) => {
-      const matchesCategory =
-        selectedDocCategory === 'all' || doc.category === selectedDocCategory;
-      const matchesSearch =
-        doc.title.toLowerCase().includes(docSearch.toLowerCase()) ||
-        doc.memberName.toLowerCase().includes(docSearch.toLowerCase()) ||
-        (doc.docNumber && doc.docNumber.toLowerCase().includes(docSearch.toLowerCase()));
-      return matchesCategory && matchesSearch;
-    });
-  }, [vaultDocs, selectedDocCategory, docSearch]);
+  const homeOperationsModules: BentoModule[] = [
+    {
+      id: 'caregiver',
+      title: t('household.caregiver_title'),
+      subtitle: t('household.caregiver_highlight_staff'),
+      description: 'Manage household staff profiles, daily attendance, emergency contacts, shifts, and caregiver coordination.',
+      tag: 'Staff',
+      tagColor: '#6366F1',
+      Icon: UsersRound,
+    },
+    {
+      id: 'resources',
+      title: t('household.resources_title'),
+      subtitle: t('household.resources_highlight_deliveries'),
+      description: 'Quick-tap logging for daily supplies, water cans, LPG cylinders, delivery logs, and household utility refills.',
+      tag: 'Deliveries',
+      tagColor: '#0070F3',
+      Icon: Droplets,
+    },
+    {
+      id: 'events',
+      title: t('household.events_title'),
+      subtitle: t('household.events_highlight_budget'),
+      description: 'Organize family celebrations, birthdays, weddings, track shared event budgets, vendor expenses, and milestones.',
+      tag: 'Events',
+      tagColor: '#F97316',
+      Icon: PartyPopper,
+    },
+    {
+      id: 'assets',
+      title: t('household.assets_title'),
+      subtitle: t('household.assets_highlight_vehicle'),
+      description: 'Maintain vehicle records, fuel log tracking, odometer readings, appliance warranty radars, and service schedules.',
+      tag: 'Assets',
+      tagColor: '#F59E0B',
+      Icon: CarFront,
+    },
+  ];
 
   const chartData = useMemo(() => {
     if (selectedInsightsTab === 'spend') return [3200, 4800, 2900, 6100, 4300, 5200, 4900];
     if (selectedInsightsTab === 'activity') return [65, 80, 72, 90, 85, 95, 88];
     return [78, 85, 92, 88, 96, 94, 98];
   }, [selectedInsightsTab]);
+
+  const valueFormatter = useCallback(
+    (val: number) => {
+      if (selectedInsightsTab === 'spend') return `₹${val >= 1000 ? `${(val / 1000).toFixed(1)}k` : val}`;
+      return `${val}%`;
+    },
+    [selectedInsightsTab]
+  );
 
   const fetchLiveProfile = useCallback(async () => {
     try {
@@ -342,12 +265,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
           }),
           Promise.all([loadMedicines(), loadIntakeLog()]).then(([medicines, log]) => {
             if (mounted) {
-              setMedicinesList(medicines);
               setAdherence(calculateAdherence(medicines, log));
             }
-          }),
-          loadDocuments().then((docs) => {
-            if (mounted) setVaultDocs(docs);
           }),
           loadQuickTapItems().then((items) => {
             if (mounted) setResourceItems(items.filter((item) => item.active));
@@ -378,10 +297,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
       });
 
       Promise.all([loadMedicines(), loadIntakeLog()]).then(([medicines, log]) => {
-        setMedicinesList(medicines);
         setAdherence(calculateAdherence(medicines, log));
       });
-      loadDocuments().then((docs) => setVaultDocs(docs));
       loadQuickTapItems().then((items) =>
         setResourceItems(items.filter((item) => item.active))
       );
@@ -407,10 +324,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
           setPhotoUri((current) => current ?? data?.photoUri ?? null);
         }),
         Promise.all([loadMedicines(), loadIntakeLog()]).then(([medicines, log]) => {
-          setMedicinesList(medicines);
           setAdherence(calculateAdherence(medicines, log));
         }),
-        loadDocuments().then((docs) => setVaultDocs(docs)),
         loadQuickTapItems().then((items) =>
           setResourceItems(items.filter((item) => item.active))
         ),
@@ -420,21 +335,16 @@ export default function DashboardScreen({ navigation, route }: Props) {
     }
   }, [fetchLiveProfile]);
 
-  const handleTilePress = (id: TileId) => {
-    if (id === 'family') navigation.navigate('Family');
-    else if (id === 'medicine') navigation.navigate('Medicine');
-    else if (id === 'wellness') navigation.navigate('Wellness');
-    else if (id === 'cycle') navigation.navigate('Cycle');
-    else if (id === 'household') navigation.navigate('HouseholdOperations');
-    else if (id === 'money') navigation.navigate('ExpenseGroups');
-    else if (id === 'docs') navigation.navigate('DocHub');
-    else if (id === 'safety') navigation.navigate('Staff');
+  const handleLifeOsPress = (id: LifeOsId) => {
+    if (id === 'pantry') navigation.navigate('Pantry');
     else if (id === 'style') navigation.navigate('Wardrobe');
+  };
+
+  const handleHomeOpPress = (id: HomeOpId) => {
+    if (id === 'caregiver') navigation.navigate('Staff');
+    else if (id === 'resources') navigation.navigate('Resources');
     else if (id === 'events') navigation.navigate('EventBudgets');
-    else if (id === 'vehicles') navigation.navigate('Vehicles');
-    else if (id === 'pantry') navigation.navigate('Pantry');
-    else if (id === 'pay') navigation.navigate('ExpenseGroups');
-    else if (id === 'scan') navigation.navigate('DocHub');
+    else if (id === 'assets') navigation.navigate('Vehicles');
   };
 
   const handleActionPress = (id: ActionId) => {
@@ -442,18 +352,19 @@ export default function DashboardScreen({ navigation, route }: Props) {
     else if (id === 'mood') navigation.navigate('Wellness');
     else if (id === 'cycle') navigation.navigate('Cycle');
     else if (id === 'expense') navigation.navigate('ExpenseGroups');
-    else if (id === 'smartLife') navigation.navigate('SmartLife');
+    else if (id === 'safety') navigation.navigate('Staff');
     else if (id === 'fuel') navigation.navigate('Vehicles');
-    else if (id === 'wardrobe') navigation.navigate('Wardrobe');
-    else if (id === 'pay') navigation.navigate('ExpenseGroups');
-    else if (id === 'scan') navigation.navigate('DocHub');
   };
 
   const handleNavPress = (tab: BottomNavTab) => {
-    if (tab === 'center') {
+    if (tab === 'family') {
+      navigation.navigate('Family');
+    } else if (tab === 'center') {
       navigation.navigate('Voice');
-    } else {
-      setActiveNavTab(tab);
+    } else if (tab === 'health') {
+      navigation.navigate('Medicine');
+    } else if (tab === 'vault') {
+      navigation.navigate('DocHub');
     }
   };
 
@@ -480,265 +391,6 @@ export default function DashboardScreen({ navigation, route }: Props) {
 
   const firstName = userName ? userName.trim().split(' ')[0] : 'Pranay';
   const greetingPrefix = t(getGreetingKey()).replace('Habita AI', '').replace(',', '').trim();
-
-  const renderHealthTab = () => (
-    <View style={styles.tabViewWrapper}>
-      <View style={styles.tabViewHeader}>
-        <Text style={styles.tabViewTitle}>{t('dashboard.tile_medicine')}</Text>
-        <Text style={styles.tabViewSubtitle}>Daily intake, adherence & prescriptions</Text>
-      </View>
-
-      {/* Adherence Hero Banner */}
-      <View style={styles.healthHeroBanner}>
-        <View style={styles.healthHeroLeft}>
-          <Text style={styles.healthHeroNumber}>
-            {adherence === null ? '94%' : `${adherence}%`}
-          </Text>
-          <Text style={styles.healthHeroSub}>On-time adherence this week</Text>
-        </View>
-        <Pressable
-          style={styles.healthAddBtn}
-          onPress={() => navigation.navigate('Medicine')}>
-          <Plus size={14} color="#FFFFFF" strokeWidth={2} />
-          <Text style={styles.healthAddBtnText}>{t('medicine.add_medicine') || 'Add Med'}</Text>
-        </Pressable>
-      </View>
-
-      {/* Medicine List */}
-      <View style={styles.medicineList}>
-        {medicinesList.length > 0 ? (
-          medicinesList.slice(0, 5).map((med) => (
-            <Pressable
-              key={med.id}
-              style={styles.medRowCard}
-              onPress={() => navigation.navigate('Medicine')}>
-              <View style={styles.medIconSquare}>
-                <Pill size={18} color="#000000" strokeWidth={1.5} />
-              </View>
-              <View style={styles.medInfo}>
-                <Text style={styles.medName} numberOfLines={1}>
-                  {med.name}
-                </Text>
-                <Text style={styles.medDosage} numberOfLines={1}>
-                  {med.dosage || '1 dose'} · {med.schedule && med.schedule.length > 0 ? med.schedule.join(', ') : 'Daily'}
-                </Text>
-              </View>
-              <ChevronRight size={16} color="#000000" strokeWidth={1.3} />
-            </Pressable>
-          ))
-        ) : (
-          <View style={styles.emptyCard}>
-            <Pill size={28} color="#888888" strokeWidth={1.3} />
-            <Text style={styles.emptyCardTitle}>No Medicines Added</Text>
-            <Text style={styles.emptyCardSub}>Add medicines to track schedules & adherence</Text>
-          </View>
-        )}
-      </View>
-
-      <Button
-        title={t('dashboard.tile_medicine')}
-        onPress={() => navigation.navigate('Medicine')}
-        style={styles.tabActionBtn}
-      />
-    </View>
-  );
-
-  const renderVaultTab = () => (
-    <View style={styles.tabViewWrapper}>
-      <View style={styles.tabViewHeader}>
-        <Text style={styles.tabViewTitle}>{t('expenses.doc_hub_title')}</Text>
-        <Text style={styles.tabViewSubtitle}>Encrypted vault & expiry tracking</Text>
-      </View>
-
-      {/* Search Input */}
-      <View style={styles.docSearchInputWrapper}>
-        <Search size={16} color="#888888" strokeWidth={1.5} />
-        <TextInput
-          style={styles.docSearchInput}
-          placeholder="Search documents & records..."
-          placeholderTextColor="#888888"
-          value={docSearch}
-          onChangeText={setDocSearch}
-        />
-      </View>
-
-      {/* Category Filter Chips */}
-      <View style={styles.vaultCatStrip}>
-        {(['all', 'personal', 'medical', 'finance', 'property', 'vehicle'] as (DocCategory | 'all')[]).map((cat) => {
-          const isSelected = selectedDocCategory === cat;
-          return (
-            <Pressable
-              key={cat}
-              style={[styles.vaultCatChip, isSelected && styles.vaultCatChipActive]}
-              onPress={() => setSelectedDocCategory(cat)}>
-              <Text style={[styles.vaultCatChipText, isSelected && styles.vaultCatChipTextActive]}>
-                {cat.charAt(0).toUpperCase() + cat.slice(1)}
-              </Text>
-            </Pressable>
-          );
-        })}
-      </View>
-
-      {/* Documents List */}
-      <View style={styles.docList}>
-        {filteredVaultDocs.length > 0 ? (
-          filteredVaultDocs.slice(0, 6).map((doc) => {
-            const docStatus = doc.expiryDate
-              ? getDocStatus(doc.expiryDate)
-              : { status: 'valid' as const, daysLeft: 999 };
-            const statusLabel =
-              docStatus.status === 'expired'
-                ? 'Expired'
-                : docStatus.status === 'expiring'
-                ? `${docStatus.daysLeft}d left`
-                : 'Valid';
-            const isAlert = docStatus.status === 'expired' || docStatus.status === 'expiring';
-
-            return (
-              <Pressable
-                key={doc.id}
-                style={styles.docRowCard}
-                onPress={() => navigation.navigate('DocDetails', { docId: doc.id })}>
-                <View style={styles.docIconSquare}>
-                  <FileText size={18} color="#000000" strokeWidth={1.5} />
-                </View>
-                <View style={styles.docInfo}>
-                  <Text style={styles.docRowTitle} numberOfLines={1}>
-                    {doc.title}
-                  </Text>
-                  <Text style={styles.docRowSub} numberOfLines={1}>
-                    {doc.memberName} · {doc.category}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.docStatusPill,
-                    isAlert ? styles.tagDanger : styles.tagSuccess,
-                  ]}>
-                  <Text
-                    style={[
-                      styles.docStatusText,
-                      isAlert ? styles.tagTextDanger : styles.tagTextSuccess,
-                    ]}>
-                    {statusLabel}
-                  </Text>
-                </View>
-              </Pressable>
-            );
-          })
-        ) : (
-          <View style={styles.emptyCard}>
-            <FolderOpen size={28} color="#888888" strokeWidth={1.3} />
-            <Text style={styles.emptyCardTitle}>No Documents in Vault</Text>
-            <Text style={styles.emptyCardSub}>Add IDs, insurance, and medical records</Text>
-          </View>
-        )}
-      </View>
-
-      <Button
-        title={t('expenses.doc_hub_title')}
-        onPress={() => navigation.navigate('DocHub')}
-        style={styles.tabActionBtn}
-      />
-    </View>
-  );
-
-  const renderLifeTab = () => (
-    <View style={styles.tabViewWrapper}>
-      <View style={styles.tabViewHeader}>
-        <Text style={styles.tabViewTitle}>Smart Life & Operations</Text>
-        <Text style={styles.tabViewSubtitle}>Household inventory, wardrobes & utilities</Text>
-      </View>
-
-      <View style={styles.bentoGrid}>
-        <Pressable
-          style={({ pressed }) => [styles.bentoCard, pressed && styles.bentoCardPressed]}
-          onPress={() => navigation.navigate('Pantry')}>
-          <View style={styles.bentoCardTop}>
-            <View style={styles.bentoIconBox}>
-              <ShoppingCart size={18} color="#000000" strokeWidth={1.5} />
-            </View>
-            <View style={styles.bentoTag}>
-              <Text style={[styles.bentoTagText, { color: '#10B981' }]}>Active</Text>
-            </View>
-          </View>
-          <View style={styles.bentoCardBottom}>
-            <View style={styles.bentoTextGroup}>
-              <Text style={styles.bentoTitle}>{t('expenses.pantry_title')}</Text>
-              <Text style={styles.bentoSubtitle}>{t('expenses.pantry_sub')}</Text>
-            </View>
-            <ChevronRight size={16} color="#000000" strokeWidth={1.3} />
-          </View>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.bentoCard, pressed && styles.bentoCardPressed]}
-          onPress={() => navigation.navigate('Wardrobe')}>
-          <View style={styles.bentoCardTop}>
-            <View style={styles.bentoIconBox}>
-              <Shirt size={18} color="#000000" strokeWidth={1.5} />
-            </View>
-            <View style={styles.bentoTag}>
-              <Text style={[styles.bentoTagText, { color: '#FF2E93' }]}>Mirror</Text>
-            </View>
-          </View>
-          <View style={styles.bentoCardBottom}>
-            <View style={styles.bentoTextGroup}>
-              <Text style={styles.bentoTitle}>{t('expenses.style_mirror_title')}</Text>
-              <Text style={styles.bentoSubtitle}>{t('expenses.style_mirror_sub')}</Text>
-            </View>
-            <ChevronRight size={16} color="#000000" strokeWidth={1.3} />
-          </View>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.bentoCard, pressed && styles.bentoCardPressed]}
-          onPress={() => navigation.navigate('HouseholdOperations')}>
-          <View style={styles.bentoCardTop}>
-            <View style={styles.bentoIconBox}>
-              <House size={18} color="#000000" strokeWidth={1.5} />
-            </View>
-            <View style={styles.bentoTag}>
-              <Text style={[styles.bentoTagText, { color: '#666666' }]}>Ops</Text>
-            </View>
-          </View>
-          <View style={styles.bentoCardBottom}>
-            <View style={styles.bentoTextGroup}>
-              <Text style={styles.bentoTitle}>Home Operations</Text>
-              <Text style={styles.bentoSubtitle}>Staff & Utilities</Text>
-            </View>
-            <ChevronRight size={16} color="#000000" strokeWidth={1.3} />
-          </View>
-        </Pressable>
-
-        <Pressable
-          style={({ pressed }) => [styles.bentoCard, pressed && styles.bentoCardPressed]}
-          onPress={() => navigation.navigate('Vehicles')}>
-          <View style={styles.bentoCardTop}>
-            <View style={styles.bentoIconBox}>
-              <Fuel size={18} color="#000000" strokeWidth={1.5} />
-            </View>
-            <View style={styles.bentoTag}>
-              <Text style={[styles.bentoTagText, { color: '#F59E0B' }]}>Assets</Text>
-            </View>
-          </View>
-          <View style={styles.bentoCardBottom}>
-            <View style={styles.bentoTextGroup}>
-              <Text style={styles.bentoTitle}>Vehicles & Fuel</Text>
-              <Text style={styles.bentoSubtitle}>Logs & Mileage</Text>
-            </View>
-            <ChevronRight size={16} color="#000000" strokeWidth={1.3} />
-          </View>
-        </Pressable>
-      </View>
-
-      <Button
-        title={t('dashboard.action_smart_life')}
-        onPress={() => navigation.navigate('SmartLife')}
-        style={styles.tabActionBtn}
-      />
-    </View>
-  );
 
   return (
     <View key={localeVersion} style={styles.flex}>
@@ -837,7 +489,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
                 <SkeletonBox width="48%" height={110} borderRadius={16} />
               </View>
             </View>
-          ) : activeNavTab === 'home' ? (
+          ) : (
             <>
               {/* Minimalist Greeting & Status */}
               <View style={styles.heroSection}>
@@ -853,10 +505,10 @@ export default function DashboardScreen({ navigation, route }: Props) {
                   </View>
                 </View>
 
-                {/* Minimalist Search Bar */}
+                {/* Minimalist Search Bar - Direct AI Voice/Chat Entry */}
                 <SearchPill
                   placeholder={t('dashboard.search_placeholder')}
-                  onPress={() => navigation.navigate('DocHub')}
+                  onPress={() => navigation.navigate('Voice')}
                   onMicPress={() => navigation.navigate('Voice')}
                 />
               </View>
@@ -900,7 +552,9 @@ export default function DashboardScreen({ navigation, route }: Props) {
                   <StatWaveChart
                     data={chartData}
                     height={110}
-                    selectedIndex={5}
+                    selectedIndex={selectedDayIndex}
+                    onSelectIndex={setSelectedDayIndex}
+                    valueFormatter={valueFormatter}
                     accentColor="#000000"
                   />
                 </View>
@@ -909,10 +563,19 @@ export default function DashboardScreen({ navigation, route }: Props) {
                 <View style={styles.statHighlightsRow}>
                   <View style={styles.statPillar}>
                     <Text style={styles.statPillarValue}>
-                      {adherence === null ? '94%' : `${adherence}%`}
+                      {selectedInsightsTab === 'spend'
+                        ? `₹${chartData[selectedDayIndex]?.toLocaleString('en-IN')}`
+                        : selectedInsightsTab === 'adherence' && selectedDayIndex === 6 && adherence !== null
+                        ? `${adherence}%`
+                        : `${chartData[selectedDayIndex]}%`}
                     </Text>
                     <Text style={styles.statPillarLabel} numberOfLines={1}>
-                      {t('dashboard.stats_meds_title')}
+                      {['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'][selectedDayIndex]}{' '}
+                      {selectedInsightsTab === 'spend'
+                        ? 'Spend'
+                        : selectedInsightsTab === 'activity'
+                        ? 'Score'
+                        : t('dashboard.stats_meds_title')}
                     </Text>
                   </View>
 
@@ -983,43 +646,51 @@ export default function DashboardScreen({ navigation, route }: Props) {
                 </View>
               ) : null}
 
-              {/* Minimalist Clean Bento Workspaces */}
+              {/* Direct Life OS Section */}
               <View style={styles.sectionContainer}>
                 <View style={styles.sectionHeaderRow}>
-                  <Text style={styles.sectionHeading}>Household Workspaces</Text>
-                  <Text style={styles.sectionSubCount}>
-                    {showAllWorkspaces ? bentoModules.length : Math.min(6, bentoModules.length)} of {bentoModules.length}
-                  </Text>
+                  <Text style={styles.sectionHeading}>{t('nav.life') || 'Life OS'}</Text>
                 </View>
 
                 <View style={styles.bentoGrid}>
-                  {(showAllWorkspaces ? bentoModules : bentoModules.slice(0, 6)).map((module) => (
+                  {lifeOsModules.map((module) => (
                     <Pressable
                       key={module.id}
                       style={({ pressed }) => [
                         styles.bentoCard,
                         pressed && styles.bentoCardPressed,
                       ]}
-                      onPress={() => handleTilePress(module.id)}>
-                      {/* Top Row: Icon + Minimal Tag */}
+                      onPress={() => handleLifeOsPress(module.id as LifeOsId)}>
                       <View style={styles.bentoCardTop}>
                         <View style={styles.bentoIconBox}>
                           <module.Icon size={18} color="#000000" strokeWidth={1.5} />
                         </View>
-                        <View style={styles.bentoTag}>
-                          <Text style={[styles.bentoTagText, { color: module.tagColor }]}>
-                            {module.tag}
-                          </Text>
+                        <View style={styles.bentoTopRight}>
+                          <View style={styles.bentoTag}>
+                            <Text style={[styles.bentoTagText, { color: module.tagColor }]}>
+                              {module.tag}
+                            </Text>
+                          </View>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Info for ${module.title}`}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={styles.bentoInfoBtn}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setInfoModule(module);
+                            }}>
+                            <Info size={13} color="#888888" strokeWidth={1.8} />
+                          </Pressable>
                         </View>
                       </View>
 
-                      {/* Bottom Content: Clean Title + Thin Black Arrow */}
                       <View style={styles.bentoCardBottom}>
                         <View style={styles.bentoTextGroup}>
-                          <Text style={styles.bentoTitle} numberOfLines={1}>
+                          <Text style={styles.bentoTitle} numberOfLines={2}>
                             {module.title}
                           </Text>
-                          <Text style={styles.bentoSubtitle} numberOfLines={1}>
+                          <Text style={styles.bentoSubtitle} numberOfLines={2}>
                             {module.subtitle}
                           </Text>
                         </View>
@@ -1028,33 +699,61 @@ export default function DashboardScreen({ navigation, route }: Props) {
                     </Pressable>
                   ))}
                 </View>
+              </View>
 
-                {/* Show More / Show Less Toggle Button */}
-                {bentoModules.length > 6 && (
-                  <Pressable
-                    accessibilityRole="button"
-                    accessibilityLabel={
-                      showAllWorkspaces
-                        ? t('dashboard.show_less_workspaces') || 'Show fewer workspaces'
-                        : t('dashboard.show_more_workspaces') || 'Show all workspaces'
-                    }
-                    style={({ pressed }) => [
-                      styles.showMoreWorkspacesBtn,
-                      pressed && styles.showMoreWorkspacesBtnPressed,
-                    ]}
-                    onPress={() => setShowAllWorkspaces((prev) => !prev)}>
-                    <Text style={styles.showMoreWorkspacesText}>
-                      {showAllWorkspaces
-                        ? t('dashboard.show_less_workspaces') || 'Show fewer workspaces'
-                        : t('dashboard.show_more_workspaces') || 'Show all workspaces'}
-                    </Text>
-                    {showAllWorkspaces ? (
-                      <ChevronUp size={15} color="#000000" strokeWidth={1.8} />
-                    ) : (
-                      <ChevronDown size={15} color="#000000" strokeWidth={1.8} />
-                    )}
-                  </Pressable>
-                )}
+              {/* Direct Home Operations Section */}
+              <View style={styles.sectionContainer}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionHeading}>{t('household.header_title') || 'Home Operations'}</Text>
+                </View>
+
+                <View style={styles.bentoGrid}>
+                  {homeOperationsModules.map((module) => (
+                    <Pressable
+                      key={module.id}
+                      style={({ pressed }) => [
+                        styles.bentoCard,
+                        pressed && styles.bentoCardPressed,
+                      ]}
+                      onPress={() => handleHomeOpPress(module.id as HomeOpId)}>
+                      <View style={styles.bentoCardTop}>
+                        <View style={styles.bentoIconBox}>
+                          <module.Icon size={18} color="#000000" strokeWidth={1.5} />
+                        </View>
+                        <View style={styles.bentoTopRight}>
+                          <View style={styles.bentoTag}>
+                            <Text style={[styles.bentoTagText, { color: module.tagColor }]}>
+                              {module.tag}
+                            </Text>
+                          </View>
+                          <Pressable
+                            accessibilityRole="button"
+                            accessibilityLabel={`Info for ${module.title}`}
+                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+                            style={styles.bentoInfoBtn}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              setInfoModule(module);
+                            }}>
+                            <Info size={13} color="#888888" strokeWidth={1.8} />
+                          </Pressable>
+                        </View>
+                      </View>
+
+                      <View style={styles.bentoCardBottom}>
+                        <View style={styles.bentoTextGroup}>
+                          <Text style={styles.bentoTitle} numberOfLines={2}>
+                            {module.title}
+                          </Text>
+                          <Text style={styles.bentoSubtitle} numberOfLines={2}>
+                            {module.subtitle}
+                          </Text>
+                        </View>
+                        <ChevronRight size={16} color="#000000" strokeWidth={1.3} />
+                      </View>
+                    </Pressable>
+                  ))}
+                </View>
               </View>
 
               {/* Minimalist Footer */}
@@ -1063,21 +762,56 @@ export default function DashboardScreen({ navigation, route }: Props) {
                 <Text style={styles.footerSub}>{t('dashboard.footer_note')}</Text>
               </View>
             </>
-          ) : activeNavTab === 'health' ? (
-            renderHealthTab()
-          ) : activeNavTab === 'vault' ? (
-            renderVaultTab()
-          ) : activeNavTab === 'life' ? (
-            renderLifeTab()
-          ) : null}
+          )}
         </View>
       </ScrollView>
 
+      {/* Workspace Info BottomSheet */}
+      <BottomSheet
+        visible={!!infoModule}
+        onClose={() => setInfoModule(null)}
+        title={infoModule?.title || 'Workspace Info'}>
+        {infoModule && (
+          <View style={styles.infoSheetContent}>
+            <View style={styles.infoSheetHeader}>
+              <View style={styles.infoSheetIconBox}>
+                <infoModule.Icon size={22} color="#000000" strokeWidth={1.5} />
+              </View>
+              <View style={styles.infoSheetHeaderText}>
+                <Text style={styles.infoSheetTitle}>{infoModule.title}</Text>
+                <View style={[styles.bentoTag, { alignSelf: 'flex-start', marginTop: 4 }]}>
+                  <Text style={[styles.bentoTagText, { color: infoModule.tagColor }]}>
+                    {infoModule.tag}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            <Text style={styles.infoSheetSubTitle}>{infoModule.subtitle}</Text>
+            <Text style={styles.infoSheetDesc}>{infoModule.description}</Text>
+
+            <Button
+              title={`Open ${infoModule.title}`}
+              onPress={() => {
+                const mod = infoModule;
+                setInfoModule(null);
+                if (mod.id === 'pantry' || mod.id === 'style') {
+                  handleLifeOsPress(mod.id);
+                } else {
+                  handleHomeOpPress(mod.id);
+                }
+              }}
+              style={styles.infoSheetCta}
+            />
+          </View>
+        )}
+      </BottomSheet>
+
       {/* Solid Black Minimalist Bottom Nav Dock */}
       <ModernBottomNav
-        activeTab={activeNavTab}
+        activeTab="home"
         onTabPress={handleNavPress}
-        badgeCounts={{ health: 2, life: 1 }}
+        badgeCounts={{ health: 2 }}
       />
     </View>
   );
@@ -1357,11 +1091,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     actionsGrid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      justifyContent: 'space-between',
-      rowGap: spacing.xs,
+      justifyContent: 'flex-start',
+      rowGap: spacing.md,
+      columnGap: 10,
     },
     actionGridColumn: {
-      width: '23%',
+      width: '22.5%',
       alignItems: 'center',
     },
     resourceTapsRow: {
@@ -1433,6 +1168,11 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
+    bentoTopRight: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+    },
     bentoTag: {
       paddingHorizontal: 6,
       paddingVertical: 2,
@@ -1443,6 +1183,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       fontFamily: fonts.sans,
       fontSize: 9,
       fontWeight: '500',
+    },
+    bentoInfoBtn: {
+      width: 20,
+      height: 20,
+      borderRadius: 10,
+      backgroundColor: '#F5F5F7',
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     bentoCardBottom: {
       flexDirection: 'row',
@@ -1456,9 +1204,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     bentoTitle: {
       fontFamily: fonts.sans,
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: 13,
+      fontWeight: '600',
       color: '#000000',
+      lineHeight: 17,
     },
     bentoSubtitle: {
       fontFamily: fonts.sans,
@@ -1466,264 +1215,51 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       fontWeight: '300',
       color: '#888888',
       marginTop: 2,
+      lineHeight: 13,
     },
-    sectionSubCount: {
-      fontFamily: fonts.sans,
-      fontSize: 12,
-      fontWeight: '400',
-      color: '#888888',
+    infoSheetContent: {
+      paddingBottom: spacing.lg,
     },
-    showMoreWorkspacesBtn: {
+    infoSheetHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: '#FFFFFF',
-      borderRadius: radius.card,
-      borderWidth: 1,
-      borderColor: '#ECECEE',
-      paddingVertical: 12,
-      paddingHorizontal: spacing.md,
-      marginTop: spacing.md,
-      gap: 6,
-      ...shadow.soft,
-    },
-    showMoreWorkspacesBtnPressed: {
-      backgroundColor: '#F5F5F7',
-      opacity: 0.9,
-    },
-    showMoreWorkspacesText: {
-      fontFamily: fonts.sans,
-      fontSize: 13,
-      fontWeight: '500',
-      color: '#000000',
-    },
-    tabViewWrapper: {
-      paddingTop: spacing.xs,
-    },
-    tabViewHeader: {
+      gap: 12,
       marginBottom: spacing.md,
     },
-    tabViewTitle: {
-      fontFamily: fonts.sans,
-      fontSize: 16,
-      fontWeight: '500',
-      color: '#000000',
-      marginBottom: 2,
-    },
-    tabViewSubtitle: {
-      fontFamily: fonts.sans,
-      fontSize: 12,
-      fontWeight: '300',
-      color: '#888888',
-    },
-    healthHeroBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      backgroundColor: '#FFFFFF',
-      borderRadius: radius.card,
-      borderWidth: 1,
-      borderColor: '#ECECEE',
-      padding: spacing.lg,
-      marginBottom: spacing.lg,
-      ...shadow.soft,
-    },
-    healthHeroLeft: {
-      flex: 1,
-    },
-    healthHeroNumber: {
-      fontFamily: fonts.sans,
-      fontSize: 28,
-      fontWeight: '300',
-      color: '#000000',
-    },
-    healthHeroSub: {
-      fontFamily: fonts.sans,
-      fontSize: 11,
-      fontWeight: '400',
-      color: '#888888',
-      marginTop: 2,
-    },
-    healthAddBtn: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 4,
-      backgroundColor: '#000000',
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-      borderRadius: radius.pill,
-    },
-    healthAddBtnText: {
-      fontFamily: fonts.sans,
-      fontSize: 11,
-      color: '#FFFFFF',
-      fontWeight: '500',
-    },
-    medicineList: {
-      gap: 8,
-    },
-    medRowCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#FFFFFF',
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: '#ECECEE',
-      padding: spacing.md,
-      ...shadow.soft,
-    },
-    medIconSquare: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
+    infoSheetIconBox: {
+      width: 44,
+      height: 44,
+      borderRadius: 12,
       backgroundColor: '#F5F5F7',
       alignItems: 'center',
       justifyContent: 'center',
-      marginRight: spacing.sm,
     },
-    medInfo: {
+    infoSheetHeaderText: {
       flex: 1,
     },
-    medName: {
+    infoSheetTitle: {
       fontFamily: fonts.sans,
-      fontSize: 14,
-      fontWeight: '500',
+      fontSize: 17,
+      fontWeight: '600',
       color: '#000000',
     },
-    medDosage: {
-      fontFamily: fonts.sans,
-      fontSize: 11,
-      fontWeight: '300',
-      color: '#888888',
-      marginTop: 1,
-    },
-    docSearchInputWrapper: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#FFFFFF',
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: '#ECECEE',
-      paddingHorizontal: spacing.md,
-      marginBottom: spacing.md,
-      height: 42,
-      gap: 8,
-      ...shadow.soft,
-    },
-    searchIconColor: {
-      color: '#888888',
-    },
-    docSearchInput: {
-      flex: 1,
-      color: '#000000',
+    infoSheetSubTitle: {
       fontFamily: fonts.sans,
       fontSize: 13,
-      fontWeight: '400',
+      fontWeight: '500',
+      color: '#444444',
+      marginBottom: spacing.sm,
     },
-    vaultCatStrip: {
-      flexDirection: 'row',
-      gap: 6,
-      marginBottom: spacing.md,
-      flexWrap: 'wrap',
-    },
-    vaultCatChip: {
-      backgroundColor: '#F5F5F7',
-      borderRadius: radius.pill,
-      borderWidth: 1,
-      borderColor: '#ECECEE',
-      paddingHorizontal: 10,
-      paddingVertical: 4,
-    },
-    vaultCatChipActive: {
-      backgroundColor: '#000000',
-      borderColor: '#000000',
-    },
-    vaultCatChipText: {
+    infoSheetDesc: {
       fontFamily: fonts.sans,
-      fontSize: 10,
-      fontWeight: '400',
+      fontSize: 13,
+      fontWeight: '300',
       color: '#666666',
+      lineHeight: 20,
+      marginBottom: spacing.lg,
     },
-    vaultCatChipTextActive: {
-      color: '#FFFFFF',
-      fontWeight: '500',
-    },
-    docAlertBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      backgroundColor: 'rgba(255, 59, 48, 0.06)',
-      borderWidth: 1,
-      borderColor: 'rgba(255, 59, 48, 0.25)',
-      borderRadius: radius.md,
-      padding: spacing.sm + 2,
-      marginBottom: spacing.md,
-    },
-    docAlertText: {
-      fontFamily: fonts.sans,
-      fontSize: 11,
-      fontWeight: '400',
-      color: '#FF3B30',
-    },
-    docList: {
-      gap: 8,
-    },
-    docRowCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: '#FFFFFF',
-      borderRadius: radius.md,
-      borderWidth: 1,
-      borderColor: '#ECECEE',
-      padding: spacing.md,
-      ...shadow.soft,
-    },
-    docIconSquare: {
-      width: 36,
-      height: 36,
-      borderRadius: 10,
-      backgroundColor: '#F5F5F7',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.sm,
-    },
-    docInfo: {
-      flex: 1,
-    },
-    docRowTitle: {
-      fontFamily: fonts.sans,
-      fontSize: 14,
-      fontWeight: '500',
-      color: '#000000',
-    },
-    docRowSub: {
-      fontFamily: fonts.sans,
-      fontSize: 11,
-      fontWeight: '300',
-      color: '#888888',
-      marginTop: 1,
-    },
-    docStatusPill: {
-      paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: radius.pill,
-    },
-    tagSuccess: {
-      backgroundColor: 'rgba(16, 185, 129, 0.1)',
-    },
-    tagDanger: {
-      backgroundColor: 'rgba(255, 59, 48, 0.1)',
-    },
-    docStatusText: {
-      fontFamily: fonts.sans,
-      fontSize: 9,
-      fontWeight: '500',
-    },
-    tagTextSuccess: {
-      color: '#10B981',
-    },
-    tagTextDanger: {
-      color: '#FF3B30',
+    infoSheetCta: {
+      marginTop: spacing.xs,
     },
     footerContainer: {
       alignItems: 'center',

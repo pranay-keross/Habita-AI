@@ -64,6 +64,25 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
   const showRemoteError = (err: unknown) => {
     const detail = extractMedchestErrorMessage(err);
     if (detail) {
+      if (
+        detail.toLowerCase().includes('unable to extract') ||
+        detail.toLowerCase().includes('extract medicines') ||
+        detail.toLowerCase().includes('prescription')
+      ) {
+        Alert.alert(
+          t('medicine.prescription_failed_title'),
+          t('medicine.prescription_failed_msg'),
+          [
+            { text: t('medicine.cancel'), style: 'cancel' },
+            {
+              text: t('medicine.add_medicine_manually'),
+              style: 'default',
+              onPress: () => navigation.navigate('Medicine', { openAddModal: true }),
+            },
+          ]
+        );
+        return;
+      }
       Alert.alert(t('onboarding.error_title'), detail);
     } else {
       const key: Record<MedchestErrorKind, string> = {
@@ -135,7 +154,7 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
       t('medicine.delete_doc_confirm_title'),
       t('medicine.delete_doc_confirm_msg'),
       [
-        { text: t('onboarding.cancel') || 'Cancel', style: 'cancel' },
+        { text: t('medicine.cancel'), style: 'cancel' },
         {
           text: t('medicine.delete_document'),
           style: 'destructive',
@@ -182,7 +201,18 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
     await refreshDocuments(token);
 
     if (uploaded.ocrStatus === 'FAILED') {
-      Alert.alert(t('medicine.prescription_failed_title'), t('medicine.prescription_failed_msg'));
+      Alert.alert(
+        t('medicine.prescription_failed_title'),
+        t('medicine.prescription_failed_msg'),
+        [
+          { text: t('medicine.cancel'), style: 'cancel' },
+          {
+            text: t('medicine.add_medicine_manually'),
+            style: 'default',
+            onPress: () => navigation.navigate('Medicine', { openAddModal: true }),
+          },
+        ]
+      );
       return;
     }
 
@@ -244,9 +274,9 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
         t('medicine.prescription_processed_title'),
         t('medicine.prescription_empty_msg'),
         [
-          { text: t('common.ok') || 'OK', style: 'cancel' },
+          { text: t('medicine.ok'), style: 'cancel' },
           {
-            text: t('medicine.add_medicine') || 'Add Medicine',
+            text: t('medicine.add_medicine_manually'),
             style: 'default',
             onPress: () => navigation.navigate('Medicine', { openAddModal: true }),
           },

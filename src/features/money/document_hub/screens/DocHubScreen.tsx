@@ -6,7 +6,6 @@ import {
   StyleSheet,
   Pressable,
   TextInput,
-  ActivityIndicator,
   Platform,
   RefreshControl,
 } from 'react-native';
@@ -16,8 +15,8 @@ import type { RootStackParamList } from '../../../../app/_layout';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
 import useResponsive from '../../../../hooks/useResponsive';
-import ModernBottomNav, { type BottomNavTab } from '../../../../components/ModernBottomNav';
 import { SkeletonCard } from '../../../../components/Skeleton';
+import ModernBottomNav, { type BottomNavTab } from '../../../../components/ModernBottomNav';
 import {
   ArrowLeft,
   Search,
@@ -139,19 +138,23 @@ export default function DocHubScreen({ navigation }: Props) {
     }
   };
 
-  const handleNavPress = (tab: BottomNavTab) => {
-    if (tab === 'home') navigation.navigate('Dashboard');
-    else if (tab === 'life') navigation.navigate('SmartLife');
-    else if (tab === 'center') navigation.navigate('Voice');
-    else if (tab === 'health') navigation.navigate('Medicine');
-    else if (tab === 'vault') {
-      // already here
-    }
-  };
-
   const maxContentStyle = isExpanded
     ? { maxWidth: contentMaxWidth, alignSelf: 'center' as const, width: '100%' as const }
     : { width: '100%' as const };
+
+  const handleNavPress = (tab: BottomNavTab) => {
+    if (tab === 'home') {
+      navigation.navigate('Dashboard');
+    } else if (tab === 'family') {
+      navigation.navigate('Family');
+    } else if (tab === 'center') {
+      navigation.navigate('Voice');
+    } else if (tab === 'health') {
+      navigation.navigate('Medicine');
+    } else if (tab === 'vault') {
+      // already on vault
+    }
+  };
 
   return (
     <View style={styles.root}>
@@ -173,7 +176,7 @@ export default function DocHubScreen({ navigation }: Props) {
       <ScrollView
         contentContainerStyle={[
           styles.content,
-          { paddingBottom: insets.bottom + 90 },
+          { paddingBottom: insets.bottom + 96 },
         ]}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -335,12 +338,7 @@ export default function DocHubScreen({ navigation }: Props) {
         </View>
       </ScrollView>
 
-      {/* Floating Modern Bottom Navigation Bar */}
-      <ModernBottomNav
-        activeTab="vault"
-        onTabPress={handleNavPress}
-        badgeCounts={{ health: 2 }}
-      />
+      <ModernBottomNav activeTab="vault" onTabPress={handleNavPress} />
     </View>
   );
 }

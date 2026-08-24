@@ -8,7 +8,8 @@ import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
-import { SkeletonBox, SkeletonCard, SkeletonHeroCard } from '../../components/Skeleton';
+import ModernBottomNav, { type BottomNavTab } from '../../components/ModernBottomNav';
+import { SkeletonCard, SkeletonHeroCard } from '../../components/Skeleton';
 import useAuth from '../../hooks/useAuth';
 import {
   ArrowLeft,
@@ -21,11 +22,7 @@ import {
   User,
   Users,
   Mail,
-  Send,
-  Check,
-  X,
   AlertCircle,
-  Plus,
 } from 'lucide-react-native';
 import {
   acceptInvite,
@@ -420,6 +417,20 @@ export default function FamilyScreen({ navigation }: Props) {
     return null;
   };
 
+  const handleNavPress = (tab: BottomNavTab) => {
+    if (tab === 'home') {
+      navigation.navigate('Dashboard');
+    } else if (tab === 'family') {
+      // already on family tab
+    } else if (tab === 'center') {
+      navigation.navigate('Voice');
+    } else if (tab === 'health') {
+      navigation.navigate('Medicine');
+    } else if (tab === 'vault') {
+      navigation.navigate('DocHub');
+    }
+  };
+
   return (
     <View style={styles.root} key={localeVersion}>
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
@@ -633,6 +644,35 @@ export default function FamilyScreen({ navigation }: Props) {
               </Pressable>
             </View>
 
+            {invitesForMe.length > 0 && (
+              <View style={styles.inviteForMeSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>
+                    {t('family.invites_for_me_title')} ({invitesForMe.length})
+                  </Text>
+                  <Text style={styles.sectionSub}>Invitations to join a family</Text>
+                </View>
+                {invitesForMe.map((invite) => (
+                  <View key={invite.id} style={styles.pendingAdminRow}>
+                    <View style={styles.pendingAdminInfo}>
+                      <Users size={14} color="#555555" strokeWidth={1.5} />
+                      <Text style={styles.pendingAdminText}>
+                        {invite.familyName || invite.familyId}
+                      </Text>
+                    </View>
+                    <View style={{ flexDirection: 'row', gap: 6 }}>
+                      <Pressable style={styles.addBtn} onPress={() => openAcceptSheet(invite)}>
+                        <Text style={styles.addBtnText}>{t('family.accept_invite')}</Text>
+                      </Pressable>
+                      <Pressable style={styles.cancelInvitePill} onPress={() => handleDeclineInvite(invite)}>
+                        <Text style={styles.cancelInviteText}>{t('family.decline_invite')}</Text>
+                      </Pressable>
+                    </View>
+                  </View>
+                ))}
+              </View>
+            )}
+
             {pendingInvitesAdmin.length > 0 && (
               <View style={styles.inviteForMeSection}>
                 <View style={styles.sectionHeader}>
@@ -831,11 +871,13 @@ export default function FamilyScreen({ navigation }: Props) {
           </>
         )}
       </BottomSheet>
+
+      <ModernBottomNav activeTab="family" onTabPress={handleNavPress} />
     </View>
   );
 }
 
-const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
+const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
   root: {
     flex: 1,
     backgroundColor: '#F8F9FA',
@@ -902,7 +944,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl + 40,
+    paddingBottom: spacing.xxl + 80,
   },
   loadingWrap: {
     paddingVertical: spacing.xxl,

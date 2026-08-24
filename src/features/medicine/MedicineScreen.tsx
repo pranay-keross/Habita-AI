@@ -9,6 +9,7 @@ import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
+import ModernBottomNav, { type BottomNavTab } from '../../components/ModernBottomNav';
 import { SkeletonCard, SkeletonHeroCard } from '../../components/Skeleton';
 import useAuth from '../../hooks/useAuth';
 import {
@@ -731,6 +732,20 @@ export default function MedicineScreen({ navigation, route }: Props) {
     );
   };
 
+  const handleNavPress = (tab: BottomNavTab) => {
+    if (tab === 'home') {
+      navigation.navigate('Dashboard');
+    } else if (tab === 'family') {
+      navigation.navigate('Family');
+    } else if (tab === 'center') {
+      navigation.navigate('Voice');
+    } else if (tab === 'health') {
+      // already on health
+    } else if (tab === 'vault') {
+      navigation.navigate('DocHub');
+    }
+  };
+
   return (
     <View style={styles.root} key={localeVersion}>
       {/* Top Header */}
@@ -1246,6 +1261,8 @@ export default function MedicineScreen({ navigation, route }: Props) {
           </>
         )}
       </BottomSheet>
+
+      <ModernBottomNav activeTab="health" onTabPress={handleNavPress} />
     </View>
   );
 }
@@ -1317,7 +1334,7 @@ const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleShe
   content: {
     paddingHorizontal: spacing.lg,
     paddingTop: spacing.sm,
-    paddingBottom: spacing.xxl + 40,
+    paddingBottom: spacing.xxl + 80,
   },
   loadingWrap: {
     paddingVertical: spacing.xxl,

@@ -128,9 +128,21 @@ const AppLayout = () => {
           <Stack.Screen name="Phone" component={PhoneScreen} />
           <Stack.Screen name="Otp" component={OtpScreen} />
           <Stack.Screen name="Profile" component={ProfileScreen} />
-          <Stack.Screen name="Dashboard" component={DashboardScreen} />
-          <Stack.Screen name="Family" component={FamilyScreen} />
-          <Stack.Screen name="Medicine" component={MedicineScreen} />
+          <Stack.Screen
+            name="Dashboard"
+            component={DashboardScreen}
+            options={{ animation: 'none' }}
+          />
+          <Stack.Screen
+            name="Family"
+            component={FamilyScreen}
+            options={{ animation: 'none' }}
+          />
+          <Stack.Screen
+            name="Medicine"
+            component={MedicineScreen}
+            options={{ animation: 'none' }}
+          />
           <Stack.Screen name="Prescriptions" component={PrescriptionsScreen} />
           <Stack.Screen name="Wellness" component={WellnessScreen} />
           <Stack.Screen name="Cycle" component={CycleScreen} />
@@ -147,7 +159,11 @@ const AppLayout = () => {
           <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
           <Stack.Screen name="AddSplitExpense" component={AddSplitExpenseScreen} />
           <Stack.Screen name="ExpenseDetailsSettleUp" component={ExpenseDetailsSettleUpScreen} />
-          <Stack.Screen name="DocHub" component={DocHubScreen} />
+          <Stack.Screen
+            name="DocHub"
+            component={DocHubScreen}
+            options={{ animation: 'none' }}
+          />
           <Stack.Screen name="DocDetails" component={DocDetailsScreen} />
           <Stack.Screen name="AddDoc" component={AddDocScreen} />
           <Stack.Screen name="DocTemplateForm" component={DocTemplateFormScreen} />
@@ -159,7 +175,11 @@ const AppLayout = () => {
           <Stack.Screen name="ClothingDetails" component={ClothingDetailsScreen} />
           <Stack.Screen name="StyleMirror" component={StyleMirrorScreen} />
           <Stack.Screen name="OutfitDetails" component={OutfitDetailsScreen} />
-          <Stack.Screen name="Voice" component={VoiceScreen} />
+          <Stack.Screen
+            name="Voice"
+            component={VoiceScreen}
+            options={{ animation: 'fade' }}
+          />
           <Stack.Screen name="VoiceSettings" component={VoiceSettingsScreen} />
           <Stack.Screen name="SmartLife" component={SmartLifeScreen} />
         </Stack.Navigator >
