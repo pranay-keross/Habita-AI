@@ -45,8 +45,15 @@ This repository is the React Native 0.86 client. It is mostly still a **static, 
 - **Session** persists to `habita.session`; a valid session on cold start skips onboarding straight to the dashboard (`src/app/_layout.tsx`'s auth guard). No idle/absolute expiry yet — see `docs/ARCHITECTURE.md` §6.
 
 ### Home dashboard
-`src/app/dashboard.tsx` — a plain-background greeting with a muted `2 Pending · 4 Due` status line (still placeholder numbers), two stat cards (30-day spend — still hardcoded; 7-day medicine adherence — real, `M4-T3`), a wrapping grid of quick-action icon buttons, and a bordered module list (11 tiles, `M1-T14`). A sticky AppBar fades in on scroll with a compact echo of the pending/due status. Tiles and quick actions route on a stable ID (`M1-T7`), not the translated label. **Family**, **Medicine**, **Wellness** and **Cycle** all navigate to real screens; the rest are still static. The quick-action grid gained "Log mood" and "Log period" alongside "Take medicine" (`M4-T6`/`M4-T8`).
-`src/app/dashboard.tsx` — a plain-background greeting with a muted `2 Pending · 4 Due` status line (still placeholder numbers), two stat cards (30-day spend — still hardcoded; 7-day medicine adherence — real, `M4-T3`), a wrapping grid of quick-action icon buttons, and a bordered module list. A sticky AppBar fades in on scroll with a compact echo of the pending/due status. Tiles and quick actions route on a stable ID (`M1-T7`), not the translated label. **Family**, **Medicine**, and the static **Household Operations** overview navigate to real screens; the remaining tiles are still static.
+`src/app/dashboard.tsx` — an ultra-modern glassmorphic home experience matching futuristic mobile design standards (`D-044`):
+- **Sticky Glassmorphic Header:** Brand title with live status indicator dot, dynamic scroll-driven compact pill ("2 Pending · 4 Due"), quick AI Voice trigger, and glowing profile avatar.
+- **Search & AI Capsule:** Quick search bar and voice assistant copilot shortcut ("Ask Habita AI anything or search...").
+- **Hero Data Insights Card:** Frosted translucent glass container with interactive SVG sine wave chart (`StatWaveChart`), tab selector (`Adherence`, `Spend`, `Activity`), weekly metric curves, and bottom stat cards.
+- **Quick Action Grid:** Squircle glass tiles (`QuickActionTile`) with glowing icon backgrounds for common tasks (Scan Bill, UPI Pay, Medicine, Mood, Cycle, Expenses, Smart Life, Fuel, Wardrobe).
+- **Quick Resources Delivery Tap:** Interactive quick-tap counters for immediate logging (+ Milk, + Water, + Gas).
+- **Core Modules Explorer:** Glassmorphic module list with status indicators and chevron navigators.
+- **Floating Modern Bottom Navigation Dock (`ModernBottomNav`):** Floating dock with 5 core actions (Home, Life OS, floating elevated Center AI Assistant button with glowing gradient, Health, and Vault).
+- **Responsive Architecture:** Auto-centers (`maxWidth: 640`) on tablets and wide screens with dynamic column calculation via `useResponsive()`.
 
 ### Household Operations overview
 

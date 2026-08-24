@@ -218,10 +218,30 @@ export async function uploadMedicalDocument(
   documentType: string,
   token: string,
 ): Promise<MedicalDocument> {
+  const fileName = file.name || (file.type?.includes('pdf') ? 'prescription.pdf' : 'prescription.jpg');
+  const fileType = file.type || (fileName.endsWith('.pdf') ? 'application/pdf' : 'image/jpeg');
+
   const form = new FormData();
-  form.append('file', { uri: file.uri, name: file.name, type: file.type } as unknown as Blob);
+  form.append('file', {
+    uri: file.uri,
+    name: fileName,
+    type: fileType,
+  } as unknown as Blob);
   form.append('documentType', { string: JSON.stringify(documentType), type: 'application/json' } as unknown as Blob);
-  return postMultipart<MedicalDocument>(`/profiles/${familyProfileId}/documents`, form, token);
+
+  try {
+    return await postMultipart<MedicalDocument>(`/profiles/${familyProfileId}/documents`, form, token);
+  } catch {
+    // If JSON-typed part is rejected by certain server configurations, retry with direct string field
+    const fallbackForm = new FormData();
+    fallbackForm.append('file', {
+      uri: file.uri,
+      name: fileName,
+      type: fileType,
+    } as unknown as Blob);
+    fallbackForm.append('documentType', documentType);
+    return await postMultipart<MedicalDocument>(`/profiles/${familyProfileId}/documents`, fallbackForm, token);
+  }
 }
 
 export async function listMedicalDocuments(familyProfileId: string, token: string): Promise<MedicalDocument[]> {

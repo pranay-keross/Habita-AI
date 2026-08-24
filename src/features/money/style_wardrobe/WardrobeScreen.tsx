@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -16,17 +17,19 @@ import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import BottomSheet from '../../../components/BottomSheet';
 import Button from '../../../components/Button';
+import { SkeletonCard } from '../../../components/Skeleton';
 import { loadWardrobe, MOCK_WEATHER_RECOMMENDATION, saveWardrobe } from './wardrobeStore';
 import type { ClosetCategory, WardrobeItem } from './types';
+import { ArrowLeft, CloudSun, Plus, Shirt, Trash2 } from 'lucide-react-native';
 
 type Props = StackScreenProps<RootStackParamList, 'Wardrobe'>;
 
-const CATEGORY_MAP: Record<ClosetCategory, { label: string; icon: string }> = {
-  formal: { label: 'Formal', icon: '🧥' },
-  casual: { label: 'Casual', icon: '👕' },
-  traditional: { label: 'Festive / Silk', icon: '👘' },
-  party: { label: 'Party', icon: '👗' },
-  activewear: { label: 'Activewear', icon: '👟' },
+const CATEGORY_MAP: Record<ClosetCategory, { label: string }> = {
+  formal: { label: 'Formal' },
+  casual: { label: 'Casual' },
+  traditional: { label: 'Festive / Silk' },
+  party: { label: 'Party' },
+  activewear: { label: 'Activewear' },
 };
 
 export default function WardrobeScreen({ navigation }: Props) {
@@ -34,6 +37,7 @@ export default function WardrobeScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<WardrobeItem[]>([]);
   const [selectedCat, setSelectedCat] = useState<ClosetCategory | 'all'>('all');
 
@@ -44,11 +48,20 @@ export default function WardrobeScreen({ navigation }: Props) {
   const [color, setColor] = useState('Navy Blue');
   const [saving, setSaving] = useState(false);
 
-  const fetchItems = async () => {
-    setLoading(true);
+  const fetchItems = async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
+      setLoading(true);
+    }
     const list = await loadWardrobe();
     setItems(list);
     setLoading(false);
+    setRefreshing(false);
+  };
+
+  const onRefresh = () => {
+    fetchItems(true);
   };
 
   useEffect(() => {
@@ -61,7 +74,7 @@ export default function WardrobeScreen({ navigation }: Props) {
 
   const handleAddItem = async () => {
     if (!name.trim()) {
-      Alert.alert('Incomplete Info', 'Please enter item name.');
+      Alert.alert('Missing Info', 'Please enter outfit/item name.');
       return;
     }
     setSaving(true);
@@ -71,9 +84,9 @@ export default function WardrobeScreen({ navigation }: Props) {
       category,
       color,
       season: 'all-year',
-      emoji: CATEGORY_MAP[category].icon,
+      emoji: '',
     };
-    const updated = [...items, newItem];
+    const updated = [newItem, ...items];
     await saveWardrobe(updated);
     setItems(updated);
     setShowAddSheet(false);
@@ -101,20 +114,34 @@ export default function WardrobeScreen({ navigation }: Props) {
       {/* Header Bar */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
         </Pressable>
         <Text style={styles.headerTitle}>Wardrobe & Style Mirror</Text>
         <Pressable onPress={() => setShowAddSheet(true)} style={styles.addBtn}>
-          <Text style={styles.addBtnText}>+ Outfit</Text>
+          <Plus size={13} color="#FFFFFF" strokeWidth={2.2} style={{ marginRight: 4 }} />
+          <Text style={styles.addBtnText}>Outfit</Text>
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#000000"
+            colors={['#000000']}
+          />
+        }>
         {/* Weather-Adaptive Style Mirror Hero */}
         <View style={styles.heroCard}>
-          <Text style={styles.heroTitle}>🌤️ Weather-Adaptive Style Mirror</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 6 }}>
+            <CloudSun size={15} color="#10B981" strokeWidth={1.8} style={{ marginRight: 6 }} />
+            <Text style={styles.heroTitle}>Weather-Adaptive Style Mirror</Text>
+          </View>
           <Text style={styles.heroSub}>
-            {MOCK_WEATHER_RECOMMENDATION.location} · {MOCK_WEATHER_RECOMMENDATION.tempC}°C ({MOCK_WEATHER_RECOMMENDATION.condition})
+            {MOCK_WEATHER_RECOMMENDATION.location} · {MOCK_WEATHER_RECOMMENDATION.tempC}°C
           </Text>
 
           <View style={styles.recommendationBox}>
@@ -141,27 +168,32 @@ export default function WardrobeScreen({ navigation }: Props) {
               style={[styles.catChip, selectedCat === cat && styles.catChipActive]}
               onPress={() => setSelectedCat(cat)}>
               <Text style={[styles.catChipText, selectedCat === cat && styles.catChipTextActive]}>
-                {CATEGORY_MAP[cat].icon} {CATEGORY_MAP[cat].label}
+                {CATEGORY_MAP[cat].label}
               </Text>
             </Pressable>
           ))}
         </ScrollView>
 
         {loading ? (
-          <ActivityIndicator color={styles.addBtnText.color} style={{ marginTop: 40 }} />
+          <View style={{ paddingTop: 8 }}>
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
         ) : (
           filteredItems.map((item) => (
             <View key={item.id} style={styles.itemCard}>
               <View style={styles.itemMainRow}>
-                <Text style={{ fontSize: 24, marginRight: 12 }}>{item.emoji}</Text>
+                <View style={{ width: 36, height: 36, borderRadius: 18, backgroundColor: '#F5F5F7', alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                  <Shirt size={18} color="#000000" strokeWidth={1.5} />
+                </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.itemName}>{item.name}</Text>
                   <Text style={styles.itemSub}>
                     {CATEGORY_MAP[item.category]?.label} · Color: {item.color}
                   </Text>
                 </View>
-                <Pressable onPress={() => handleDelete(item.id)}>
-                  <Text style={styles.crossText}>×</Text>
+                <Pressable onPress={() => handleDelete(item.id)} hitSlop={8}>
+                  <Trash2 size={16} color="#888888" strokeWidth={1.5} />
                 </Pressable>
               </View>
             </View>
@@ -188,7 +220,7 @@ export default function WardrobeScreen({ navigation }: Props) {
               style={[styles.catChip, category === cat && styles.catChipActive]}
               onPress={() => setCategory(cat)}>
               <Text style={[styles.catChipText, category === cat && styles.catChipTextActive]}>
-                {CATEGORY_MAP[cat].icon} {CATEGORY_MAP[cat].label}
+                {CATEGORY_MAP[cat].label}
               </Text>
             </Pressable>
           ))}

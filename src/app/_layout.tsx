@@ -1,5 +1,4 @@
 import React from 'react';
-import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -45,8 +44,7 @@ import {
 import VoiceScreen from '../features/money/voice_assistant/VoiceScreen';
 import SmartLifeScreen from '../features/smart_life/SmartLifeScreen';
 import VoiceSettingsScreen from '../features/money/voice_assistant/VoiceSettingsScreen';
-import type { ThemeTokens } from '../theme';
-import useThemedStyles from '../hooks/useThemedStyles';
+import SplashScreen from '../components/SplashScreen';
 import useTheme from '../hooks/useTheme';
 import useAuth from '../hooks/useAuth';
 
@@ -60,7 +58,7 @@ export type RootStackParamList = {
   // on every focus — see docs/DECISIONS.md.
   Dashboard: { profileUpdated?: boolean } | undefined;
   Family: undefined;
-  Medicine: undefined;
+  Medicine: { openAddModal?: boolean } | undefined;
   Prescriptions: { familyProfileId: string };
   Wellness: undefined;
   Cycle: undefined;
@@ -101,17 +99,16 @@ const Stack = createNativeStackNavigator<RootStackParamList>();
 const AppLayout = () => {
   const { theme } = useTheme();
   const { pending, signedIn } = useAuth();
-  const styles = useThemedStyles(makeStyles);
+  const [splashFinished, setSplashFinished] = React.useState(false);
 
-  // `initialRouteName` is only read on the Navigator's first mount, so the Navigator
-  // itself must not render until the session restore check resolves — otherwise it
-  // locks in `Language` before `signedIn` is known.
-  if (pending) {
+  // Show luxury animated splash screen on app start / restore from killed state
+  if (pending || !splashFinished) {
     return (
       <SafeAreaProvider>
-        <View style={styles.loading}>
-          <ActivityIndicator color={theme.colors.primary} />
-        </View>
+        <SplashScreen
+          onFinish={() => setSplashFinished(true)}
+          minDuration={1800}
+        />
       </SafeAreaProvider>
     );
   }
@@ -167,18 +164,8 @@ const AppLayout = () => {
           <Stack.Screen name="SmartLife" component={SmartLifeScreen} />
         </Stack.Navigator >
       </NavigationContainer >
-    </SafeAreaProvider >
+    </SafeAreaProvider>
   );
 };
-
-const makeStyles = ({ colors }: ThemeTokens) =>
-  StyleSheet.create({
-    loading: {
-      flex: 1,
-      backgroundColor: colors.background,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-  });
 
 export default AppLayout;

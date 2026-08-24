@@ -9,9 +9,12 @@ import PartyPopper from 'lucide-react-native/icons/party-popper';
 import CarFront from 'lucide-react-native/icons/car-front';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Info from 'lucide-react-native/icons/info';
+import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import type { RootStackParamList } from '../../app/_layout';
 import SectionHeader from '../../components/SectionHeader';
+import ModernBottomNav, { type BottomNavTab } from '../../components/ModernBottomNav';
 import useThemedStyles from '../../hooks/useThemedStyles';
+import useResponsive from '../../hooks/useResponsive';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
 
@@ -20,6 +23,7 @@ type Props = StackScreenProps<RootStackParamList, 'HouseholdOperations'>;
 export default function HouseholdOperationsScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { isExpanded, contentMaxWidth } = useResponsive();
   const [localeVersion, setLocaleVersion] = useState(0);
 
   useEffect(() => {
@@ -37,8 +41,6 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
     description: string;
     highlights: string[];
     Icon: LucideIcon;
-    tint: string;
-    tintSoft: string;
   }[] = [
     {
       id: 'caregiver',
@@ -50,8 +52,6 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
         t('household.caregiver_highlight_pay'),
       ],
       Icon: UsersRound,
-      tint: '#2E7D5B',
-      tintSoft: '#E3F3EA',
     },
     {
       id: 'resources',
@@ -63,8 +63,6 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
         t('household.resources_highlight_bills'),
       ],
       Icon: Droplets,
-      tint: '#1D7FBF',
-      tintSoft: '#E1F1FB',
     },
     {
       id: 'events',
@@ -76,8 +74,6 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
         t('household.events_highlight_calendar'),
       ],
       Icon: PartyPopper,
-      tint: '#C24F8E',
-      tintSoft: '#FAE6F0',
     },
     {
       id: 'assets',
@@ -89,186 +85,201 @@ export default function HouseholdOperationsScreen({ navigation }: Props) {
         t('household.assets_highlight_maintenance'),
       ],
       Icon: CarFront,
-      tint: '#C7791E',
-      tintSoft: '#FBEBDA',
     },
   ];
+
+  const handleNavPress = (tab: BottomNavTab) => {
+    if (tab === 'home') navigation.navigate('Dashboard');
+    else if (tab === 'life') navigation.navigate('SmartLife');
+    else if (tab === 'center') navigation.navigate('Voice');
+    else if (tab === 'health') navigation.navigate('Medicine');
+    else if (tab === 'vault') navigation.navigate('DocHub');
+  };
+
+  const maxContentStyle = isExpanded
+    ? { maxWidth: contentMaxWidth, alignSelf: 'center' as const, width: '100%' as const }
+    : { width: '100%' as const };
 
   return (
     <View key={localeVersion} style={styles.screen}>
       <View style={[styles.header, { paddingTop: insets.top + 8 }]}>
-        <Pressable
-          accessibilityRole="button"
-          accessibilityLabel={t('household.back')}
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <ArrowLeft
-            size={20}
-            color={styles.backIcon.color}
-            strokeWidth={1.8}
-          />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('household.header_title')}</Text>
+        <View style={[styles.headerContent, maxContentStyle]}>
+          <Pressable
+            accessibilityRole="button"
+            accessibilityLabel={t('common.back')}
+            onPress={() => navigation.goBack()}
+            style={styles.backButton}
+          >
+            <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{t('household.operations_title')}</Text>
+          <View style={styles.backButtonPlaceholder} />
+        </View>
       </View>
 
       <ScrollView
-        contentContainerStyle={[
-          styles.content,
-          { paddingBottom: insets.bottom + 28 },
-        ]}
+        contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 90 }]}
         showsVerticalScrollIndicator={false}
       >
-        <SectionHeader
-          title={t('household.sections_title')}
-          subtitle={t('household.sections_subtitle')}
-        />
+        <View style={maxContentStyle}>
+          <SectionHeader
+            title={t('household.domains_title')}
+            subtitle={t('household.domains_subtitle')}
+          />
 
-        <View style={styles.grid}>
-          {sections.map(({ id, title, description, highlights, Icon, tint, tintSoft }) => (
-            <Pressable
-              key={id}
-              style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
-              onPress={() =>
-                id === 'caregiver'
-                  ? navigation.navigate('Staff')
-                  : id === 'resources'
-                  ? navigation.navigate('Resources')
-                  : id === 'events'
-                  ? navigation.navigate('EventBudgets')
-                  : id === 'assets'
-                  ? navigation.navigate('Vehicles')
-                  : navigation.navigate('HouseholdArea', { area: id })
-              }
-            >
-              <View style={styles.tileTopRow}>
-                <View style={[styles.tileIcon, { backgroundColor: tintSoft }]}>
-                  <Icon size={26} color={tint} strokeWidth={2.4} />
+          <View style={styles.grid}>
+            {sections.map(({ id, title, description, highlights, Icon }) => (
+              <Pressable
+                key={id}
+                style={({ pressed }) => [styles.tile, pressed && styles.tilePressed]}
+                onPress={() =>
+                  id === 'caregiver'
+                    ? navigation.navigate('Staff')
+                    : id === 'resources'
+                    ? navigation.navigate('Resources')
+                    : id === 'events'
+                    ? navigation.navigate('EventBudgets')
+                    : id === 'assets'
+                    ? navigation.navigate('Vehicles')
+                    : navigation.navigate('HouseholdArea', { area: id })
+                }
+              >
+                <View style={styles.tileTopRow}>
+                  <View style={styles.tileIcon}>
+                    <Icon size={20} color="#000000" strokeWidth={1.5} />
+                  </View>
+                  <Pressable
+                    accessibilityRole="button"
+                    accessibilityLabel={title}
+                    hitSlop={10}
+                    onPress={(e) => {
+                      e.stopPropagation();
+                      Alert.alert(title, [description, ...highlights.map((h) => `• ${h}`)].join('\n'));
+                    }}
+                    style={styles.infoButton}
+                  >
+                    <Info size={14} color="#888888" strokeWidth={1.5} />
+                  </Pressable>
                 </View>
-                <Pressable
-                  accessibilityRole="button"
-                  accessibilityLabel={title}
-                  hitSlop={10}
-                  onPress={(e) => {
-                    e.stopPropagation();
-                    Alert.alert(title, [description, ...highlights.map((h) => `• ${h}`)].join('\n'));
-                  }}
-                  style={styles.infoButton}
-                >
-                  <Info size={16} color={styles.infoIconColor.color} strokeWidth={2} />
-                </Pressable>
-              </View>
-              <Text style={styles.tileTitle} numberOfLines={2}>
-                {title}
-              </Text>
-              <View style={[styles.tileOpenBtn, { backgroundColor: tintSoft }]}>
-                <Text style={[styles.tileOpenBtnText, { color: tint }]}>
-                  {t('household.open_workspace')}
+                <Text style={styles.tileTitle} numberOfLines={2}>
+                  {title}
                 </Text>
-              </View>
-            </Pressable>
-          ))}
+                <View style={styles.tileBottomRow}>
+                  <Text style={styles.tileOpenBtnText}>
+                    {t('household.open_workspace')}
+                  </Text>
+                  <ChevronRight size={14} color="#000000" strokeWidth={1.3} />
+                </View>
+              </Pressable>
+            ))}
+          </View>
         </View>
       </ScrollView>
+
+      {/* Solid Black Minimalist Bottom Navigation Bar */}
+      <ModernBottomNav
+        activeTab="life"
+        onTabPress={handleNavPress}
+        badgeCounts={{ health: 2 }}
+      />
     </View>
   );
 }
 
-const makeStyles = ({ colors, fonts, spacing }: ThemeTokens) =>
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
   StyleSheet.create({
     screen: { flex: 1, backgroundColor: colors.background },
     header: {
+      backgroundColor: '#FFFFFF',
+      borderBottomWidth: 1,
+      borderBottomColor: '#ECECEE',
+    },
+    headerContent: {
       flexDirection: 'row',
       alignItems: 'center',
+      justifyContent: 'space-between',
       paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.md,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-      backgroundColor: colors.background,
+      paddingBottom: spacing.sm,
     },
     backButton: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+      width: 36,
+      height: 36,
+      borderRadius: 18,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surface,
+      backgroundColor: '#F5F5F7',
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: '#EAEAEA',
     },
-    backIcon: { color: colors.textPrimary },
+    backButtonPlaceholder: {
+      width: 36,
+    },
     headerTitle: {
-      marginLeft: spacing.md,
-      fontFamily: fonts.serif,
-      fontSize: 22,
-      color: colors.textPrimary,
+      fontFamily: fonts.sans,
+      fontSize: 16,
+      fontWeight: '600',
+      color: '#000000',
     },
     content: { padding: spacing.lg },
     grid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
-      gap: spacing.md,
+      gap: 10,
+      justifyContent: 'space-between',
     },
     tile: {
-      width: '47%',
-      minHeight: 168,
-      backgroundColor: colors.surface,
-      borderRadius: 20,
-      padding: spacing.lg,
+      width: '48%',
+      minHeight: 140,
+      backgroundColor: '#FFFFFF',
+      borderRadius: radius.card,
+      padding: spacing.md,
       borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: '#000',
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.04,
-      shadowRadius: 6,
-      elevation: 1,
+      borderColor: '#ECECEE',
+      ...shadow.soft,
       justifyContent: 'space-between',
     },
     tilePressed: {
-      opacity: 0.9,
+      opacity: 0.7,
       transform: [{ scale: 0.98 }],
     },
     tileTopRow: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       justifyContent: 'space-between',
-      marginBottom: spacing.md,
+      marginBottom: spacing.sm,
     },
     tileIcon: {
-      width: 52,
-      height: 52,
-      borderRadius: 26,
+      width: 36,
+      height: 36,
+      borderRadius: 10,
+      backgroundColor: '#F5F5F7',
       alignItems: 'center',
       justifyContent: 'center',
     },
     infoButton: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
+      width: 26,
+      height: 26,
+      borderRadius: 13,
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.surfaceElevated,
-      borderWidth: 1,
-      borderColor: colors.border,
+      backgroundColor: '#F5F5F7',
     },
-    infoIconColor: { color: colors.textMuted },
     tileTitle: {
-      flex: 1,
-      fontFamily: fonts.serif,
-      fontWeight: '700',
-      fontSize: 17,
-      color: colors.textPrimary,
+      fontFamily: fonts.sans,
+      fontWeight: '500',
+      fontSize: 14,
+      color: '#000000',
     },
-    tileOpenBtn: {
+    tileBottomRow: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      borderRadius: 12,
-      paddingVertical: 9,
-      marginTop: spacing.md,
+      justifyContent: 'space-between',
+      marginTop: spacing.sm,
     },
     tileOpenBtnText: {
-      fontFamily: fonts.sansBold,
-      fontWeight: '700',
-      fontSize: 13,
+      fontFamily: fonts.sans,
+      fontWeight: '400',
+      fontSize: 11,
+      color: '#555555',
     },
   });

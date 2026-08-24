@@ -6,6 +6,7 @@ import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { ArrowLeft } from 'lucide-react-native';
 
 import { ScreenTab } from './types';
 import { useSmartPantry } from './hooks/useSmartPantry';
@@ -59,7 +60,7 @@ export default function PantryScreen({ navigation }: Props) {
       {/* Header Bar */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
         </Pressable>
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={styles.headerTitle}>{t('smart_pantry.header_title')}</Text>

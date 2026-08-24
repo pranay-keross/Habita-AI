@@ -10,6 +10,7 @@ import Button from '../../components/Button';
 import { setItem } from '../../utils/storage';
 import useAuth from '../../hooks/useAuth';
 import { parseAuthError } from '../../features/auth/api';
+import { ArrowLeft, Phone as PhoneIcon } from 'lucide-react-native';
 
 type Props = StackScreenProps<RootStackParamList, 'Phone'>;
 
@@ -66,12 +67,12 @@ const PhoneScreen = ({ navigation }: Props) => {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
       <View style={[styles.root, { paddingTop: insets.top + 20 }]}> 
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
         </Pressable>
 
         <View style={styles.hero}>
           <View style={styles.heroIcon}>
-            <Text style={styles.heroIconText}>📞</Text>
+            <PhoneIcon size={26} color="#000000" strokeWidth={1.5} />
           </View>
           <Text style={styles.welcome}>{t('onboarding.welcome')}</Text>
           <Text style={styles.welcomeSub}>{t('onboarding.welcome_sub')}</Text>
@@ -91,7 +92,7 @@ const PhoneScreen = ({ navigation }: Props) => {
           />
 
           <Button
-            title={`${t('onboarding.continue')} →`}
+            title={t('onboarding.continue')}
             onPress={submit}
             loading={submitting}
             style={styles.cta}

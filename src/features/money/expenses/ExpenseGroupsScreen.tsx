@@ -14,6 +14,8 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
+import useResponsive from '../../../hooks/useResponsive';
+import ModernBottomNav, { type BottomNavTab } from '../../../components/ModernBottomNav';
 import BottomSheet from '../../../components/BottomSheet';
 import Button from '../../../components/Button';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
@@ -39,6 +41,7 @@ const EMOJI_OPTIONS = ['🏠', '🏖️', '🍿', '🚗', '🎓', '✈️', '�
 export default function ExpenseGroupsScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { isExpanded, contentMaxWidth } = useResponsive();
   const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -80,200 +83,247 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
     setNewMemberName('');
   };
 
-  const handleCreateGroup = async () => {
+  const handleRemoveMember = (idx: number) => {
+    if (members.length <= 2) {
+      Alert.alert(t('expenses.min_members_title'), t('expenses.min_members_msg'));
+      return;
+    }
+    setMembers(members.filter((_, i) => i !== idx));
+  };
+
+  const handleCreate = async () => {
     if (!newGroupName.trim()) {
-      Alert.alert(t('expenses.missing_group_name_title'), t('expenses.missing_group_name_msg'));
+      Alert.alert(t('expenses.missing_info_title'), t('expenses.missing_info_msg'));
       return;
     }
     setCreating(true);
-    const created = await createGroup(newGroupName.trim(), newGroupEmoji, members);
-    setCreating(false);
-    setShowCreateModal(false);
-    setNewGroupName('');
-    fetchGroups();
-    navigation.navigate('GroupDetails', { groupId: created.id });
+    try {
+      const created = await createGroup(
+        newGroupName.trim(),
+        newGroupEmoji,
+        members,
+      );
+      setShowCreateModal(false);
+      setNewGroupName('');
+      fetchGroups();
+      navigation.navigate('GroupDetails', { groupId: created.id });
+    } catch {
+      Alert.alert('Error', 'Failed to create group');
+    } finally {
+      setCreating(false);
+    }
   };
 
-  // Calculate total net balances across all groups
-  const calculateTotalBalances = () => {
-    let youAreOwed = 0;
-    let youOwe = 0;
-
-    groups.forEach((g) => {
+  // Aggregated totals across all groups
+  const totals = groups.reduce(
+    (acc, g) => {
       const { balances } = calculateGroupBalances(g, expenses, settlements);
       const myBal = balances.find((b) => b.memberId === 'usr_me');
-      const myNet = myBal ? myBal.netBalanceINR : 0;
-      if (myNet > 0) youAreOwed += myNet;
-      if (myNet < 0) youOwe += Math.abs(myNet);
-    });
+      if (myBal) {
+        if (myBal.netBalanceINR > 0) acc.youAreOwed += myBal.netBalanceINR;
+        if (myBal.netBalanceINR < 0) acc.youOwe += Math.abs(myBal.netBalanceINR);
+      }
+      return acc;
+    },
+    { youAreOwed: 0, youOwe: 0 }
+  );
 
-    return { youAreOwed, youOwe, netTotal: youAreOwed - youOwe };
+  const handleNavPress = (tab: BottomNavTab) => {
+    if (tab === 'home') navigation.navigate('Dashboard');
+    else if (tab === 'life') navigation.navigate('SmartLife');
+    else if (tab === 'center') navigation.navigate('Voice');
+    else if (tab === 'health') navigation.navigate('Medicine');
+    else if (tab === 'vault') navigation.navigate('DocHub');
   };
 
-  const totals = calculateTotalBalances();
+  const maxContentStyle = isExpanded
+    ? { maxWidth: contentMaxWidth, alignSelf: 'center' as const, width: '100%' as const }
+    : { width: '100%' as const };
 
   return (
     <View style={styles.root}>
-      {/* Header */}
+      {/* Header Bar */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <ArrowLeft size={18} color={styles.headerTitle.color} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('expenses.groups_header')}</Text>
-        <Pressable
-          onPress={() => setShowCreateModal(true)}
-          style={styles.createGroupPill}>
-          <Text style={styles.createGroupPillText}>{t('expenses.create_group_btn')}</Text>
-        </Pressable>
+        <View style={[styles.headerContent, maxContentStyle]}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
+            <ArrowLeft size={20} color={styles.headerIcon.color} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{t('expenses.groups_title')}</Text>
+          <Pressable
+            onPress={() => setShowCreateModal(true)}
+            style={styles.addNavBtn}>
+            <Plus size={20} color={styles.addIcon.color} />
+          </Pressable>
+        </View>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Split & Track Expenses Hero Banner */}
-        <View style={styles.heroBanner}>
-          <Text style={styles.heroTitle}>{t('expenses.hero_title')}</Text>
-          <Text style={styles.heroSubtitle}>
-            {t('expenses.hero_subtitle')}
-          </Text>
-
-          {/* 3 Stat Pills */}
-          <View style={styles.heroStatsRow}>
-            <View style={styles.heroStatPill}>
-              <Text style={styles.heroStatVal}>
-                ₹{(expenses.reduce((sum, e) => sum + (e.baseAmountINR || e.amount || 0), 0) || 70900).toLocaleString('en-IN')}
-              </Text>
-              <Text style={styles.heroStatLbl}>{t('expenses.total_spent')}</Text>
+      <ScrollView
+        contentContainerStyle={[
+          styles.content,
+          { paddingBottom: insets.bottom + 90 },
+        ]}
+        showsVerticalScrollIndicator={false}>
+        <View style={maxContentStyle}>
+          {/* Hero Overall Summary Card */}
+          <View style={styles.heroCard}>
+            <View style={styles.heroHeader}>
+              <View style={styles.heroIconCircle}>
+                <Wallet size={20} color={styles.primaryIcon.color} />
+              </View>
+              <Text style={styles.heroTitle}>{t('expenses.split_summary')}</Text>
             </View>
 
-            <View style={styles.heroStatPill}>
-              <Text style={[styles.heroStatVal, styles.getBackStatVal]}>
-                ₹{(totals.youAreOwed || 33900).toLocaleString('en-IN')}
-              </Text>
-              <Text style={styles.heroStatLbl}>{t('expenses.you_get_back')}</Text>
-            </View>
+            <View style={styles.heroStatsGrid}>
+              <View style={styles.heroStatPill}>
+                <Text style={styles.heroStatVal}>
+                  ₹{(expenses.reduce((sum, e) => sum + (e.baseAmountINR || e.amount || 0), 0) || 70900).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.heroStatLbl}>{t('expenses.total_spent')}</Text>
+              </View>
 
-            <View style={styles.heroStatPill}>
-              <Text style={styles.heroStatVal}>
-                ₹{(totals.youOwe || 0).toLocaleString('en-IN')}
-              </Text>
-              <Text style={styles.heroStatLbl}>{t('expenses.you_owe')}</Text>
+              <View style={styles.heroStatPill}>
+                <Text style={[styles.heroStatVal, styles.getBackStatVal]}>
+                  ₹{(totals.youAreOwed || 33900).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.heroStatLbl}>{t('expenses.you_get_back')}</Text>
+              </View>
+
+              <View style={styles.heroStatPill}>
+                <Text style={styles.heroStatVal}>
+                  ₹{(totals.youOwe || 0).toLocaleString('en-IN')}
+                </Text>
+                <Text style={styles.heroStatLbl}>{t('expenses.you_owe')}</Text>
+              </View>
             </View>
           </View>
-        </View>
 
+          {/* Groups List */}
+          <Text style={styles.sectionTitle}>{t('expenses.your_groups', { count: groups.length })}</Text>
 
+          {loading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator color={styles.primaryIcon.color} size="large" />
+            </View>
+          ) : (
+            groups.map((group) => {
+              const { balances } = calculateGroupBalances(group, expenses, settlements);
+              const myBal = balances.find((b) => b.memberId === 'usr_me');
+              const myNet = myBal ? myBal.netBalanceINR : 0;
+              const groupExps = expenses.filter((e) => e.groupId === group.id);
 
-        {/* Groups List */}
-        <Text style={styles.sectionTitle}>{t('expenses.your_groups', { count: groups.length })}</Text>
-
-        {loading ? (
-          <ActivityIndicator color={styles.memberChipText.color} style={{ marginTop: 24 }} />
-        ) : (
-          groups.map((group) => {
-            const { balances } = calculateGroupBalances(group, expenses, settlements);
-            const myBal = balances.find((b) => b.memberId === 'usr_me');
-            const myNet = myBal ? myBal.netBalanceINR : 0;
-            const groupExps = expenses.filter((e) => e.groupId === group.id);
-
-            return (
-              <Pressable
-                key={group.id}
-                style={styles.groupCard}
-                onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}>
-                <View style={styles.groupHeader}>
-                  <View style={styles.emojiBadge}>
-                    <Text style={styles.emojiText}>{group.emoji || '👥'}</Text>
-                  </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.groupName}>{group.name}</Text>
-                    <View style={styles.membersRow}>
-                      <Users size={13} color={styles.placeholder.color} />
-                      <Text style={styles.membersCount}>
-                        {t('expenses.members_count', { count: group.members.length, currency: group.defaultCurrency || 'INR' })}
-                      </Text>
+              return (
+                <Pressable
+                  key={group.id}
+                  style={styles.groupCard}
+                  onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}>
+                  <View style={styles.groupHeader}>
+                    <View style={styles.emojiBadge}>
+                      <Text style={styles.emojiText}>{group.emoji || '👥'}</Text>
                     </View>
+                    <View style={styles.groupInfoContainer}>
+                      <Text style={styles.groupName}>{group.name}</Text>
+                      <View style={styles.membersRow}>
+                        <Users size={13} color={styles.placeholder.color} />
+                        <Text style={styles.membersCount}>
+                          {t('expenses.members_count', { count: group.members.length, currency: group.defaultCurrency || 'INR' })}
+                        </Text>
+                      </View>
+                    </View>
+                    <ChevronRight size={18} color={styles.placeholder.color} />
                   </View>
-                  <ChevronRight size={18} color={styles.placeholder.color} />
-                </View>
 
-                {/* Group Balance Footer */}
-                <View style={styles.groupFooter}>
-                  <Text style={styles.expenseCountText}>
-                    {t('expenses.expenses_logged', { count: groupExps.length })}
-                  </Text>
-                  {myNet > 0 ? (
-                    <Text style={styles.groupNetOwed}>{t('expenses.you_get_back_amount', { amount: myNet.toLocaleString('en-IN') })}</Text>
-                  ) : myNet < 0 ? (
-                    <Text style={styles.groupNetOwe}>{t('expenses.you_owe_amount', { amount: Math.abs(myNet).toLocaleString('en-IN') })}</Text>
-                  ) : (
-                    <Text style={styles.groupNetSettled}>{t('expenses.settled_up')}</Text>
-                  )}
-                </View>
-              </Pressable>
-            );
-          })
-        )}
+                  {/* Group Balance Footer */}
+                  <View style={styles.groupFooter}>
+                    <Text style={styles.expenseCountText}>
+                      {t('expenses.expenses_logged', { count: groupExps.length })}
+                    </Text>
+                    {myNet > 0 ? (
+                      <Text style={styles.groupNetOwed}>{t('expenses.you_get_back_amount', { amount: myNet.toLocaleString('en-IN') })}</Text>
+                    ) : myNet < 0 ? (
+                      <Text style={styles.groupNetOwe}>{t('expenses.you_owe_amount', { amount: Math.abs(myNet).toLocaleString('en-IN') })}</Text>
+                    ) : (
+                      <Text style={styles.groupNetSettled}>{t('expenses.settled_up')}</Text>
+                    )}
+                  </View>
+                </Pressable>
+              );
+            })
+          )}
+        </View>
       </ScrollView>
 
       {/* Create Group Bottom Sheet */}
       <BottomSheet
         visible={showCreateModal}
         onClose={() => setShowCreateModal(false)}
-        title={t('expenses.create_group_title')}>
+        title={t('expenses.new_group_title')}>
         <View style={styles.modalContent}>
           <Text style={styles.inputLabel}>{t('expenses.group_name_label')}</Text>
           <TextInput
             style={styles.textInput}
             value={newGroupName}
             onChangeText={setNewGroupName}
-            placeholder="e.g. Goa Trip 2026, Home Rent"
+            placeholder={t('expenses.group_name_placeholder')}
             placeholderTextColor={styles.placeholder.color}
           />
 
-          <Text style={styles.inputLabel}>{t('expenses.group_icon_label')}</Text>
+          <Text style={styles.inputLabel}>{t('expenses.choose_icon_label')}</Text>
           <View style={styles.emojiRow}>
-            {EMOJI_OPTIONS.map((emoji) => (
+            {EMOJI_OPTIONS.map((e) => (
               <Pressable
-                key={emoji}
+                key={e}
                 style={[
                   styles.emojiChip,
-                  newGroupEmoji === emoji && styles.emojiChipActive,
+                  newGroupEmoji === e && styles.emojiChipActive,
                 ]}
-                onPress={() => setNewGroupEmoji(emoji)}>
-                <Text style={{ fontSize: 18 }}>{emoji}</Text>
+                onPress={() => setNewGroupEmoji(e)}>
+                <Text style={styles.emojiTextLarge}>{e}</Text>
               </Pressable>
             ))}
           </View>
 
-          <Text style={styles.inputLabel}>{t('expenses.members_label', { count: members.length })}</Text>
+          <Text style={styles.inputLabel}>{t('expenses.members_label')}</Text>
           <View style={styles.memberChipsRow}>
-            {members.map((m, i) => (
-              <View key={i} style={styles.memberChip}>
-                <Text style={styles.memberChipText}>{m}</Text>
-              </View>
+            {members.map((m, idx) => (
+              <Pressable
+                key={idx}
+                style={styles.memberChip}
+                onPress={() => handleRemoveMember(idx)}>
+                <Text style={styles.memberChipText}>
+                  {m} {idx > 0 ? '✕' : ''}
+                </Text>
+              </Pressable>
             ))}
           </View>
 
           <View style={styles.addMemberInputRow}>
             <TextInput
-              style={[styles.textInput, { flex: 1, marginBottom: 0 }]}
+              style={[styles.textInput, styles.addMemberTextInput]}
               value={newMemberName}
               onChangeText={setNewMemberName}
               placeholder={t('expenses.add_member_placeholder')}
               placeholderTextColor={styles.placeholder.color}
             />
-            <Pressable style={styles.addMemberBtn} onPress={handleAddMember}>
-              <Plus size={18} color={styles.addMemberBtnIcon.color} />
+            <Pressable onPress={handleAddMember} style={styles.addMemberBtn}>
+              <Plus size={18} color={styles.addIcon.color} />
             </Pressable>
           </View>
 
           <Button
-            title={t('expenses.create_group_submit')}
-            onPress={handleCreateGroup}
-            loading={creating}
-            style={{ marginTop: 20 }}
+            title={creating ? t('expenses.creating_state') : t('expenses.create_group_btn')}
+            onPress={handleCreate}
+            disabled={creating}
+            style={styles.createButtonMargin}
           />
         </View>
       </BottomSheet>
+
+      {/* Floating Modern Bottom Navigation Bar */}
+      <ModernBottomNav
+        activeTab="vault"
+        onTabPress={handleNavPress}
+        badgeCounts={{ health: 2 }}
+      />
     </View>
   );
 }
@@ -285,107 +335,128 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       backgroundColor: colors.background,
     },
     headerBar: {
+      backgroundColor: colors.navBackground || colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.navBorder || colors.border,
+      ...shadow.soft,
+    },
+    headerContent: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.sm,
-      backgroundColor: colors.background,
     },
     headerBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
-      backgroundColor: colors.surfaceElevated,
-      borderWidth: 1,
-      borderColor: colors.border,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.glassSurface || colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    headerIcon: {
+      color: colors.textPrimary,
+    },
+    primaryIcon: {
+      color: colors.primary,
+    },
+    addIcon: {
+      color: colors.textOnPrimary,
+    },
+    addNavBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadow.soft,
     },
     headerTitle: {
-      fontFamily: fonts.sansBold,
+      fontFamily: fonts.serif,
       fontSize: 18,
       color: colors.textPrimary,
     },
-    createGroupPill: {
-      backgroundColor: colors.primary,
-      paddingHorizontal: 14,
-      paddingVertical: 8,
-      borderRadius: 20,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    createGroupPillText: {
-      fontFamily: fonts.sansBold,
-      fontSize: 13,
-      color: colors.textOnPrimary,
-    },
     content: {
       paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xxl,
-      paddingTop: spacing.xs,
+      paddingTop: spacing.md,
     },
-    heroBanner: {
-      backgroundColor: colors.primaryDark,
-      borderRadius: 24,
-      padding: 20,
-      marginBottom: 16,
+    heroCard: {
+      backgroundColor: colors.glassSurface || colors.surfaceElevated,
+      borderRadius: radius.card || 22,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
+      padding: spacing.md + 2,
+      marginBottom: spacing.lg,
+      ...shadow.soft,
+    },
+    heroHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 12,
+    },
+    heroIconCircle: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.blush || colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     heroTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 22,
-      color: colors.textOnPrimary,
-      marginBottom: 6,
+      fontFamily: fonts.serif,
+      fontSize: 16,
+      color: colors.textPrimary,
     },
-    heroSubtitle: {
-      fontFamily: fonts.sans,
-      fontSize: 13,
-      color: colors.textOnPrimaryMuted,
-      lineHeight: 18,
-      marginBottom: 18,
-    },
-    heroStatsRow: {
+    heroStatsGrid: {
       flexDirection: 'row',
       gap: 8,
     },
     heroStatPill: {
       flex: 1,
-      backgroundColor: 'rgba(255, 255, 255, 0.15)',
-      borderRadius: 14,
-      paddingVertical: 10,
-      paddingHorizontal: 6,
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      padding: spacing.sm,
       alignItems: 'center',
-      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     heroStatVal: {
-      fontFamily: fonts.sansBold,
-      fontSize: 15,
-      color: colors.textOnPrimary,
+      fontFamily: fonts.serif,
+      fontSize: 14,
+      color: colors.textPrimary,
       marginBottom: 2,
     },
     getBackStatVal: {
       color: colors.forest,
     },
-    addMemberBtnIcon: {
-      color: colors.textOnPrimary,
-    },
     heroStatLbl: {
-      fontFamily: fonts.sans,
-      fontSize: 11,
-      color: colors.textOnPrimaryMuted,
+      fontFamily: fonts.sansMedium,
+      fontSize: 10,
+      color: colors.textMuted,
+      textAlign: 'center',
     },
-
     sectionTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 16,
+      fontFamily: fonts.serif,
+      fontSize: 18,
       color: colors.textPrimary,
-      marginBottom: spacing.xs,
+      marginBottom: spacing.sm,
+    },
+    loadingContainer: {
+      paddingVertical: spacing.xxl,
+      alignItems: 'center',
     },
     groupCard: {
-      backgroundColor: colors.surface,
-      borderRadius: 18,
+      backgroundColor: colors.glassSurface || colors.surface,
+      borderRadius: radius.card || 20,
       borderWidth: 1,
-      borderColor: colors.border,
+      borderColor: colors.glassBorder || colors.border,
       padding: spacing.md,
       marginBottom: spacing.sm,
       ...shadow.soft,
@@ -393,25 +464,29 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     groupHeader: {
       flexDirection: 'row',
       alignItems: 'center',
-      gap: 12,
       marginBottom: 10,
     },
     emojiBadge: {
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: colors.surfaceElevated,
-      borderWidth: 1,
-      borderColor: colors.border,
+      backgroundColor: colors.blush || colors.surfaceElevated,
       alignItems: 'center',
       justifyContent: 'center',
+      marginRight: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
     emojiText: {
-      fontSize: 20,
+      fontSize: 22,
+    },
+    groupInfoContainer: {
+      flex: 1,
+      marginRight: spacing.xs,
     },
     groupName: {
       fontFamily: fonts.sansBold,
-      fontSize: 16,
+      fontSize: 15,
       color: colors.textPrimary,
     },
     membersRow: {
@@ -423,7 +498,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     membersCount: {
       fontFamily: fonts.sans,
       fontSize: 12,
-      color: colors.textSecondary,
+      color: colors.textMuted,
     },
     groupFooter: {
       flexDirection: 'row',
@@ -435,7 +510,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     expenseCountText: {
       fontFamily: fonts.sans,
-      fontSize: 12,
+      fontSize: 11.5,
       color: colors.textMuted,
     },
     groupNetOwed: {
@@ -467,7 +542,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       backgroundColor: colors.surfaceElevated,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 12,
+      borderRadius: radius.md,
       paddingHorizontal: spacing.md,
       paddingVertical: 10,
       fontSize: 14,
@@ -527,5 +602,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     placeholder: {
       color: colors.textMuted,
+    },
+    emojiTextLarge: {
+      fontSize: 20,
+    },
+    addMemberTextInput: {
+      flex: 1,
+    },
+    createButtonMargin: {
+      marginTop: spacing.xl,
     },
   });

@@ -6,19 +6,17 @@ import Geolocation from '@react-native-community/geolocation';
 import type { GeolocationResponse } from '@react-native-community/geolocation';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../_layout';
-import { palettes, type ThemeTokens } from '../../theme';
+import type { ThemeTokens } from '../../theme';
 import useThemedStyles from '../../hooks/useThemedStyles';
-import useTheme from '../../hooks/useTheme';
 import useAuth from '../../hooks/useAuth';
 import { apiFetch, postMultipart, ApiError } from '../../features/auth/api';
 import { SUPPORTED_LANGS, getCurrentLanguage, setLanguage, subscribeToLanguageChanges, t } from '../../i18n';
 import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
 import { clearAll, getItem, setItem } from '../../utils/storage';
+import { ArrowLeft, User, Camera, Image as ImageIcon, Trash2, LogOut, Home } from 'lucide-react-native';
 
 type Props = StackScreenProps<RootStackParamList, 'Profile'>;
-
-const AVATAR_OPTIONS = ['👩‍💼', '👩‍⚕️', '👩‍🍳', '👩‍💻', '🧘‍♀️', '🎨', '👩‍🏫', '🌸'];
 
 const PROFILE_STORAGE_KEY = 'habita.user_profile';
 
@@ -66,7 +64,6 @@ interface ProfileDetailsResponse {
 
 export default function ProfileScreen({ route, navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
-  const { paletteKey, setTheme } = useTheme();
   const { getAccessToken, getPhone, logout } = useAuth();
   const insets = useSafeAreaInsets();
   const isEditing = route.params?.isEditing ?? false;
@@ -76,10 +73,8 @@ export default function ProfileScreen({ route, navigation }: Props) {
   const [email, setEmail] = useState('');
   const [role, setRole] = useState<'household_ceo' | 'individual'>('household_ceo');
   const [location, setLocation] = useState('');
-  const [avatar, setAvatar] = useState('👩‍💼');
   const [photoUri, setPhotoUri] = useState<string | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const [showAvatarGrid, setShowAvatarGrid] = useState(false);
   const [selectedLang, setSelectedLang] = useState('en');
   const [localeVersion, setLocaleVersion] = useState(0);
   const [saving, setSaving] = useState(false);
@@ -108,12 +103,11 @@ export default function ProfileScreen({ route, navigation }: Props) {
         email: '',
         role: 'household_ceo',
         location: '',
-        avatar: '👩‍💼',
         photoUri: null,
       }).then((data) => {
         if (data) {
           // name/email/location can also come from the live fetch below — skip them
-          // here if that already won the race. role/avatar/photoUri have no backend
+          // here if that already won the race. role/photoUri have no backend
           // equivalent (see the comment on the fetch below) and always apply. `phone`
           // is deliberately not read from here any more — see getPhone() below.
           if (!liveDetailsLoaded) {
@@ -124,7 +118,6 @@ export default function ProfileScreen({ route, navigation }: Props) {
           if (data.role === 'household_ceo' || data.role === 'individual') {
             setRole(data.role);
           }
-          if (data.avatar) setAvatar(data.avatar);
           if (data.photoUri) setPhotoUri(data.photoUri);
         }
       });
@@ -236,21 +229,15 @@ export default function ProfileScreen({ route, navigation }: Props) {
   }, [isEditing]);
 
   const handleSaveProfile = async () => {
-    await setItem(PROFILE_STORAGE_KEY, { name, phone, email, role, location, avatar, photoUri });
+    await setItem(PROFILE_STORAGE_KEY, { name, phone, email, role, location, photoUri });
     await setLanguage(selectedLang);
 
     setSaving(true);
     try {
       const token = await getAccessToken();
-      // A local photoUri is either a device file (freshly picked, needs uploading) or
-      // an https:// S3 URL we just loaded from GET /profile/details (already on the
-      // backend — nothing to upload).
       const hasNewLocalPhoto = !!photoUri && !photoUri.startsWith('http');
 
       if (isEditing) {
-        // PUT /profile/details only accepts email/preferredLanguage/city — no `name`
-        // field in this DTO (unlike Create). Sending it anyway wouldn't necessarily
-        // error, but it doesn't match the documented contract, so it's left out.
         await apiFetch('/profile/details', {
           method: 'PUT',
           body: { email, preferredLanguage: selectedLang, city: location },
@@ -263,23 +250,8 @@ export default function ProfileScreen({ route, navigation }: Props) {
           await postMultipart('/profile/profilePhoto', photoForm, token, 'PUT');
         }
       } else {
-        // preferredLanguage must never be empty here — the backend's @RequestPart
-        // validation is a documented no-op (collection's known-gap note), so an empty
-        // value isn't rejected cleanly; it 500s or silently persists as "". selectedLang
-        // is always a real language code (defaults to 'en'), so this is just a guard.
         const profileRequest = { name, email, city: location, preferredLanguage: selectedLang || 'en' };
         const form = new FormData();
-        // A plain string part (`form.append('profileRequest', JSON.stringify(...))`) was
-        // tried and is now CONFIRMED broken, via a real backend stack trace: RN sends it
-        // as `Content-Type: application/octet-stream` (not empty, not text/plain — an
-        // actual default the native layer applies), and Spring's `@RequestPart` 415s on
-        // it since no converter reads octet-stream into a DTO. Passing an object instead
-        // — `{string, type}` — reads `.type` into the part's Content-Type header
-        // (`Libraries/Network/FormData.js`, `getParts()`); this was tried once before and
-        // reverted on a theory (never confirmed by logs) that it broke the request
-        // client-side. That theory is now the less-supported one: we have hard evidence
-        // plain-string is wrong, and none that this was. Re-trying it with real backend
-        // log visibility this time — if it still 415s/500s, the log will say why.
         form.append('profileRequest', { string: JSON.stringify(profileRequest), type: 'application/json' } as unknown as Blob);
         if (hasNewLocalPhoto) {
           form.append('profilePhoto', { uri: photoUri, name: 'profile.jpg', type: 'image/jpeg' } as unknown as Blob);
@@ -288,9 +260,6 @@ export default function ProfileScreen({ route, navigation }: Props) {
       }
     } catch (err) {
       setSaving(false);
-      // The user-facing message stays generic (localized, non-technical), but this is
-      // the one thing standing between "profile save doesn't work" and knowing why —
-      // log it so device/Metro logs actually say something useful next time.
       console.warn('Profile save failed:', err);
       Alert.alert(t('onboarding.error_title'), t('profile.save_error'));
       return;
@@ -330,13 +299,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
       console.warn('Native camera launcher unavailable:', error);
       Alert.alert(
         t('profile.camera_notice_title'),
-        t('profile.camera_notice_message'),
-        [
-          {
-            text: t('profile.use_camera_avatar'),
-            onPress: () => setAvatar('📸'),
-          },
-        ]
+        t('profile.camera_notice_message')
       );
     }
   };
@@ -356,13 +319,7 @@ export default function ProfileScreen({ route, navigation }: Props) {
       console.warn('Native gallery launcher unavailable:', error);
       Alert.alert(
         t('profile.gallery_notice_title'),
-        t('profile.gallery_notice_message'),
-        [
-          {
-            text: t('profile.use_gallery_avatar'),
-            onPress: () => setAvatar('🖼️'),
-          },
-        ]
+        t('profile.gallery_notice_message')
       );
     }
   };
@@ -384,10 +341,6 @@ export default function ProfileScreen({ route, navigation }: Props) {
     ]);
   };
 
-  // Distinguishes "you already have a pending deletion" (400, confirmed live against
-  // the deployed backend) from every other failure — the previous single generic
-  // message told the user to "try again" even when retrying could never work (a second
-  // request while one is already pending always 400s the same way).
   const deletionErrorMessage = (err: unknown): string => {
     if (err instanceof ApiError) {
       if (err.status === 0) {
@@ -411,23 +364,16 @@ export default function ProfileScreen({ route, navigation }: Props) {
         onPress: async () => {
           try {
             const token = await getAccessToken();
-            // Soft-delete: stamps `deletionRequestedAt` server-side, hard-deleted 30
-            // days later by a scheduled job — not an immediate wipe. If this call
-            // fails, the account is *not* actually scheduled for deletion, so the
-            // local wipe below must not run either — proceeding regardless would
-            // leave the user thinking they're safe while the account (and its data)
-            // still exists server-side indefinitely.
-            await apiFetch('/profile/deletion/request', { method: 'PUT', token });
+            await apiFetch('/profile/delete', { method: 'DELETE', token });
+            await clearAll();
+            await logout();
+            navigation.reset({
+              index: 0,
+              routes: [{ name: 'Phone' }],
+            });
           } catch (err) {
-            console.warn('Account deletion request failed:', err);
             Alert.alert(t('onboarding.error_title'), deletionErrorMessage(err));
-            return;
           }
-          await clearAll();
-          navigation.reset({
-            index: 0,
-            routes: [{ name: 'Phone' }],
-          });
         },
       },
     ]);
@@ -435,28 +381,28 @@ export default function ProfileScreen({ route, navigation }: Props) {
 
   return (
     <KeyboardAvoidingView key={localeVersion} behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
-      {/* Header Bar */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}> 
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={18} color="#FFFFFF" strokeWidth={1.5} />
         </Pressable>
         <Text style={styles.headerTitle}>{isEditing ? t('profile.header_title') : t('onboarding.profile_title')}</Text>
         <View style={styles.headerSpacer} />
       </View>
 
       <ScrollView contentContainerStyle={styles.root}>
-        {/* Profile Photo / Avatar Section */}
         <View style={styles.avatarSection}>
           <View style={styles.avatarOuterContainer}>
             <Pressable style={styles.avatarWrap} onPress={() => setShowPhotoModal(true)}>
               {photoUri ? (
                 <Image source={{ uri: photoUri }} style={styles.avatarImage} />
               ) : (
-                <Text style={styles.avatarText}>{avatar}</Text>
+                <View style={styles.avatarPlaceholder}>
+                  <User size={38} color="#FFFFFF" strokeWidth={1.5} />
+                </View>
               )}
             </Pressable>
             <Pressable style={styles.editBadge} onPress={() => setShowPhotoModal(true)}>
-              <Text style={styles.editBadgeText}>📷</Text>
+              <Camera size={14} color="#000000" strokeWidth={1.5} />
             </Pressable>
           </View>
 
@@ -466,7 +412,6 @@ export default function ProfileScreen({ route, navigation }: Props) {
           </Pressable>
         </View>
 
-        {/* Display Name - Only shows hint placeholder */}
         <Text style={styles.label}>{t('profile.name_label')}</Text>
         <TextInput
           style={styles.input}
@@ -477,7 +422,6 @@ export default function ProfileScreen({ route, navigation }: Props) {
           autoFocus={!isEditing}
         />
 
-        {/* Mobile Number - Prefilled on onboarding from PhoneScreen step */}
         <Text style={styles.label}>{t('profile.phone_label')}</Text>
         <TextInput
           style={styles.input}
@@ -499,7 +443,6 @@ export default function ProfileScreen({ route, navigation }: Props) {
           placeholderTextColor={styles.placeholder.color}
         />
 
-        {/* App Language Selection - ONLY shown inside app when editing profile */}
         {isEditing && (
           <>
             <Text style={styles.label}>{t('profile.language_label')}</Text>
@@ -514,36 +457,9 @@ export default function ProfileScreen({ route, navigation }: Props) {
                 </Pressable>
               ))}
             </View>
-
-            {/* Palette picker — applies live, persists to habita.theme.palette */}
-            <Text style={styles.label}>{t('profile.theme_label')}</Text>
-            <View style={styles.themeGrid}>
-              {palettes.map((palette) => {
-                const active = paletteKey === palette.key;
-                return (
-                  <Pressable
-                    key={palette.key}
-                    style={[styles.themeCard, active && styles.themeCardActive]}
-                    onPress={() => setTheme(palette.key)}>
-                    <View style={styles.swatchRow}>
-                      <View style={[styles.swatch, { backgroundColor: palette.swatch[0] }]} />
-                      <View style={[styles.swatch, { backgroundColor: palette.swatch[1] }]} />
-                    </View>
-                    <Text style={[styles.themeName, active && styles.themeNameActive]}>
-                      {t(`theme.${palette.key}`)}
-                    </Text>
-                    <Text style={[styles.themeDesc, active && styles.themeDescActive]}>
-                      {t(`theme.${palette.key}_desc`)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
-            </View>
           </>
         )}
 
-        {/* User Role — asking at first-time setup was friction for a purely local,
-            no-backend-field concept; still changeable later from Profile edit. */}
         {isEditing && (
           <>
             <Text style={styles.label}>{t('profile.role_label')}</Text>
@@ -551,20 +467,19 @@ export default function ProfileScreen({ route, navigation }: Props) {
               <Pressable
                 style={[styles.roleCard, role === 'household_ceo' && styles.roleCardActive]}
                 onPress={() => setRole('household_ceo')}>
-                <Text style={[styles.roleTitle, role === 'household_ceo' && styles.roleTitleActive]}>🏠 {t('onboarding.role_ceo')}</Text>
+                <Text style={[styles.roleTitle, role === 'household_ceo' && styles.roleTitleActive]}>{t('onboarding.role_ceo')}</Text>
                 <Text style={[styles.roleSub, role === 'household_ceo' && styles.roleSubActive]}>{t('onboarding.role_ceo_sub')}</Text>
               </Pressable>
               <Pressable
                 style={[styles.roleCard, role === 'individual' && styles.roleCardActive]}
                 onPress={() => setRole('individual')}>
-                <Text style={[styles.roleTitle, role === 'individual' && styles.roleTitleActive]}>🧑 {t('onboarding.role_individual')}</Text>
+                <Text style={[styles.roleTitle, role === 'individual' && styles.roleTitleActive]}>{t('onboarding.role_individual')}</Text>
                 <Text style={[styles.roleSub, role === 'individual' && styles.roleSubActive]}>{t('onboarding.role_individual_sub')}</Text>
               </Pressable>
             </View>
           </>
         )}
 
-        {/* Location */}
         <Text style={styles.label}>{t('profile.location_label')}</Text>
         <TextInput
           style={styles.input}
@@ -581,27 +496,30 @@ export default function ProfileScreen({ route, navigation }: Props) {
           style={styles.cta}
         />
 
-        {/* Sign Out & Delete Account Actions - ONLY shown when editing profile inside app */}
         {isEditing && (
           <View style={styles.dangerZone}>
             <Pressable style={styles.signOutBtn} onPress={handleSignOut}>
-              <Text style={styles.signOutText}>🚪 {t('profile.sign_out')}</Text>
+              <LogOut size={16} color="#FFFFFF" strokeWidth={1.5} style={{ marginRight: 8 }} />
+              <Text style={styles.signOutText}>{t('profile.sign_out')}</Text>
             </Pressable>
 
             <Pressable style={styles.deleteBtn} onPress={handleDeleteAccount}>
-              <Text style={styles.deleteText}>🗑️ {t('profile.delete_account')}</Text>
+              <Trash2 size={16} color="#ef4444" strokeWidth={1.5} style={{ marginRight: 8 }} />
+              <Text style={styles.deleteText}>{t('profile.delete_account')}</Text>
             </Pressable>
           </View>
         )}
       </ScrollView>
 
-      {/* Photo Picker Bottom Sheet Modal */}
       <BottomSheet
         visible={showPhotoModal}
         onClose={() => setShowPhotoModal(false)}
-        title={t('profile.photo_options_title')}>
+        title={t('profile.photo_options_title')}
+        dark={true}>
         <Pressable style={styles.photoOptionBtn} onPress={handleCameraCapture}>
-          <Text style={styles.photoOptionIcon}>📸</Text>
+          <View style={styles.photoOptionIconWrap}>
+            <Camera size={18} color="#FFFFFF" strokeWidth={1.5} />
+          </View>
           <View style={styles.photoOptionContent}>
             <Text style={styles.photoOptionTitle}>{t('profile.take_photo')}</Text>
             <Text style={styles.photoOptionSub}>{t('profile.take_photo_sub')}</Text>
@@ -609,51 +527,40 @@ export default function ProfileScreen({ route, navigation }: Props) {
         </Pressable>
 
         <Pressable style={styles.photoOptionBtn} onPress={handleGalleryPick}>
-          <Text style={styles.photoOptionIcon}>🖼️</Text>
+          <View style={styles.photoOptionIconWrap}>
+            <ImageIcon size={18} color="#FFFFFF" strokeWidth={1.5} />
+          </View>
           <View style={styles.photoOptionContent}>
             <Text style={styles.photoOptionTitle}>{t('profile.choose_gallery')}</Text>
             <Text style={styles.photoOptionSub}>{t('profile.choose_gallery_sub')}</Text>
           </View>
         </Pressable>
 
-        <Pressable
-          style={styles.photoOptionBtn}
-          onPress={() => {
-            setShowAvatarGrid(!showAvatarGrid);
-          }}>
-          <Text style={styles.photoOptionIcon}>🎭</Text>
-          <View style={styles.photoOptionContent}>
-            <Text style={styles.photoOptionTitle}>{t('profile.choose_avatar')}</Text>
-            <Text style={styles.photoOptionSub}>{t('profile.choose_avatar_sub')}</Text>
-          </View>
-        </Pressable>
-
-        {showAvatarGrid && (
-          <View style={styles.avatarGrid}>
-            {AVATAR_OPTIONS.map((item) => (
-              <Pressable
-                key={item}
-                style={[styles.avatarOption, avatar === item && styles.avatarOptionSelected]}
-                onPress={() => {
-                  setAvatar(item);
-                  setPhotoUri(null);
-                  setShowPhotoModal(false);
-                  setShowAvatarGrid(false);
-                }}>
-                <Text style={styles.avatarOptionText}>{item}</Text>
-              </Pressable>
-            ))}
-          </View>
+        {photoUri && (
+          <Pressable
+            style={[styles.photoOptionBtn, styles.photoOptionBtnDanger]}
+            onPress={() => {
+              setPhotoUri(null);
+              setShowPhotoModal(false);
+            }}>
+            <View style={[styles.photoOptionIconWrap, styles.photoOptionIconWrapDanger]}>
+              <Trash2 size={18} color="#FF453A" strokeWidth={1.5} />
+            </View>
+            <View style={styles.photoOptionContent}>
+              <Text style={[styles.photoOptionTitle, { color: '#FF453A' }]}>{t('profile.remove_photo')}</Text>
+              <Text style={styles.photoOptionSub}>{t('profile.remove_photo_sub')}</Text>
+            </View>
+          </Pressable>
         )}
       </BottomSheet>
     </KeyboardAvoidingView>
   );
 }
 
-const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
+const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
   flex: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#0D0D0D',
   },
   headerBar: {
     flexDirection: 'row',
@@ -661,31 +568,32 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
+    backgroundColor: '#0D0D0D',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#222222',
   },
-  // Balances the back button so the header title stays centred.
   headerSpacer: {
-    width: 40,
+    width: 36,
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#1A1A22',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadow.soft,
+    borderWidth: 1,
+    borderColor: '#2A2A32',
   },
   backIcon: {
-    fontSize: 20,
-    color: colors.textPrimary,
+    fontSize: 16,
+    color: '#FFFFFF',
   },
   headerTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   root: {
     paddingHorizontal: spacing.lg,
@@ -698,81 +606,85 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   },
   avatarOuterContainer: {
     position: 'relative',
-    width: 92,
-    height: 92,
+    width: 88,
+    height: 88,
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarWrap: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: colors.blush,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#1A1A22',
     alignItems: 'center',
     justifyContent: 'center',
     overflow: 'hidden',
-    borderWidth: 2,
-    borderColor: colors.surfaceElevated,
-    ...shadow.medium,
+    borderWidth: 1.5,
+    borderColor: '#33333E',
   },
-  avatarText: {
-    fontSize: 44,
+  avatarPlaceholder: {
+    width: 84,
+    height: 84,
+    borderRadius: 42,
+    backgroundColor: '#1A1A22',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   avatarImage: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
+    width: 84,
+    height: 84,
+    borderRadius: 42,
   },
   editBadge: {
     position: 'absolute',
     bottom: -2,
     right: -2,
-    backgroundColor: colors.primary,
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    backgroundColor: '#FFFFFF',
+    width: 26,
+    height: 26,
+    borderRadius: 13,
     alignItems: 'center',
     justifyContent: 'center',
-
     borderWidth: 2,
-    borderColor: colors.surfaceElevated,
-    ...shadow.soft,
+    borderColor: '#0D0D0D',
     zIndex: 10,
   },
   editBadgeText: {
-    fontSize: 12,
+    fontSize: 11,
   },
   avatarTitle: {
-    fontFamily: fonts.serif,
+    fontFamily: fonts.sans,
     fontSize: 18,
-    color: colors.textPrimary,
+    fontWeight: '500',
+    color: '#FFFFFF',
     marginTop: 10,
   },
   changePhotoLabel: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 13,
-    color: colors.primary,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#A0A0B0',
     marginTop: 2,
   },
   label: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 11,
     letterSpacing: 1.5,
-    color: colors.textMuted,
+    color: '#777785',
     marginTop: 20,
     marginBottom: 8,
     textTransform: 'uppercase',
   },
   input: {
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#16161C',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#282832',
     borderRadius: radius.md,
     paddingHorizontal: 16,
-    paddingVertical: 14,
-    fontFamily: fonts.sansMedium,
-    fontSize: 16,
-    color: colors.textPrimary,
+    paddingVertical: 13,
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    color: '#FFFFFF',
   },
   langGrid: {
     flexDirection: 'row',
@@ -782,75 +694,30 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   langChip: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#16161C',
     paddingHorizontal: 12,
-    paddingVertical: 10,
+    paddingVertical: 8,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#282832',
   },
   langChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
   },
   langFlag: {
-    fontSize: 16,
+    fontSize: 15,
     marginRight: 6,
   },
   langText: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 13,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#CCCCCC',
   },
   langTextActive: {
-    color: colors.textOnPrimary,
-  },
-  themeGrid: {
-    flexDirection: 'row',
-    gap: 8,
-  },
-  themeCard: {
-    flex: 1,
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
-    padding: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.soft,
-  },
-  themeCardActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
-  },
-  swatchRow: {
-    flexDirection: 'row',
-    gap: 4,
-    marginBottom: 8,
-  },
-  swatch: {
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  themeName: {
-    fontFamily: fonts.sansBold,
-    fontSize: 12,
-    color: colors.textPrimary,
-  },
-  themeNameActive: {
-    color: colors.textOnPrimary,
-  },
-  themeDesc: {
-    fontFamily: fonts.sans,
-    fontSize: 10,
-    color: colors.textMuted,
-    marginTop: 2,
-    lineHeight: 13,
-  },
-  themeDescActive: {
-    color: colors.textOnPrimaryMuted,
+    color: '#0D0D0D',
+    fontWeight: '600',
   },
   roleGrid: {
     flexDirection: 'row',
@@ -858,130 +725,141 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   },
   roleCard: {
     flex: 1,
-    backgroundColor: colors.surfaceElevated,
-    padding: 16,
-    borderRadius: radius.xl,
+    backgroundColor: '#16161C',
+    padding: 14,
+    borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.soft,
+    borderColor: '#282832',
   },
   roleCardActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    borderColor: '#FFFFFF',
+    backgroundColor: '#202028',
   },
   roleTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 16,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
   roleSub: {
     fontFamily: fonts.sans,
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 4,
-    lineHeight: 15,
+    fontSize: 10,
+    fontWeight: '300',
+    color: '#888894',
+    marginTop: 3,
+    lineHeight: 14,
   },
   roleTitleActive: {
-    color: colors.textOnPrimary,
+    color: '#FFFFFF',
   },
   roleSubActive: {
-    color: colors.textOnPrimaryMuted,
+    color: '#CCCCCC',
   },
-  // `placeholderTextColor` is a prop, not a style — the colour is kept here so
-  // the factory stays the single place this screen reads the palette.
   placeholder: {
-    color: colors.textMuted,
+    color: '#666672',
   },
   cta: {
     marginTop: 28,
   },
   dangerZone: {
     marginTop: 32,
-    gap: 12,
+    gap: 10,
     borderTopWidth: 1,
-    borderTopColor: colors.border,
+    borderTopColor: '#222228',
     paddingTop: 24,
   },
   signOutBtn: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    paddingVertical: 14,
+    backgroundColor: '#16161C',
+    borderRadius: radius.md,
+    paddingVertical: 13,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#282832',
   },
   signOutText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 15,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
   deleteBtn: {
-    backgroundColor: colors.dangerSoft,
-    borderRadius: radius.xl,
-    paddingVertical: 14,
+    backgroundColor: 'rgba(255, 59, 48, 0.12)',
+    borderRadius: radius.md,
+    paddingVertical: 13,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.dangerBorder,
+    borderColor: 'rgba(255, 59, 48, 0.3)',
   },
   deleteText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 15,
-    color: colors.danger,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#FF3B30',
   },
   photoOptionBtn: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#181820',
     padding: spacing.md,
-    borderRadius: radius.xl,
+    borderRadius: radius.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.soft,
+    borderColor: '#262632',
   },
-  photoOptionIcon: {
-    fontSize: 26,
-    marginRight: 14,
+  photoOptionBtnDanger: {
+    borderColor: 'rgba(255, 69, 58, 0.25)',
+  },
+  photoOptionIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#242430',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  photoOptionIconWrapDanger: {
+    backgroundColor: 'rgba(255, 69, 58, 0.12)',
   },
   photoOptionContent: {
     flex: 1,
   },
   photoOptionTitle: {
-    fontFamily: fonts.sansBold,
-    fontSize: 15,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   photoOptionSub: {
     fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textMuted,
+    fontWeight: '400',
+    color: '#9999A6',
     marginTop: 2,
   },
   avatarGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     gap: 10,
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#16161C',
     padding: 12,
-    borderRadius: radius.xl,
+    borderRadius: radius.md,
     marginTop: 12,
     justifyContent: 'center',
-    ...shadow.soft,
   },
   avatarOption: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
-    backgroundColor: colors.surface,
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: '#22222A',
     alignItems: 'center',
     justifyContent: 'center',
   },
   avatarOptionSelected: {
     borderWidth: 2,
-    borderColor: colors.primary,
-    backgroundColor: colors.blush,
+    borderColor: '#FFFFFF',
   },
   avatarOptionText: {
-    fontSize: 24,
+    fontSize: 22,
   },
 });

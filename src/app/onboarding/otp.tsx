@@ -11,6 +11,7 @@ import Button from '../../components/Button';
 import useAuth from '../../hooks/useAuth';
 import { parseAuthError } from '../../features/auth/api';
 import { getItem } from '../../utils/storage';
+import { ArrowLeft, Lock } from 'lucide-react-native';
 
 type Props = StackScreenProps<RootStackParamList, 'Otp'>;
 
@@ -118,12 +119,12 @@ const OtpScreen = ({ navigation, route }: Props) => {
     <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.flex}>
       <View style={[styles.root, { paddingTop: insets.top + 20 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
         </Pressable>
 
         <View style={styles.content}>
           <View style={styles.heroIcon}>
-            <Text style={styles.heroIconText}>🔐</Text>
+            <Lock size={26} color="#000000" strokeWidth={1.5} />
           </View>
           <Text style={styles.title}>{t('onboarding.otp_title')}</Text>
           <Text style={styles.hint}>{t('onboarding.otp_hint')}</Text>

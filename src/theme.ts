@@ -15,9 +15,6 @@ export interface PaletteColors {
   textPrimary: string;
   textSecondary: string;
   textMuted: string;
-  // Text sitting on a `primary`-filled surface — hero cards, filled chips, role
-  // badges. Not white by definition: Midnight's primary is a light lavender, so
-  // white-on-primary there is unreadable and the role resolves to a dark ink.
   textOnPrimary: string;
   textOnPrimaryMuted: string;
   textOnPrimaryAccent: string;
@@ -26,6 +23,18 @@ export interface PaletteColors {
   danger: string;
   dangerSoft: string;
   dangerBorder: string;
+  accentCyan: string;
+  accentIndigo: string;
+  glassSurface: string;
+  glassBorder: string;
+  cardGlow: string;
+  navBackground: string;
+  navBorder: string;
+  navActivePill: string;
+  navActiveText: string;
+  chartLine: string;
+  chartGradientStart: string;
+  chartGradientEnd: string;
 }
 
 export interface Palette {
@@ -41,96 +50,131 @@ export interface Palette {
 export const palettes: Palette[] = [
   {
     key: 'terracotta',
-    name: 'Terracotta',
-    description: 'Warm earthy · default',
-    swatch: ['#BC4B51', '#F7D6D0'],
+    name: 'CRED Minimalist',
+    description: 'Clean White Canvas · Jet Black & Thin Typography',
+    swatch: ['#000000', '#FFFFFF'],
     isDark: false,
-    shadowColor: '#BC4B51',
+    shadowColor: '#000000',
     colors: {
-      primary: '#C96B5D',
-      primaryDark: '#A5564A',
-      deepMaroon: '#7D3F3F',
-      background: '#FCF7F2',
-      surface: '#F8EFE8',
-      surfaceElevated: '#FFFDF9',
-      turmeric: '#D9A24C',
-      turmericSoft: '#FCE3C8',
-      blush: '#F4DCD3',
-      forest: '#5B7B5C',
-      textPrimary: '#4A2F2B',
-      textSecondary: '#6A514C',
-      textMuted: '#8C726D',
+      primary: '#000000',
+      primaryDark: '#222222',
+      deepMaroon: '#FF2E93',
+      background: '#F8F9FA',
+      surface: '#FFFFFF',
+      surfaceElevated: '#F2F3F5',
+      turmeric: '#F59E0B',
+      turmericSoft: 'rgba(245, 158, 11, 0.12)',
+      blush: 'rgba(0, 0, 0, 0.05)',
+      forest: '#10B981',
+      textPrimary: '#000000',
+      textSecondary: '#666666',
+      textMuted: '#999999',
       textOnPrimary: '#FFFFFF',
-      textOnPrimaryMuted: '#F8ECE4',
-      textOnPrimaryAccent: '#FFE8A3',
-      border: 'rgba(201, 107, 93, 0.16)',
-      borderStrong: 'rgba(201, 107, 93, 0.34)',
-      danger: '#C95A4C',
-      dangerSoft: '#FDE8E8',
-      dangerBorder: '#F8B4B4',
+      textOnPrimaryMuted: '#E0E0E0',
+      textOnPrimaryAccent: '#FFFFFF',
+      border: '#ECECEE',
+      borderStrong: '#D1D1D6',
+      danger: '#FF3B30',
+      dangerSoft: 'rgba(255, 59, 48, 0.10)',
+      dangerBorder: '#FF3B30',
+      accentCyan: '#0070F3',
+      accentIndigo: '#6A35FF',
+      glassSurface: '#FFFFFF',
+      glassBorder: '#ECECEE',
+      cardGlow: 'rgba(0, 0, 0, 0.04)',
+      navBackground: '#0D0D0D',
+      navBorder: '#222222',
+      navActivePill: '#FFFFFF',
+      navActiveText: '#FFFFFF',
+      chartLine: '#000000',
+      chartGradientStart: 'rgba(0, 0, 0, 0.08)',
+      chartGradientEnd: 'rgba(0, 0, 0, 0.00)',
     },
   },
   {
     key: 'ocean',
-    name: 'Ocean Breeze',
-    description: 'Cool · calming blues',
-    swatch: ['#0A6E8C', '#C5E8EF'],
+    name: 'Cyber Cyan',
+    description: 'CRED Electric Blue & White',
+    swatch: ['#00D2FF', '#FFFFFF'],
     isDark: false,
-    shadowColor: '#0A6E8C',
+    shadowColor: '#00D2FF',
     colors: {
-      primary: '#0A6E8C',
-      primaryDark: '#075A72',
-      deepMaroon: '#044253',
-      background: '#F3F9FB',
-      surface: '#E6F1F4',
-      surfaceElevated: '#FFFFFF',
-      turmeric: '#F2A65A',
-      turmericSoft: '#FDE7CE',
-      blush: '#C5E8EF',
-      forest: '#1A8F73',
-      textPrimary: '#0C2A34',
-      textSecondary: '#2B4852',
-      textMuted: '#6A8490',
+      primary: '#0070F3',
+      primaryDark: '#0051B3',
+      deepMaroon: '#F43F5E',
+      background: '#F4F7FB',
+      surface: '#FFFFFF',
+      surfaceElevated: '#EAF1F8',
+      turmeric: '#F59E0B',
+      turmericSoft: 'rgba(245, 158, 11, 0.12)',
+      blush: 'rgba(0, 112, 243, 0.08)',
+      forest: '#10B981',
+      textPrimary: '#111827',
+      textSecondary: '#4B5563',
+      textMuted: '#9CA3AF',
       textOnPrimary: '#FFFFFF',
-      textOnPrimaryMuted: '#D6EDF4',
-      textOnPrimaryAccent: '#FFD9A8',
-      border: 'rgba(10, 110, 140, 0.15)',
-      borderStrong: 'rgba(10, 110, 140, 0.35)',
-      danger: '#C0392B',
-      dangerSoft: '#FBE4E1',
-      dangerBorder: '#F0B3AC',
+      textOnPrimaryMuted: '#E0E7FF',
+      textOnPrimaryAccent: '#FFFFFF',
+      border: '#E2E8F0',
+      borderStrong: '#CBD5E1',
+      danger: '#FF3B30',
+      dangerSoft: 'rgba(255, 59, 48, 0.10)',
+      dangerBorder: '#FF3B30',
+      accentCyan: '#0070F3',
+      accentIndigo: '#6A35FF',
+      glassSurface: '#FFFFFF',
+      glassBorder: '#E2E8F0',
+      cardGlow: 'rgba(0, 112, 243, 0.05)',
+      navBackground: '#0D0D0D',
+      navBorder: '#222222',
+      navActivePill: '#FFFFFF',
+      navActiveText: '#FFFFFF',
+      chartLine: '#0070F3',
+      chartGradientStart: 'rgba(0, 112, 243, 0.10)',
+      chartGradientEnd: 'rgba(0, 112, 243, 0.00)',
     },
   },
   {
     key: 'midnight',
-    name: 'Midnight',
-    description: 'Dark · easy on the eyes',
-    swatch: ['#8B5CF6', '#1F1B2E'],
+    name: 'Poli Purple',
+    description: 'CRED Luxury Ultraviolet & Jet Black',
+    swatch: ['#6A35FF', '#0E0B16'],
     isDark: true,
-    shadowColor: '#000',
+    shadowColor: '#6A35FF',
     colors: {
-      primary: '#A78BFA',
-      primaryDark: '#8B5CF6',
-      deepMaroon: '#F0ABFC',
-      background: '#14121D',
-      surface: '#1F1B2E',
-      surfaceElevated: '#2A2440',
-      turmeric: '#F5B840',
-      turmericSoft: '#3A2E17',
-      blush: '#3A2F52',
-      forest: '#4ADE80',
-      textPrimary: '#F3F0FF',
-      textSecondary: '#D0C8E8',
-      textMuted: '#9187A8',
-      // Midnight's primary is a light lavender, so on-primary text goes dark.
-      textOnPrimary: '#1B1430',
-      textOnPrimaryMuted: '#3E2F63',
-      textOnPrimaryAccent: '#4A2F00',
-      border: 'rgba(167, 139, 250, 0.20)',
-      borderStrong: 'rgba(167, 139, 250, 0.45)',
-      danger: '#F87171',
-      dangerSoft: '#3A1F24',
-      dangerBorder: '#7F3B44',
+      primary: '#6A35FF',
+      primaryDark: '#5322DB',
+      deepMaroon: '#EC4899',
+      background: '#0E0B16',
+      surface: '#171422',
+      surfaceElevated: '#211D30',
+      turmeric: '#FFB800',
+      turmericSoft: 'rgba(255, 184, 0, 0.15)',
+      blush: 'rgba(106, 53, 255, 0.15)',
+      forest: '#00E599',
+      textPrimary: '#F8F9FA',
+      textSecondary: '#A5A2B8',
+      textMuted: '#6D697C',
+      textOnPrimary: '#FFFFFF',
+      textOnPrimaryMuted: '#211D30',
+      textOnPrimaryAccent: '#EDE9FE',
+      border: '#28233A',
+      borderStrong: '#3D3558',
+      danger: '#FF3B30',
+      dangerSoft: 'rgba(255, 59, 48, 0.15)',
+      dangerBorder: '#FF3B30',
+      accentCyan: '#00D2FF',
+      accentIndigo: '#6A35FF',
+      glassSurface: '#171422',
+      glassBorder: '#28233A',
+      cardGlow: 'rgba(106, 53, 255, 0.18)',
+      navBackground: '#0D0D0D',
+      navBorder: '#222222',
+      navActivePill: '#6A35FF',
+      navActiveText: '#FFFFFF',
+      chartLine: '#6A35FF',
+      chartGradientStart: 'rgba(106, 53, 255, 0.40)',
+      chartGradientEnd: 'rgba(106, 53, 255, 0.01)',
     },
   },
 ];
@@ -138,107 +182,101 @@ export const palettes: Palette[] = [
 export const colors: PaletteColors = { ...palettes[0].colors };
 export const currentPaletteMeta = { key: palettes[0].key, isDark: palettes[0].isDark };
 
-// Same hand-rolled observer i18n uses for language changes: the tokens below are
-// mutable singletons, so nothing in React notices a change without a nudge.
-const themeListeners = new Set<() => void>();
+type ThemeListener = () => void;
+const listeners = new Set<ThemeListener>();
 
-export function subscribeToThemeChanges(listener: () => void) {
-  themeListeners.add(listener);
+export function subscribeToThemeChanges(listener: ThemeListener): () => void {
+  listeners.add(listener);
   return () => {
-    themeListeners.delete(listener);
+    listeners.delete(listener);
   };
 }
 
-export function applyPalette(paletteKey: string) {
-  const p = palettes.find((x) => x.key === paletteKey) || palettes[0];
+export function applyPalette(key: string): void {
+  const p = palettes.find((item) => item.key === key);
+  if (!p) return;
   Object.assign(colors, p.colors);
   currentPaletteMeta.key = p.key;
   currentPaletteMeta.isDark = p.isDark;
-  applyShadowColor(p.shadowColor);
-  themeListeners.forEach((listener) => listener());
+  shadow.soft = makeShadow(p.shadowColor, 6, 0.06, 1, 2);
+  shadow.medium = makeShadow(p.shadowColor, 12, 0.10, 2, 4);
+  listeners.forEach((l) => l());
 }
 
-const THEME_KEY = 'habita.theme.palette';
+export const THEME_STORAGE_KEY = 'habita.theme.palette';
 
 export async function loadSavedTheme(): Promise<string> {
-  const saved = await getItem<string>(THEME_KEY, 'terracotta');
-  const key = palettes.find((p) => p.key === saved) ? saved : 'terracotta';
-  applyPalette(key);
-  return key;
+  const saved = await getItem<string>(THEME_STORAGE_KEY, palettes[0].key);
+  if (saved && palettes.some((p) => p.key === saved)) {
+    applyPalette(saved);
+    return saved;
+  }
+  return palettes[0].key;
 }
 
-export async function saveTheme(paletteKey: string) {
-  applyPalette(paletteKey);
-  await setItem(THEME_KEY, paletteKey);
+export async function saveTheme(key: string): Promise<void> {
+  if (palettes.some((p) => p.key === key)) {
+    applyPalette(key);
+    await setItem(THEME_STORAGE_KEY, key);
+  }
 }
 
 export const spacing = {
   xs: 4,
   sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 24,
-  xxl: 32,
+  md: 16,
+  lg: 24,
+  xl: 32,
+  xxl: 40,
 };
 
 export const radius = {
-  sm: 8,
-  md: 12,
-  lg: 16,
-  xl: 20,
-  xxl: 28,
-  pill: 999,
+  none: 0,
+  xs: 4,
+  sm: 6,
+  md: 10,
+  lg: 14,
+  xl: 18,
+  card: 16,
+  xxl: 24,
+  xxxl: 36,
+  full: 9999,
+  pill: 9999,
 };
 
 export const fonts = {
-  serif: 'Fraunces_600SemiBold',
-  serifRegular: 'Fraunces_400Regular',
-  sans: 'DMSans_400Regular',
-  sansMedium: 'DMSans_500Medium',
-  sansBold: 'DMSans_700Bold',
+  serif: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
+  serifRegular: Platform.select({ ios: 'Georgia', android: 'serif', default: 'serif' }),
+  sans: Platform.select({ ios: 'System', android: 'Roboto', default: 'sans-serif' }),
+  sansMedium: Platform.select({ ios: 'System', android: 'Roboto-Medium', default: 'sans-serif-medium' }),
+  sansBold: Platform.select({ ios: 'System', android: 'Roboto-Bold', default: 'sans-serif' }),
 };
 
-function hexToRgba(hex: string, alpha: number) {
-  const h = hex.replace('#', '');
-  const full = h.length === 3 ? h.split('').map((c) => c + c).join('') : h;
-  const r = parseInt(full.slice(0, 2), 16);
-  const g = parseInt(full.slice(2, 4), 16);
-  const b = parseInt(full.slice(4, 6), 16);
-  return `rgba(${r},${g},${b},${alpha})`;
+function makeShadow(
+  color: string,
+  blur: number,
+  opacity: number,
+  offsetY: number,
+  elevation: number
+) {
+  if (Platform.OS === 'web') {
+    return {
+      boxShadow: `0px ${offsetY}px ${blur}px rgba(0, 0, 0, ${opacity})`,
+    };
+  }
+  return {
+    shadowColor: color,
+    shadowOffset: { width: 0, height: offsetY },
+    shadowOpacity: opacity,
+    shadowRadius: blur / 2,
+    elevation,
+  };
 }
 
-function buildShadow(shadowColor: string) {
-  return Platform.OS === 'web'
-    ? {
-        soft: { boxShadow: `0 4px 16px ${hexToRgba(shadowColor, 0.08)}` } as any,
-        medium: { boxShadow: `0 6px 20px ${hexToRgba(shadowColor, 0.12)}` } as any,
-      }
-    : {
-        soft: {
-          shadowColor,
-          shadowOffset: { width: 0, height: 4 },
-          shadowOpacity: 0.08,
-          shadowRadius: 16,
-          elevation: 3,
-        },
-        medium: {
-          shadowColor,
-          shadowOffset: { width: 0, height: 6 },
-          shadowOpacity: 0.12,
-          shadowRadius: 20,
-          elevation: 6,
-        },
-      };
-}
-
-// Mutable, like `colors` — each palette declares its own shadowColor.
-export const shadow = buildShadow(palettes[0].shadowColor);
-
-function applyShadowColor(shadowColor: string) {
-  const next = buildShadow(shadowColor);
-  Object.assign(shadow.soft, next.soft);
-  Object.assign(shadow.medium, next.medium);
-}
+export const shadow = {
+  soft: makeShadow(palettes[0].shadowColor, 6, 0.05, 1, 2),
+  medium: makeShadow(palettes[0].shadowColor, 12, 0.08, 2, 4),
+};
 
 export interface ThemeTokens {
   colors: PaletteColors;
@@ -255,3 +293,5 @@ export const theme: ThemeTokens = {
   fonts,
   shadow,
 };
+
+export default theme;

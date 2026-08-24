@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert, ActivityIndicator, Image, Modal } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Alert, ActivityIndicator, Image, Modal, RefreshControl } from 'react-native';
 import { pick, keepLocalCopy, isErrorWithCode, errorCodes, types as documentTypes } from '@react-native-documents/picker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import BottomSheet from '../../components/BottomSheet';
@@ -9,7 +9,9 @@ import type { RootStackParamList } from '../../app/_layout';
 import type { ThemeTokens } from '../../theme';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
+import { SkeletonCard } from '../../components/Skeleton';
 import useAuth from '../../hooks/useAuth';
+import { ArrowLeft, ChevronRight, Eye, Trash2, Camera, Image as ImageIcon, FileText, X, MoreVertical, Paperclip } from 'lucide-react-native';
 import {
   deleteMedicalDocument,
   extractMedchestErrorMessage,
@@ -46,6 +48,7 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
   const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [documents, setDocuments] = useState<MedicalDocument[]>([]);
   const [uploadingDoc, setUploadingDoc] = useState(false);
   const [showUploadSheet, setShowUploadSheet] = useState(false);
@@ -54,9 +57,6 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
   const [fullscreenDoc, setFullscreenDoc] = useState<MedicalDocument | null>(null);
   const [localeVersion, setLocaleVersion] = useState(0);
 
-  // After a prescription is parsed, any medicines it auto-created come back with no
-  // confirmed count — this queue walks the user through setting a real quantity (and
-  // whether it's a liquid) for each one, one at a time, via `MedicineQuantitySheet`.
   const [queue, setQueue] = useState<QueueItem[]>([]);
   const [queueIndex, setQueueIndex] = useState(0);
   const [savingQuantity, setSavingQuantity] = useState(false);
@@ -78,6 +78,20 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
 
   const refreshDocuments = async (token: string) => {
     setDocuments(await listMedicalDocuments(familyProfileId, token));
+  };
+
+  const onRefresh = async () => {
+    setRefreshing(true);
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        await refreshDocuments(token);
+      }
+    } catch (err) {
+      showRemoteError(err);
+    } finally {
+      setRefreshing(false);
+    }
   };
 
   useEffect(() => {
@@ -172,21 +186,49 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
       return;
     }
 
-    const remoteMedicines = await listMedicines(familyProfileId, token);
+    // Polling loop to wait for asynchronous OCR processing to complete (up to 5 attempts)
+    let remoteMedicines: RemoteMedicine[] = [];
+    let newlyAdded: RemoteMedicine[] = [];
+    let matchedByName: RemoteMedicine[] = [];
 
-    // 1. Identify medicines newly added to the remote list since before the upload
-    const newlyAdded = remoteMedicines.filter((m) => !existingMedicines.some((e) => e.id === m.id));
+    const delay = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
 
-    // 2. Identify medicines matching extracted names (fuzzy/case-insensitive substring matching)
-    const extractedNames = uploaded.extractedMedicineNames ?? [];
-    const matchedByName = extractedNames.flatMap((rawName) => {
-      const cleanName = rawName.trim().toLowerCase();
-      if (!cleanName) return [];
-      return remoteMedicines.filter((m) => {
-        const medName = m.name.trim().toLowerCase();
-        return medName === cleanName || medName.includes(cleanName) || cleanName.includes(medName);
-      });
-    });
+    for (let attempt = 0; attempt < 5; attempt++) {
+      await delay(attempt === 0 ? 800 : 1500);
+      try {
+        const [docs, meds] = await Promise.all([
+          listMedicalDocuments(familyProfileId, token),
+          listMedicines(familyProfileId, token),
+        ]);
+        setDocuments(docs);
+        remoteMedicines = meds;
+
+        // 1. Identify medicines newly added to the remote list
+        newlyAdded = remoteMedicines.filter((m) => !existingMedicines.some((e) => e.id === m.id));
+
+        // 2. Identify medicines matching extracted names
+        const latestDoc = docs.find((d) => d.id === uploaded.id) || uploaded;
+        const extractedNames = latestDoc.extractedMedicineNames || uploaded.extractedMedicineNames || [];
+        matchedByName = extractedNames.flatMap((rawName) => {
+          const cleanName = rawName.trim().toLowerCase();
+          if (!cleanName) return [];
+          return remoteMedicines.filter((m) => {
+            const medName = m.name.trim().toLowerCase();
+            return medName === cleanName || medName.includes(cleanName) || cleanName.includes(medName);
+          });
+        });
+
+        if (newlyAdded.length > 0 || matchedByName.length > 0) {
+          break;
+        }
+
+        if (latestDoc.ocrStatus === 'COMPLETED' || latestDoc.ocrStatus === 'SUCCESS' || latestDoc.ocrStatus === 'FAILED') {
+          break;
+        }
+      } catch {
+        // Continue polling if a transient error occurs
+      }
+    }
 
     // Combine newly added medicines and matched-by-name medicines, deduplicating by ID
     const combinedMap = new Map<string, RemoteMedicine>();
@@ -198,7 +240,18 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
     if (matched.length > 0) {
       await startQuantityQueue(matched);
     } else {
-      Alert.alert(t('medicine.prescription_processed_title'), t('medicine.prescription_empty_msg'));
+      Alert.alert(
+        t('medicine.prescription_processed_title'),
+        t('medicine.prescription_empty_msg'),
+        [
+          { text: t('common.ok') || 'OK', style: 'cancel' },
+          {
+            text: t('medicine.add_medicine') || 'Add Medicine',
+            style: 'default',
+            onPress: () => navigation.navigate('Medicine', { openAddModal: true }),
+          },
+        ]
+      );
     }
   };
 
@@ -382,16 +435,27 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
     <View style={styles.root} key={localeVersion}>
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+          <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('medicine.prescriptions_header_title')}</Text>
         <View style={styles.addBtnPlaceholder} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#000000"
+            colors={['#000000']}
+          />
+        }>
         {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={styles.headerTitle.color} />
+          <View style={{ paddingTop: 8 }}>
+            <SkeletonCard />
+            <SkeletonCard />
           </View>
         ) : (
           <>
@@ -399,15 +463,15 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
 
             <Pressable style={styles.uploadBanner} onPress={() => setShowUploadSheet(true)} disabled={uploadingDoc}>
               {uploadingDoc ? (
-                <ActivityIndicator color={styles.uploadBannerArrow.color} />
+                <ActivityIndicator color="#000000" />
               ) : (
                 <>
-                  <Text style={styles.uploadBannerIcon}>📎</Text>
+                  <Paperclip size={18} color="#000000" strokeWidth={1.5} style={{ marginRight: 12 }} />
                   <View style={styles.uploadBannerContent}>
                     <Text style={styles.uploadBannerTitle}>{t('medicine.upload_document_btn')}</Text>
                     <Text style={styles.uploadBannerSub}>{t('medicine.upload_document_sub')}</Text>
                   </View>
-                  <Text style={styles.uploadBannerArrow}>→</Text>
+                  <ChevronRight size={16} color="#000000" strokeWidth={1.3} />
                 </>
               )}
             </Pressable>
@@ -417,7 +481,9 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
             ) : (
               documents.map((doc) => (
                 <Pressable key={doc.id} style={styles.documentRow} onPress={() => handleSelectDocOptions(doc)}>
-                  <Text style={styles.documentIcon}>📄</Text>
+                  <View style={styles.documentIconWrap}>
+                    <FileText size={18} color="#000000" strokeWidth={1.5} />
+                  </View>
                   <View style={styles.documentInfo}>
                     <Text style={styles.documentName} numberOfLines={1}>
                       {doc.originalFilename}
@@ -427,18 +493,21 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
                       {t(`medicine.ocr_status_${doc.ocrStatus.toLowerCase()}`)}
                     </Text>
                   </View>
-                  <Text style={styles.documentMoreIcon}>⋮</Text>
+                  <MoreVertical size={16} color={styles.documentMeta.color ?? '#888888'} />
                 </Pressable>
               ))
             )}
             <BottomSheet visible={showUploadSheet} onClose={() => setShowUploadSheet(false)} title={t('medicine.upload_document_btn')}>
               <Pressable style={styles.sheetOption} onPress={handleTakePhoto}>
+                <Camera size={16} color="#000000" style={{ marginRight: 10 }} />
                 <Text style={styles.sheetOptionText}>{t('medicine.choose_camera')}</Text>
               </Pressable>
               <Pressable style={styles.sheetOption} onPress={handlePickFromGallery}>
+                <ImageIcon size={16} color="#000000" style={{ marginRight: 10 }} />
                 <Text style={styles.sheetOptionText}>{t('medicine.choose_gallery')}</Text>
               </Pressable>
               <Pressable style={styles.sheetOption} onPress={async () => { setShowUploadSheet(false); await handlePickDocument(); }}>
+                <FileText size={16} color="#000000" style={{ marginRight: 10 }} />
                 <Text style={styles.sheetOptionText}>{t('medicine.choose_document')}</Text>
               </Pressable>
             </BottomSheet>
@@ -449,10 +518,12 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
               title={selectedDocForOptions?.originalFilename ?? t('medicine.prescriptions_header_title')}
             >
               <Pressable style={styles.sheetOption} onPress={handleViewFullscreen}>
-                <Text style={styles.sheetOptionText}>👁️ {t('medicine.view_fullscreen')}</Text>
+                <Eye size={16} color="#000000" style={{ marginRight: 10 }} />
+                <Text style={styles.sheetOptionText}>{t('medicine.view_fullscreen')}</Text>
               </Pressable>
               <Pressable style={styles.sheetOption} onPress={handleDeleteDocument}>
-                <Text style={[styles.sheetOptionText, styles.destructiveText]}>🗑️ {t('medicine.delete_document')}</Text>
+                <Trash2 size={16} color="#ef4444" style={{ marginRight: 10 }} />
+                <Text style={[styles.sheetOptionText, styles.destructiveText]}>{t('medicine.delete_document')}</Text>
               </Pressable>
             </BottomSheet>
           </>
@@ -486,7 +557,7 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
           <View style={[styles.fullscreenContainer, { paddingTop: insets.top + 8 }]}>
             <View style={styles.fullscreenHeader}>
               <Pressable onPress={() => setFullscreenDoc(null)} style={styles.fullscreenCloseBtn}>
-                <Text style={styles.fullscreenCloseIcon}>✕</Text>
+                <X size={18} color="#000000" />
               </Pressable>
               <Text style={styles.fullscreenTitle} numberOfLines={1}>
                 {fullscreenDoc.originalFilename}
@@ -525,30 +596,32 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#ECECEE',
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F7',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadow.soft,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
   },
   backIcon: {
-    fontSize: 20,
-    color: colors.textPrimary,
+    fontSize: 16,
+    color: '#000000',
   },
   headerTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
   },
   addBtnPlaceholder: {
-    width: 40,
+    width: 36,
   },
   content: {
     paddingHorizontal: spacing.lg,
@@ -561,45 +634,49 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   },
   sectionSub: {
     fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.textMuted,
+    fontSize: 11,
+    fontWeight: '300',
+    color: '#888888',
     marginBottom: spacing.md,
   },
   uploadBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
+    padding: spacing.md,
     marginBottom: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    borderStyle: 'dashed',
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+    ...shadow.soft,
   },
   uploadBannerIcon: {
-    fontSize: 28,
+    fontSize: 24,
     marginRight: 12,
   },
   uploadBannerContent: {
     flex: 1,
   },
   uploadBannerTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 15,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '500',
+    color: '#000000',
   },
   uploadBannerSub: {
     fontFamily: fonts.sans,
     fontSize: 11,
-    color: colors.textMuted,
+    fontWeight: '300',
+    color: '#888888',
     marginTop: 2,
   },
   uploadBannerArrow: {
-    fontSize: 18,
-    color: colors.primary,
-    fontFamily: fonts.sansBold,
+    fontSize: 16,
+    color: '#000000',
   },
   sheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingVertical: spacing.md,
     paddingHorizontal: spacing.lg,
     borderBottomWidth: 1,
@@ -607,7 +684,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   },
   sheetOptionText: {
     fontFamily: fonts.sans,
-    fontSize: 16,
+    fontSize: 15,
     color: colors.textPrimary,
   },
   documentsEmptyText: {
@@ -618,16 +695,22 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   documentRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
+    ...shadow.soft,
   },
-  documentIcon: {
-    fontSize: 22,
-    marginRight: 10,
+  documentIconWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 8,
+    backgroundColor: '#F5F5F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
   },
   documentInfo: {
     flex: 1,

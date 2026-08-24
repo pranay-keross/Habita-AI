@@ -24,6 +24,7 @@ interface BottomSheetProps {
   title?: string;
   children: React.ReactNode;
   maxHeightPercent?: number;
+  dark?: boolean;
 }
 
 const { height: SCREEN_HEIGHT } = Dimensions.get('window');
@@ -34,6 +35,7 @@ export default function BottomSheet({
   title,
   children,
   maxHeightPercent = 0.85,
+  dark = false,
 }: BottomSheetProps) {
   const styles = useThemedStyles(makeStyles);
   const translateY = useRef(new Animated.Value(SCREEN_HEIGHT)).current;
@@ -105,7 +107,7 @@ export default function BottomSheet({
       Animated.parallel([
         Animated.timing(opacity, {
           toValue: 1,
-          duration: 250,
+          duration: 200,
           useNativeDriver: true,
         }),
         Animated.spring(translateY, {
@@ -123,7 +125,7 @@ export default function BottomSheet({
     Animated.parallel([
       Animated.timing(opacity, {
         toValue: 0,
-        duration: 200,
+        duration: 180,
         useNativeDriver: true,
       }),
       Animated.timing(translateY, {
@@ -144,9 +146,8 @@ export default function BottomSheet({
 
   const sheetContent = (
     <>
-      {/* Pure Neutral Dark Backdrop Layer with Frosted Blur */}
-      <Animated.View style={[styles.backdrop, { opacity }]}>
-        <View style={[StyleSheet.absoluteFill, styles.backdropDarkDim]} />
+      {/* Backdrop overlay */}
+      <Animated.View style={[styles.backdrop, styles.backdropDarkDim, { opacity }]}>
         <Pressable style={StyleSheet.absoluteFill} onPress={dismissSheet} />
       </Animated.View>
 
@@ -154,6 +155,7 @@ export default function BottomSheet({
       <Animated.View
         style={[
           styles.sheet,
+          dark && styles.sheetDark,
           {
             maxHeight: SCREEN_HEIGHT * maxHeightPercent - keyboardHeight,
             transform: [{ translateY }],
@@ -161,15 +163,15 @@ export default function BottomSheet({
         ]}>
         {/* Top Handle Bar */}
         <View style={styles.handleContainer} {...panResponder.panHandlers}>
-          <View style={styles.handle} />
+          <View style={[styles.handle, dark && styles.handleDark]} />
         </View>
 
         {/* Header Bar */}
         {title ? (
-          <View style={styles.header}>
-            <Text style={styles.title}>{title}</Text>
-            <Pressable onPress={dismissSheet} style={styles.closeBtn}>
-              <Text style={styles.closeText}>✕</Text>
+          <View style={[styles.header, dark && styles.headerDark]}>
+            <Text style={[styles.title, dark && styles.titleDark]}>{title}</Text>
+            <Pressable onPress={dismissSheet} style={[styles.closeBtn, dark && styles.closeBtnDark]}>
+              <Text style={[styles.closeText, dark && styles.closeTextDark]}>✕</Text>
             </Pressable>
           </View>
         ) : null}
@@ -221,7 +223,7 @@ const makeStyles = ({ colors, fonts, shadow, spacing }: ThemeTokens) => StyleShe
     ...StyleSheet.absoluteFill,
   },
   backdropDarkDim: {
-    backgroundColor: 'rgba(0, 0, 0, 0.45)',
+    backgroundColor: 'rgba(0, 0, 0, 0.6)',
   },
   sheet: {
     backgroundColor: colors.background,
@@ -232,6 +234,10 @@ const makeStyles = ({ colors, fonts, shadow, spacing }: ThemeTokens) => StyleShe
     borderTopColor: colors.border,
     ...shadow.medium,
     elevation: 24,
+  },
+  sheetDark: {
+    backgroundColor: '#121216',
+    borderTopColor: '#24242A',
   },
   handleContainer: {
     width: '100%',
@@ -244,6 +250,9 @@ const makeStyles = ({ colors, fonts, shadow, spacing }: ThemeTokens) => StyleShe
     borderRadius: 2.5,
     backgroundColor: colors.border,
   },
+  handleDark: {
+    backgroundColor: '#32323E',
+  },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -253,10 +262,17 @@ const makeStyles = ({ colors, fonts, shadow, spacing }: ThemeTokens) => StyleShe
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
+  headerDark: {
+    borderBottomColor: '#24242A',
+  },
   title: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
+    fontFamily: fonts.sans,
+    fontSize: 17,
+    fontWeight: '600',
     color: colors.textPrimary,
+  },
+  titleDark: {
+    color: '#FFFFFF',
   },
   closeBtn: {
     width: 32,
@@ -266,9 +282,15 @@ const makeStyles = ({ colors, fonts, shadow, spacing }: ThemeTokens) => StyleShe
     alignItems: 'center',
     justifyContent: 'center',
   },
+  closeBtnDark: {
+    backgroundColor: '#1E1E26',
+  },
   closeText: {
     fontSize: 14,
     color: colors.textMuted,
+  },
+  closeTextDark: {
+    color: '#A0A0B0',
   },
   content: {
     flexGrow: 1,

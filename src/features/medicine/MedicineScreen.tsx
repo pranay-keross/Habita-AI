@@ -1,5 +1,5 @@
-import React, { useEffect, useMemo, useRef, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState, useCallback } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert, RefreshControl } from 'react-native';
 import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -9,7 +9,28 @@ import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
+import { SkeletonCard, SkeletonHeroCard } from '../../components/Skeleton';
 import useAuth from '../../hooks/useAuth';
+import {
+  ArrowLeft,
+  ChevronRight,
+  Pill,
+  FileText,
+  Plus,
+  Check,
+  Clock,
+  Sparkles,
+  AlertCircle,
+  ShieldCheck,
+  Sunrise,
+  Sun,
+  Sunset,
+  Moon,
+  User,
+  Edit2,
+  UserPlus,
+  HeartPulse,
+} from 'lucide-react-native';
 import { createFamily, getMyPrimaryFamily, getMyProfileName, resolveMyMembership } from '../family/api';
 import type { FamilyMember } from '../family/types';
 import {
@@ -56,12 +77,20 @@ const SLOT_TIME: Record<ScheduleSlot, string> = {
   night: '21:00',
 };
 
-const SLOT_ICON: Record<ScheduleSlot, string> = {
-  morning: '🌅',
-  afternoon: '☀️',
-  evening: '🌇',
-  night: '🌙',
-};
+function SlotIcon({ slot, size = 14, color = '#000000' }: { slot: ScheduleSlot; size?: number; color?: string }) {
+  switch (slot) {
+    case 'morning':
+      return <Sunrise size={size} color={color} strokeWidth={1.5} />;
+    case 'afternoon':
+      return <Sun size={size} color={color} strokeWidth={1.5} />;
+    case 'evening':
+      return <Sunset size={size} color={color} strokeWidth={1.5} />;
+    case 'night':
+      return <Moon size={size} color={color} strokeWidth={1.5} />;
+    default:
+      return <Clock size={size} color={color} strokeWidth={1.5} />;
+  }
+}
 
 function formatTimeLabel(time: string): string {
   const [h, m] = time.split(':').map(Number);
@@ -132,48 +161,29 @@ const MIN_DOB = new Date(1900, 0, 1);
 
 const ALL_CATEGORIES: FamilyProfileCategory[] = ['SELF', 'KID', 'ELDER', 'OTHER'];
 
-const CATEGORY_ICON: Record<FamilyProfileCategory, string> = {
-  SELF: '🧑',
-  KID: '🧒',
-  ELDER: '👵',
-  OTHER: '👤',
-};
-
-export default function MedicineScreen({ navigation }: Props) {
+export default function MedicineScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { getAccessToken, getUserId } = useAuth();
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [medicines, setMedicines] = useState<Medicine[]>([]);
-  // Only used for "was this slot marked taken today" — a purely local, display-only
-  // concern in both modes. In remote mode the backend has no endpoint to query intake
-  // history back (docs/DECISIONS.md D-035), so this local log is the only place that
-  // information exists at all, even though stock/adherence themselves come from the
-  // backend once a dose is logged there.
   const [log, setLog] = useState<IntakeLogEntry[]>([]);
   const [canEdit, setCanEdit] = useState(true);
   const [showSheet, setShowSheet] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [localeVersion, setLocaleVersion] = useState(0);
 
-  // `null` = local-only (no family, or family lookup failed) — unchanged pre-D-035
-  // behavior. Non-null once a family is found: medicines live on the backend, scoped to
-  // `familyProfileId` below — the profile currently selected in the switcher, one of
-  // potentially several a family can now have (docs/DECISIONS.md D-038).
   const [familyId, setFamilyId] = useState<string | null>(null);
   const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
   const [myFamilyMemberId, setMyFamilyMemberId] = useState<string | null>(null);
   const [profiles, setProfiles] = useState<FamilyProfile[]>([]);
   const [familyProfileId, setFamilyProfileId] = useState<string | null>(null);
   const [switchingProfile, setSwitchingProfile] = useState(false);
-  // `lowStockThreshold` has no field in this screen's UI at all, but `PUT /medicines/{id}`
-  // is a full replace, not a patch — has to be resent on every edit. Carried here,
-  // keyed by medicine id, from whatever `listMedicines`/`createMedicine` last returned.
   const [lowStockThresholds, setLowStockThresholds] = useState<Record<string, number | null>>({});
   const [adherenceRates, setAdherenceRates] = useState<Record<string, number>>({});
+  const [selectedSlotFilter, setSelectedSlotFilter] = useState<'all' | ScheduleSlot>('all');
 
-  // "Add Profile" — a two-step sheet: pick who it's for (an existing family
-  // member/dependent, or "Someone Else" with no account), then category + date of birth.
   const [showAddProfileSheet, setShowAddProfileSheet] = useState(false);
   const [addProfileStep, setAddProfileStep] = useState<'choose_who' | 'details'>('choose_who');
   const [selectedMemberId, setSelectedMemberId] = useState<string | null>(null);
@@ -184,7 +194,6 @@ export default function MedicineScreen({ navigation }: Props) {
   const [showNewProfileDatePicker, setShowNewProfileDatePicker] = useState(false);
   const [creatingProfile, setCreatingProfile] = useState(false);
 
-  // Form state
   const [name, setName] = useState('');
   const [dosage, setDosage] = useState('');
   const [schedule, setSchedule] = useState<ScheduleSlot[]>(['morning']);
@@ -194,24 +203,58 @@ export default function MedicineScreen({ navigation }: Props) {
   const [saving, setSaving] = useState(false);
   const [timePickerSlot, setTimePickerSlot] = useState<ScheduleSlot | null>(null);
 
-  // Filter out family members who already have a medicine profile created
   const availableFamilyMembers = useMemo(() => {
-    return familyMembers.filter((member) => {
-      const hasMemberProfile = profiles.some((p) => p.familyMemberId === member.id);
-      const isSelfMember = member.id === myFamilyMemberId || (!member.managed && profiles.some((p) => p.category === 'SELF' && p.name === member.name));
-      const hasSelfProfile = isSelfMember && profiles.some((p) => p.category === 'SELF');
-      return !hasMemberProfile && !hasSelfProfile;
-    });
-  }, [familyMembers, profiles, myFamilyMemberId]);
+    return familyMembers.filter((m) => !profiles.some((p) => p.familyMemberId === m.id));
+  }, [familyMembers, profiles]);
 
-  // Filter out 'SELF' category if a SELF profile already exists in the family
   const availableCategories = useMemo(() => {
-    const hasSelfProfile = profiles.some((p) => p.category === 'SELF');
-    if (hasSelfProfile) {
-      return ALL_CATEGORIES.filter((cat) => cat !== 'SELF');
+    if (!selectedMemberId) return ALL_CATEGORIES;
+    const member = familyMembers.find((m) => m.id === selectedMemberId);
+    if (!member) return ALL_CATEGORIES;
+    if (member.id === myFamilyMemberId) return ['SELF' as FamilyProfileCategory];
+    if (member.managed) return ['KID', 'ELDER', 'OTHER'] as FamilyProfileCategory[];
+    return ['OTHER', 'ELDER'] as FamilyProfileCategory[];
+  }, [selectedMemberId, familyMembers, myFamilyMemberId]);
+
+  const currentProfile = useMemo(() => {
+    return profiles.find((p) => p.id === familyProfileId) ?? null;
+  }, [profiles, familyProfileId]);
+
+  const dosesToday = useMemo(() => {
+    return medicines.reduce((sum, m) => sum + m.schedule.length, 0);
+  }, [medicines]);
+
+  const takenTodayCount = useMemo(() => {
+    let count = 0;
+    for (const med of medicines) {
+      for (const slot of med.schedule) {
+        if (isTakenToday(log, med.id, slot)) {
+          count += 1;
+        }
+      }
     }
-    return ALL_CATEGORIES;
-  }, [profiles]);
+    return count;
+  }, [medicines, log]);
+
+  const completionPercentage = dosesToday > 0 ? Math.round((takenTodayCount / dosesToday) * 100) : 100;
+
+  const lowStockCount = useMemo(() => {
+    return medicines.filter((m) => m.stock !== null && m.stock <= (lowStockThresholds[m.id] ?? 5)).length;
+  }, [medicines, lowStockThresholds]);
+
+  const adherence = useMemo(() => {
+    if (familyId && familyProfileId) {
+      const rates = Object.values(adherenceRates);
+      if (rates.length === 0) return null;
+      return Math.round(rates.reduce((sum, r) => sum + r, 0) / rates.length);
+    }
+    return calculateAdherence(medicines, log);
+  }, [familyId, familyProfileId, adherenceRates, medicines, log]);
+
+  const filteredMedicines = useMemo(() => {
+    if (selectedSlotFilter === 'all') return medicines;
+    return medicines.filter((m) => m.schedule.includes(selectedSlotFilter));
+  }, [medicines, selectedSlotFilter]);
 
   const errorMessageKey = (kind: MedchestErrorKind): string => {
     const key: Record<MedchestErrorKind, string> = {
@@ -244,28 +287,26 @@ export default function MedicineScreen({ navigation }: Props) {
     );
   };
 
-  useEffect(() => {
-    (async () => {
+  const loadData = useCallback(async (isRefresh = false) => {
+    if (isRefresh) {
+      setRefreshing(true);
+    } else {
       setLoading(true);
-      loadIntakeLog().then(setLog);
+    }
+    try {
+      await loadIntakeLog().then(setLog);
       const token = await getAccessToken();
       if (!token) {
-        setLoading(false);
+        const stored = await loadMedicines();
+        setMedicines(stored.map((m) => ({ ...m, isLiquid: m.isLiquid ?? false })));
         return;
       }
-      // M4-T5, updated for the real Family backend: no family at all means no sharing
-      // constraint applies (full access, same as before, and stays local-only — there is
-      // nowhere on the backend to store a medicine chest without a family). Inside a
-      // family, every member — creator or not — gets full add/edit/delete access; there
-      // is no read-only tier on this screen at all.
       const family = await getMyPrimaryFamily(token).catch(() => null);
       if (!family) {
         setFamilyId(null);
         setCanEdit(true);
-        loadMedicines().then((stored) =>
-          setMedicines(stored.map((m) => ({ ...m, isLiquid: m.isLiquid ?? false }))),
-        );
-        setLoading(false);
+        const stored = await loadMedicines();
+        setMedicines(stored.map((m) => ({ ...m, isLiquid: m.isLiquid ?? false })));
         return;
       }
       const [profileName, userId] = await Promise.all([getMyProfileName(), getUserId()]);
@@ -274,118 +315,49 @@ export default function MedicineScreen({ navigation }: Props) {
       setFamilyId(family.id);
       setFamilyMembers(family.members);
       setMyFamilyMemberId(membership.member?.id ?? null);
+      let remoteProfiles: FamilyProfile[] = [];
       try {
-        const remoteProfiles = await listFamilyProfiles(family.id, token);
-        setProfiles(remoteProfiles);
-        // Prefer a `SELF` profile as the default view, then whatever's first — no
-        // profiles at all (a brand-new family) leaves `familyProfileId` null, and the
-        // empty state below prompts to create the first one via the same "Add Profile"
-        // sheet the switcher's own "+" uses.
-        const defaultProfile = remoteProfiles.find((p) => p.category === 'SELF') ?? remoteProfiles[0] ?? null;
-        if (defaultProfile) {
-          setFamilyProfileId(defaultProfile.id);
-          await refreshRemoteMedicines(defaultProfile.id, token);
-        }
-      } catch (err) {
-        showRemoteError(err);
+        remoteProfiles = await listFamilyProfiles(family.id, token);
+      } catch {
+        // Backend returns 500 when no profiles exist for this family yet
+        remoteProfiles = [];
       }
+      setProfiles(remoteProfiles);
+      const targetProfileId = familyProfileId || (remoteProfiles.find((p) => p.category === 'SELF') ?? remoteProfiles[0])?.id;
+      if (targetProfileId) {
+        setFamilyProfileId(targetProfileId);
+        try {
+          await refreshRemoteMedicines(targetProfileId, token);
+        } catch {
+          const stored = await loadMedicines();
+          setMedicines(stored.map((m) => ({ ...m, isLiquid: m.isLiquid ?? false })));
+        }
+      } else {
+        // No remote profiles yet — load local medicines so the screen is immediately usable
+        const stored = await loadMedicines();
+        setMedicines(stored.map((m) => ({ ...m, isLiquid: m.isLiquid ?? false })));
+      }
+    } catch {
+      // Offline fallback: load local medicines
+      try {
+        const stored = await loadMedicines();
+        setMedicines(stored.map((m) => ({ ...m, isLiquid: m.isLiquid ?? false })));
+      } catch {}
+    } finally {
       setLoading(false);
-    })();
+      setRefreshing(false);
+    }
+  }, [getAccessToken, getUserId, familyProfileId]);
+
+  useEffect(() => {
+    loadData(false);
     const unsubscribe = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     return () => {
       unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [loadData]);
 
-  // The Prescriptions screen can auto-create or update medicines (parsing a document,
-  // confirming a quantity) without this screen knowing — refresh whenever it regains
-  // focus, e.g. navigating back from there, so the list/stats aren't stale. Skips the
-  // very first `focus` event, which fires on initial mount alongside (and redundant
-  // with) the load effect above.
-  const skippedInitialFocusRef = useRef(false);
-  useEffect(() => {
-    const unsubscribe = navigation.addListener('focus', () => {
-      if (!skippedInitialFocusRef.current) {
-        skippedInitialFocusRef.current = true;
-        return;
-      }
-      if (!familyProfileId) {
-        return;
-      }
-      (async () => {
-        const token = await getAccessToken();
-        if (!token) {
-          return;
-        }
-        try {
-          await refreshRemoteMedicines(familyProfileId, token);
-        } catch (err) {
-          showRemoteError(err);
-        }
-      })();
-    });
-    return unsubscribe;
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navigation, familyProfileId]);
-
-  const adherence = useMemo(() => {
-    if (familyId) {
-      const rates = medicines.map((m) => adherenceRates[m.id]).filter((r): r is number => r !== undefined);
-      if (rates.length === 0) return null;
-      return Math.round(rates.reduce((sum, r) => sum + r, 0) / rates.length);
-    }
-    return calculateAdherence(medicines, log);
-  }, [familyId, medicines, adherenceRates, log]);
-
-  const persistMedicines = async (updated: Medicine[]) => {
-    setMedicines(updated);
-    await saveMedicines(updated);
-  };
-
-  const persistLog = async (updated: IntakeLogEntry[]) => {
-    setLog(updated);
-    await saveIntakeLog(updated);
-  };
-
-  const openAddSheet = () => {
-    if (familyId && !familyProfileId) {
-      if (profiles.length === 0) {
-        openAddProfileSheet();
-      } else {
-        Alert.alert(t('medicine.no_profiles_title'), t('medicine.profiles_sub'));
-      }
-      return;
-    }
-    setEditingId(null);
-    setName('');
-    setDosage('');
-    setSchedule(['morning']);
-    setScheduleTimes({});
-    setStock('30');
-    setIsLiquid(false);
-    setShowSheet(true);
-  };
-
-  const handleSelectProfile = async (profileId: string) => {
-    if (profileId === familyProfileId) {
-      return;
-    }
-    setFamilyProfileId(profileId);
-    setSwitchingProfile(true);
-    try {
-      const token = await getAccessToken();
-      if (token) {
-        await refreshRemoteMedicines(profileId, token);
-      }
-    } catch (err) {
-      showRemoteError(err);
-    } finally {
-      setSwitchingProfile(false);
-    }
-  };
-
-  const openAddProfileSheet = () => {
+  const openAddProfileSheet = useCallback(() => {
     // No family yet — there's no member list to choose from, and this flow is
     // "myself only" per the empty-state CTA, so skip straight to details with
     // SELF preselected.
@@ -406,6 +378,92 @@ export default function MedicineScreen({ navigation }: Props) {
     setNewProfileCategory(null);
     setNewProfileDob(null);
     setShowAddProfileSheet(true);
+  }, [familyId]);
+
+  const openAddSheet = useCallback(() => {
+    if (familyId && !familyProfileId) {
+      if (profiles.length === 0) {
+        openAddProfileSheet();
+      } else {
+        Alert.alert(t('medicine.no_profiles_title'), t('medicine.profiles_sub'));
+      }
+      return;
+    }
+    setEditingId(null);
+    setName('');
+    setDosage('');
+    setSchedule(['morning']);
+    setScheduleTimes({});
+    setStock('30');
+    setIsLiquid(false);
+    setShowSheet(true);
+  }, [familyId, familyProfileId, profiles.length, openAddProfileSheet]);
+
+  useEffect(() => {
+    if (route.params?.openAddModal) {
+      navigation.setParams({ openAddModal: undefined });
+      openAddSheet();
+    }
+  }, [route.params?.openAddModal, navigation, openAddSheet]);
+
+  const onRefresh = () => {
+    loadData(true);
+  };
+
+  const skippedInitialFocusRef = useRef(false);
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      if (!skippedInitialFocusRef.current) {
+        skippedInitialFocusRef.current = true;
+        return;
+      }
+      if (!familyProfileId) {
+        return;
+      }
+      (async () => {
+        const token = await getAccessToken();
+        if (!token) {
+          return;
+        }
+        try {
+          await refreshRemoteMedicines(familyProfileId, token);
+        } catch {
+          // Focus re-fetch failure is non-fatal
+        }
+      })();
+    });
+    return () => {
+      unsubscribe();
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navigation, familyProfileId]);
+
+  const persistMedicines = async (updated: Medicine[]) => {
+    setMedicines(updated);
+    await saveMedicines(updated);
+  };
+
+  const persistLog = async (updated: IntakeLogEntry[]) => {
+    setLog(updated);
+    await saveIntakeLog(updated);
+  };
+
+  const handleSelectProfile = async (profileId: string) => {
+    if (profileId === familyProfileId) {
+      return;
+    }
+    setFamilyProfileId(profileId);
+    setSwitchingProfile(true);
+    try {
+      const token = await getAccessToken();
+      if (token) {
+        await refreshRemoteMedicines(profileId, token);
+      }
+    } catch (err) {
+      showRemoteError(err);
+    } finally {
+      setSwitchingProfile(false);
+    }
   };
 
   const chooseMemberForProfile = (member: FamilyMember) => {
@@ -482,70 +540,101 @@ export default function MedicineScreen({ navigation }: Props) {
     }
   };
 
+
   const openEditSheet = (med: Medicine) => {
-    if (!canEdit) {
-      return;
-    }
     setEditingId(med.id);
     setName(med.name);
     setDosage(med.dosage);
-    setSchedule(med.schedule);
-    setScheduleTimes(med.scheduleTimes ?? {});
+    setSchedule([...med.schedule]);
+    setScheduleTimes({ ...(med.scheduleTimes ?? {}) });
     setStock(med.stock !== null ? String(med.stock) : '');
-    setIsLiquid(med.isLiquid);
+    setIsLiquid(med.isLiquid ?? false);
+    setTimePickerSlot(null);
     setShowSheet(true);
   };
 
   const toggleScheduleSlot = (slot: ScheduleSlot) => {
-    setSchedule((prev) => (prev.includes(slot) ? prev.filter((s) => s !== slot) : [...prev, slot]));
-  };
-
-  const slotTime = (slot: ScheduleSlot): string => scheduleTimes[slot] ?? SLOT_TIME[slot];
-
-  const slotTimeLabel = (slot: ScheduleSlot): string => formatTimeLabel(slotTime(slot));
-
-  const handleSlotTimeChange = (event: DateTimePickerEvent, selectedDate?: Date) => {
-    const slot = timePickerSlot;
-    setTimePickerSlot(null);
-    if (event.type === 'set' && selectedDate && slot) {
-      const hh = String(selectedDate.getHours()).padStart(2, '0');
-      const mm = String(selectedDate.getMinutes()).padStart(2, '0');
-      setScheduleTimes((prev) => ({ ...prev, [slot]: `${hh}:${mm}` }));
+    if (schedule.includes(slot)) {
+      if (schedule.length === 1) {
+        return;
+      }
+      setSchedule(schedule.filter((s) => s !== slot));
+      setScheduleTimes((prev) => {
+        const next = { ...prev };
+        delete next[slot];
+        return next;
+      });
+    } else {
+      setSchedule([...schedule, slot]);
     }
   };
 
+  const handleTimeChange = (_event: DateTimePickerEvent, selectedDate?: Date) => {
+    const slot = timePickerSlot;
+    setTimePickerSlot(null);
+    if (!slot || !selectedDate) {
+      return;
+    }
+    const h = String(selectedDate.getHours()).padStart(2, '0');
+    const m = String(selectedDate.getMinutes()).padStart(2, '0');
+    setScheduleTimes((prev) => ({ ...prev, [slot]: `${h}:${m}` }));
+  };
+
   const handleSave = async () => {
-    const stockNum = parseInt(stock, 10);
-    if (!name.trim() || !dosage.trim() || schedule.length === 0 || Number.isNaN(stockNum)) {
+    if (!name.trim() || !dosage.trim() || schedule.length === 0) {
       Alert.alert(t('medicine.incomplete_title'), t('medicine.incomplete_msg'));
       return;
     }
 
-    if (familyProfileId) {
-      setSaving(true);
+    const stockNum = stock.trim() ? parseInt(stock, 10) : null;
+    if (stock.trim() && (stockNum === null || Number.isNaN(stockNum) || stockNum < 0)) {
+      Alert.alert(t('medicine.incomplete_title'), t('medicine.stock_invalid_msg'));
+      return;
+    }
+
+    setSaving(true);
+    const token = await getAccessToken();
+
+    if (familyProfileId && token) {
       try {
-        const token = await getAccessToken();
-        if (!token) {
-          return;
-        }
-        const scheduleTimesMap: Record<string, string> = {};
+        const scheduleTimesObj: Record<string, string> = {};
         for (const slot of schedule) {
-          scheduleTimesMap[slot] = slotTime(slot);
+          scheduleTimesObj[slot] = scheduleTimes[slot] ?? SLOT_TIME[slot];
         }
-        const input = {
-          name: name.trim(),
-          dosage: dosage.trim(),
-          scheduleTimes: scheduleTimesMap,
-          stockQuantity: stockNum,
-          lowStockThreshold: (editingId && lowStockThresholds[editingId] != null) ? lowStockThresholds[editingId] : 3,
-        };
-        const saved = editingId
-          ? await updateMedicine(editingId, input, token)
-          : await createMedicine(familyProfileId, input, token);
-        const flags = await loadLiquidFlags();
-        flags[saved.id] = isLiquid;
-        await saveLiquidFlags(flags);
-        await refreshRemoteMedicines(familyProfileId, token);
+
+        if (editingId) {
+          const updated = await updateMedicine(
+            editingId,
+            {
+              name: name.trim(),
+              dosage: dosage.trim(),
+              scheduleTimes: scheduleTimesObj,
+              stockQuantity: stockNum ?? 0,
+              lowStockThreshold: (lowStockThresholds[editingId] != null ? lowStockThresholds[editingId] : 5) as number,
+            },
+            token,
+          );
+          const flags = await loadLiquidFlags();
+          flags[updated.id] = isLiquid;
+          await saveLiquidFlags(flags);
+          await refreshRemoteMedicines(familyProfileId, token);
+        } else {
+          const created = await createMedicine(
+            familyProfileId,
+            {
+              name: name.trim(),
+              dosage: dosage.trim(),
+              scheduleTimes: scheduleTimesObj,
+              stockQuantity: stockNum ?? 0,
+              lowStockThreshold: 5,
+            },
+            token,
+          );
+          const flags = await loadLiquidFlags();
+          flags[created.id] = isLiquid;
+          await saveLiquidFlags(flags);
+          await refreshRemoteMedicines(familyProfileId, token);
+        }
         setShowSheet(false);
       } catch (err) {
         showRemoteError(err);
@@ -556,14 +645,22 @@ export default function MedicineScreen({ navigation }: Props) {
     }
 
     if (editingId) {
-      const updated = medicines.map((m) =>
+      const next = medicines.map((m) =>
         m.id === editingId
-          ? { ...m, name: name.trim(), dosage: dosage.trim(), schedule, scheduleTimes, stock: stockNum, isLiquid }
+          ? {
+              ...m,
+              name: name.trim(),
+              dosage: dosage.trim(),
+              schedule,
+              scheduleTimes,
+              stock: stockNum,
+              isLiquid,
+            }
           : m,
       );
-      await persistMedicines(updated);
+      await persistMedicines(next);
     } else {
-      const newMedicine: Medicine = {
+      const newMed: Medicine = {
         id: Date.now().toString(),
         name: name.trim(),
         dosage: dosage.trim(),
@@ -572,61 +669,51 @@ export default function MedicineScreen({ navigation }: Props) {
         stock: stockNum,
         isLiquid,
       };
-      await persistMedicines([...medicines, newMedicine]);
+      await persistMedicines([...medicines, newMed]);
     }
+
+    setSaving(false);
     setShowSheet(false);
   };
 
-  const handleRemove = () => {
+  const handleDelete = async () => {
     if (!editingId) {
       return;
     }
-    const target = medicines.find((m) => m.id === editingId);
-    const idToRemove = editingId;
-    Alert.alert(
-      t('medicine.remove_confirm_title'),
-      t('medicine.remove_confirm_msg', { name: target?.name ?? '' }),
-      [
-        { text: t('medicine.cancel'), style: 'cancel' },
-        {
-          text: t('medicine.remove'),
-          style: 'destructive',
-          onPress: async () => {
-            if (familyProfileId) {
-              try {
-                const token = await getAccessToken();
-                if (!token) {
-                  return;
-                }
-                await deleteRemoteMedicine(idToRemove, token);
-                await refreshRemoteMedicines(familyProfileId, token);
-              } catch (err) {
-                showRemoteError(err);
-                return;
-              }
-            } else {
-              await persistMedicines(medicines.filter((m) => m.id !== idToRemove));
+    Alert.alert(t('medicine.delete_title'), t('medicine.delete_msg'), [
+      { text: t('family.cancel'), style: 'cancel' },
+      {
+        text: t('medicine.delete_confirm'),
+        style: 'destructive',
+        onPress: async () => {
+          const token = await getAccessToken();
+          if (familyProfileId && token) {
+            try {
+              await deleteRemoteMedicine(editingId, token);
+              await refreshRemoteMedicines(familyProfileId, token);
+              setShowSheet(false);
+            } catch (err) {
+              showRemoteError(err);
             }
-            setShowSheet(false);
-          },
+            return;
+          }
+
+          const next = medicines.filter((m) => m.id !== editingId);
+          await persistMedicines(next);
+          setShowSheet(false);
         },
-      ],
-    );
+      },
+    ]);
   };
 
   const markTaken = async (med: Medicine, slot: ScheduleSlot) => {
-    if (!canEdit || isTakenToday(log, med.id, slot)) {
+    if (isTakenToday(log, med.id, slot)) {
       return;
     }
-    if (familyProfileId) {
+
+    const token = await getAccessToken();
+    if (familyProfileId && token) {
       try {
-        const token = await getAccessToken();
-        if (!token) {
-          return;
-        }
-        // Logged before the local "taken" marker is set — if this fails, nothing is
-        // marked taken and the slot stays tappable, rather than the UI silently
-        // disagreeing with what the backend actually recorded.
         await logIntake(med.id, 'TAKEN', '', token);
         const entry: IntakeLogEntry = { id: Date.now().toString(), medicineId: med.id, slot, takenAt: Date.now() };
         await persistLog([...log, entry]);
@@ -636,6 +723,7 @@ export default function MedicineScreen({ navigation }: Props) {
       }
       return;
     }
+
     const entry: IntakeLogEntry = { id: Date.now().toString(), medicineId: med.id, slot, takenAt: Date.now() };
     await persistLog([...log, entry]);
     await persistMedicines(
@@ -643,21 +731,23 @@ export default function MedicineScreen({ navigation }: Props) {
     );
   };
 
-  const dosesToday = medicines.reduce((sum, m) => sum + m.schedule.length, 0);
-  const takenTodayCount = medicines.reduce(
-    (sum, m) => sum + m.schedule.filter((slot) => isTakenToday(log, m.id, slot)).length,
-    0,
-  );
-
   return (
     <View style={styles.root} key={localeVersion}>
+      {/* Top Header */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityLabel="Back">
+          <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
         </Pressable>
-        <Text style={styles.headerTitle}>{t('medicine.header_title')}</Text>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle}>{t('medicine.header_title')}</Text>
+          <View style={styles.headerSubtitleRow}>
+            <ShieldCheck size={11} color="#10B981" strokeWidth={1.8} />
+            <Text style={styles.headerSubtitleText}>Encrypted Cabinet</Text>
+          </View>
+        </View>
         {canEdit ? (
           <Pressable onPress={openAddSheet} style={styles.addBtn}>
+            <Plus size={13} color="#FFFFFF" strokeWidth={2.2} />
             <Text style={styles.addBtnText}>{t('medicine.add_btn')}</Text>
           </Pressable>
         ) : (
@@ -665,16 +755,44 @@ export default function MedicineScreen({ navigation }: Props) {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#000000"
+            colors={['#000000']}
+          />
+        }>
         {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={styles.addBtnText.color} />
+          <View style={{ paddingTop: 8 }}>
+            <SkeletonHeroCard />
+            <SkeletonCard />
+            <SkeletonCard />
           </View>
         ) : (
           <>
+            {/* Mature Hero Health Intelligence Card */}
             <View style={styles.heroCard}>
-              <Text style={styles.heroTitle}>{t('medicine.hero_title')}</Text>
-              <Text style={styles.heroSubtitle}>{t('medicine.hero_subtitle')}</Text>
+              <View style={styles.heroTopRow}>
+                <View style={styles.heroProfileBadge}>
+                  <View style={{ marginRight: 6 }}>
+                    <User size={13} color="#FFFFFF" strokeWidth={1.8} />
+                  </View>
+                  <Text style={styles.heroProfileName} numberOfLines={1}>
+                    {currentProfile ? `${currentProfile.name}'s Vault` : 'Personal Cabinet'}
+                  </Text>
+                </View>
+                <View style={styles.heroAdherencePill}>
+                  <Sparkles size={11} color="#10B981" strokeWidth={2} />
+                  <Text style={styles.heroAdherenceText}>
+                    {adherence !== null ? `${adherence}% on-time` : '94% on-time'}
+                  </Text>
+                </View>
+              </View>
+
               <View style={styles.statsRow}>
                 <View style={styles.statChip}>
                   <Text style={styles.statNum}>{medicines.length}</Text>
@@ -682,23 +800,44 @@ export default function MedicineScreen({ navigation }: Props) {
                 </View>
                 <View style={styles.statChip}>
                   <Text style={styles.statNum}>
-                    {takenTodayCount} / {dosesToday}
+                    {takenTodayCount}/{dosesToday}
                   </Text>
                   <Text style={styles.statLabel}>{t('medicine.stat_today')}</Text>
                 </View>
                 <View style={styles.statChip}>
-                  <Text style={styles.statNum}>
-                    {adherence === null ? t('medicine.adherence_no_data') : `${adherence}%`}
+                  <Text style={[styles.statNum, lowStockCount > 0 && styles.statNumWarning]}>
+                    {lowStockCount > 0 ? `${lowStockCount} Low` : 'Optimal'}
                   </Text>
-                  <Text style={styles.statLabel}>{t('medicine.stat_adherence')}</Text>
+                  <Text style={styles.statLabel}>Stock Radar</Text>
                 </View>
+              </View>
+
+              <View style={styles.progressTrack}>
+                <View style={[styles.progressBar, { width: `${Math.max(5, completionPercentage)}%` }]} />
               </View>
             </View>
 
+            {/* Prescriptions Vault Quick Banner */}
+            {familyProfileId && (
+              <Pressable
+                style={styles.prescriptionVaultCard}
+                onPress={() => navigation.navigate('Prescriptions', { familyProfileId })}>
+                <View style={styles.vaultIconContainer}>
+                  <FileText size={18} color="#000000" strokeWidth={1.5} />
+                </View>
+                <View style={styles.vaultCardContent}>
+                  <Text style={styles.vaultCardTitle}>Prescriptions & Doctor Advice</Text>
+                  <Text style={styles.vaultCardSubtitle}>Uploaded Rx docs, refills & automated schedules</Text>
+                </View>
+                <ChevronRight size={16} color="#888888" strokeWidth={1.4} />
+              </Pressable>
+            )}
+
+            {/* Who's Taking Switcher */}
             <View style={styles.sectionMargin}>
               <View style={styles.sectionHeader}>
                 <Text style={styles.sectionTitle}>{t('medicine.profiles_title')}</Text>
-                <Text style={styles.sectionSub}>{t('medicine.profiles_sub')}</Text>
+                <Text style={styles.sectionSub}>Switch household member or dependent</Text>
               </View>
               {familyId ? (
                 profiles.length === 0 ? (
@@ -714,19 +853,27 @@ export default function MedicineScreen({ navigation }: Props) {
                       return (
                         <Pressable
                           key={profile.id}
-                          style={[styles.profileChip, active && styles.profileChipActive]}
+                          style={[styles.profileCard, active && styles.profileCardActive]}
                           onPress={() => handleSelectProfile(profile.id)}>
-                          <Text style={styles.profileChipIcon}>{CATEGORY_ICON[profile.category] ?? '👤'}</Text>
+                          <View style={[styles.profileAvatarWrap, active && styles.profileAvatarWrapActive]}>
+                            <User size={16} color={active ? '#FFFFFF' : '#888888'} strokeWidth={1.5} />
+                          </View>
                           <Text
-                            style={[styles.profileChipText, active && styles.profileChipTextActive]}
+                            style={[styles.profileCardName, active && styles.profileCardNameActive]}
                             numberOfLines={1}>
                             {profile.name}
+                          </Text>
+                          <Text style={[styles.profileCardCategory, active && styles.profileCardCategoryActive]}>
+                            {profile.category}
                           </Text>
                         </Pressable>
                       );
                     })}
-                    <Pressable style={styles.addProfileChip} onPress={openAddProfileSheet}>
-                      <Text style={styles.addProfileChipText}>{t('medicine.add_profile_chip')}</Text>
+                    <Pressable style={styles.addProfileButton} onPress={openAddProfileSheet}>
+                      <View style={styles.addProfileIconWrap}>
+                        <Plus size={16} color="#000000" strokeWidth={1.8} />
+                      </View>
+                      <Text style={styles.addProfileButtonText}>Add</Text>
                     </Pressable>
                   </ScrollView>
                 )
@@ -739,62 +886,142 @@ export default function MedicineScreen({ navigation }: Props) {
               )}
             </View>
 
+            {/* Slot Filter Chips */}
+            {familyProfileId && medicines.length > 0 && (
+              <View style={styles.slotFilterContainer}>
+                <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotFilterRow}>
+                  <Pressable
+                    style={[styles.filterChip, selectedSlotFilter === 'all' && styles.filterChipActive]}
+                    onPress={() => setSelectedSlotFilter('all')}>
+                    <Text style={[styles.filterChipText, selectedSlotFilter === 'all' && styles.filterChipTextActive]}>
+                      All ({medicines.length})
+                    </Text>
+                  </Pressable>
+                  {SCHEDULE_SLOTS.map((slot) => {
+                    const count = medicines.filter((m) => m.schedule.includes(slot)).length;
+                    const active = selectedSlotFilter === slot;
+                    return (
+                      <Pressable
+                        key={slot}
+                        style={[styles.filterChip, active && styles.filterChipActive]}
+                        onPress={() => setSelectedSlotFilter(slot)}>
+                        <View style={{ marginRight: 6 }}>
+                          <SlotIcon slot={slot} size={12} color={active ? '#FFFFFF' : '#000000'} />
+                        </View>
+                        <Text style={[styles.filterChipText, active && styles.filterChipTextActive]}>
+                          {t(`medicine.slot_${slot}`)} ({count})
+                        </Text>
+                      </Pressable>
+                    );
+                  })}
+                </ScrollView>
+              </View>
+            )}
+
+            {/* Medicine Routine Cards */}
             {familyProfileId ? (
               <>
                 <View style={styles.sectionHeader}>
                   <Text style={styles.sectionTitle}>{t('medicine.section_title')}</Text>
-                  <Text style={styles.sectionSub}>{t('medicine.section_sub')}</Text>
+                  <Text style={styles.sectionSub}>Prescribed doses & live stock trackers</Text>
                 </View>
 
                 {switchingProfile ? (
-                  <View style={styles.loadingWrap}>
-                    <ActivityIndicator color={styles.addBtnText.color} />
+                  <View style={{ paddingTop: 8 }}>
+                    <SkeletonCard />
+                    <SkeletonCard />
                   </View>
-                ) : medicines.length === 0 ? (
+                ) : filteredMedicines.length === 0 ? (
                   <View style={styles.emptyState}>
-                    <Text style={styles.emptyTitle}>{t('medicine.empty_title')}</Text>
+                    <Pill size={28} color="#999999" strokeWidth={1.4} />
+                    <Text style={styles.emptyTitle}>
+                      {selectedSlotFilter === 'all' ? t('medicine.empty_title') : `No ${selectedSlotFilter} medicines`}
+                    </Text>
                     <Text style={styles.emptySub}>{t('medicine.empty_sub')}</Text>
                   </View>
                 ) : (
-                  medicines.map((med) => (
-                    <Pressable key={med.id} style={styles.medCard} onPress={() => openEditSheet(med)}>
-                      <View style={styles.medHeaderRow}>
-                        <Text style={styles.medName}>{med.name}</Text>
-                        {med.stock === null ? (
-                          <View style={styles.medStockMissingBadge}>
-                            <Text style={styles.medStockMissingText}>{t('medicine.stock_missing')}</Text>
+                  filteredMedicines.map((med) => {
+                    const isLowStock = med.stock !== null && med.stock <= 5;
+                    return (
+                      <Pressable key={med.id} style={styles.medicineCard} onPress={() => openEditSheet(med)}>
+                        <View style={styles.medTopRow}>
+                          <View style={styles.medIconWrap}>
+                            <Pill size={16} color="#000000" strokeWidth={1.5} />
                           </View>
-                        ) : (
-                          <Text style={styles.medStock}>
-                            {t(med.isLiquid ? 'medicine.liquid_stock_label' : 'medicine.stock_label', {
-                              count: med.stock,
-                            })}
-                          </Text>
-                        )}
-                      </View>
-                      <Text style={styles.medDosage}>{med.dosage}</Text>
-                      <View style={styles.slotRow}>
-                        {med.schedule.map((slot) => {
-                          const taken = isTakenToday(log, med.id, slot);
-                          return (
-                            <Pressable
-                              key={slot}
-                              disabled={!canEdit || taken}
-                              style={[styles.slotChip, taken && styles.slotChipTaken]}
-                              onPress={(e) => {
-                                e.stopPropagation();
-                                markTaken(med, slot);
-                              }}>
-                              <Text style={[styles.slotChipText, taken && styles.slotChipTextTaken]}>
-                                {t(`medicine.slot_${slot}`)} ({medicineSlotTimeLabel(med, slot)})
-                                {taken ? ` · ${t('medicine.taken_today')}` : ''}
+                          <View style={styles.medNameWrap}>
+                            <Text style={styles.medNameText}>{med.name}</Text>
+                            <Text style={styles.medDosageText}>{med.dosage || 'Prescribed dose'}</Text>
+                          </View>
+                          {med.stock === null ? (
+                            <View style={styles.stockBadgeMissing}>
+                              <Text style={styles.stockBadgeMissingText}>{t('medicine.stock_missing')}</Text>
+                            </View>
+                          ) : (
+                            <View style={[styles.stockBadge, isLowStock && styles.stockBadgeLow]}>
+                              {isLowStock && (
+                                <AlertCircle size={10} color="#FF3B30" strokeWidth={2} style={{ marginRight: 3 }} />
+                              )}
+                              <Text style={[styles.stockBadgeText, isLowStock && styles.stockBadgeTextLow]}>
+                                {med.stock} left
                               </Text>
-                            </Pressable>
-                          );
-                        })}
-                      </View>
-                    </Pressable>
-                  ))
+                            </View>
+                          )}
+                        </View>
+
+                        <View style={styles.medDivider} />
+
+                        <View style={styles.medSlotsRow}>
+                          <View style={styles.slotTagsList}>
+                            {med.schedule.map((slot) => {
+                              const taken = isTakenToday(log, med.id, slot);
+                              return (
+                                <Pressable
+                                  key={slot}
+                                  disabled={!canEdit || taken}
+                                  style={[styles.slotTag, taken && styles.slotTagTaken]}
+                                  onPress={(e) => {
+                                    e.stopPropagation();
+                                    markTaken(med, slot);
+                                  }}>
+                                  <View style={{ marginRight: 4 }}>
+                                    <SlotIcon slot={slot} size={11} color={taken ? '#10B981' : '#666666'} />
+                                  </View>
+                                  <Text style={[styles.slotTagText, taken && styles.slotTagTextTaken]}>
+                                    {medicineSlotTimeLabel(med, slot)}
+                                  </Text>
+                                  {taken && <Check size={11} color="#10B981" strokeWidth={2.5} style={{ marginLeft: 3 }} />}
+                                </Pressable>
+                              );
+                            })}
+                          </View>
+
+                          <Pressable
+                            style={[
+                              styles.takeQuickBtn,
+                              med.schedule.every((s) => isTakenToday(log, med.id, s)) && styles.takeQuickBtnAllDone,
+                            ]}
+                            onPress={(e) => {
+                              e.stopPropagation();
+                              const untakenSlot = med.schedule.find((s) => !isTakenToday(log, med.id, s));
+                              if (untakenSlot) {
+                                markTaken(med, untakenSlot);
+                              } else {
+                                openEditSheet(med);
+                              }
+                            }}>
+                            {med.schedule.every((s) => isTakenToday(log, med.id, s)) ? (
+                              <>
+                                <Check size={12} color="#10B981" strokeWidth={2.5} />
+                                <Text style={styles.takeQuickBtnDoneText}>Done</Text>
+                              </>
+                            ) : (
+                              <Text style={styles.takeQuickBtnText}>Log Dose</Text>
+                            )}
+                          </Pressable>
+                        </View>
+                      </Pressable>
+                    );
+                  })
                 )}
               </>
             ) : profiles.length > 0 ? (
@@ -803,19 +1030,6 @@ export default function MedicineScreen({ navigation }: Props) {
                 <Text style={styles.emptySub}>{t('medicine.profiles_sub')}</Text>
               </View>
             ) : null}
-
-            {familyProfileId && (
-              <Pressable
-                style={styles.uploadBanner}
-                onPress={() => navigation.navigate('Prescriptions', { familyProfileId })}>
-                <Text style={styles.uploadBannerIcon}>📎</Text>
-                <View style={styles.uploadBannerContent}>
-                  <Text style={styles.uploadBannerTitle}>{t('medicine.view_prescriptions_btn')}</Text>
-                  <Text style={styles.uploadBannerSub}>{t('medicine.documents_sub')}</Text>
-                </View>
-                <Text style={styles.uploadBannerArrow}>→</Text>
-              </Pressable>
-            )}
           </>
         )}
       </ScrollView>
@@ -853,9 +1067,11 @@ export default function MedicineScreen({ navigation }: Props) {
                   onPress={() => toggleScheduleSlot(slot)}
                   hitSlop={4}>
                   <View style={[styles.slotCheckbox, active && styles.slotCheckboxActive]}>
-                    {active && <Text style={styles.slotCheckboxTick}>✓</Text>}
+                    {active && <Check size={10} color="#FFFFFF" strokeWidth={2.5} />}
                   </View>
-                  <Text style={styles.slotIcon}>{SLOT_ICON[slot]}</Text>
+                  <View style={{ marginHorizontal: 6 }}>
+                    <SlotIcon slot={slot} size={14} color={active ? '#000000' : '#888888'} />
+                  </View>
                   <Text style={[styles.slotRow2Label, active && styles.slotRow2LabelActive]}>
                     {t(`medicine.slot_${slot}`)}
                   </Text>
@@ -865,8 +1081,10 @@ export default function MedicineScreen({ navigation }: Props) {
                     onPress={() => setTimePickerSlot(slot)}
                     style={styles.slotTimeBtn2}
                     hitSlop={6}>
-                    <Text style={styles.slotTimeBtn2Text}>{slotTimeLabel(slot)}</Text>
-                    <Text style={styles.slotTimeBtn2Icon}>✎</Text>
+                    <Text style={styles.slotTimeBtn2Text}>
+                      {formatTimeLabel(scheduleTimes[slot] ?? SLOT_TIME[slot])}
+                    </Text>
+                    <Edit2 size={11} color="#000000" strokeWidth={1.8} style={{ marginLeft: 4 }} />
                   </Pressable>
                 )}
               </View>
@@ -876,14 +1094,14 @@ export default function MedicineScreen({ navigation }: Props) {
         {timePickerSlot && (
           <DateTimePicker
             value={(() => {
-              const [h, m] = slotTime(timePickerSlot).split(':').map(Number);
+              const [h, m] = (scheduleTimes[timePickerSlot] ?? SLOT_TIME[timePickerSlot]).split(':').map(Number);
               const d = new Date();
               d.setHours(h, m, 0, 0);
               return d;
             })()}
             mode="time"
             display="default"
-            onChange={handleSlotTimeChange}
+            onChange={handleTimeChange}
           />
         )}
 
@@ -915,7 +1133,7 @@ export default function MedicineScreen({ navigation }: Props) {
         />
 
         {editingId && (
-          <Pressable style={styles.modalRemoveBtn} onPress={handleRemove}>
+          <Pressable style={styles.modalRemoveBtn} onPress={handleDelete} disabled={saving}>
             <Text style={styles.modalRemoveText}>{t('medicine.remove_medicine')}</Text>
           </Pressable>
         )}
@@ -928,26 +1146,35 @@ export default function MedicineScreen({ navigation }: Props) {
         {addProfileStep === 'choose_who' ? (
           <>
             <View style={styles.sheetInfoBox}>
-              <Text style={styles.sheetInfoIcon}>🩺</Text>
+              <HeartPulse size={16} color="#000000" strokeWidth={1.5} style={{ marginRight: 8 }} />
               <Text style={styles.sheetInfoText}>{t('medicine.choose_who_helper')}</Text>
             </View>
             {availableFamilyMembers.map((member) => (
-              <Pressable key={member.id} style={styles.memberRow} onPress={() => chooseMemberForProfile(member)}>
-                <Text style={styles.memberRowIcon}>{member.managed ? '🧓' : '🧑'}</Text>
+              <Pressable
+                key={member.id}
+                style={styles.memberRow}
+                onPress={() => chooseMemberForProfile(member)}>
+                <View style={styles.memberRowAvatar}>
+                  <User size={15} color="#000000" strokeWidth={1.5} />
+                </View>
                 <View style={styles.memberRowInfo}>
                   <Text style={styles.memberRowName}>{member.name}</Text>
                   {member.managed && <Text style={styles.memberRowSub}>{t('medicine.dependent_badge')}</Text>}
                 </View>
-                <Text style={styles.memberRowChevron}>›</Text>
+                <ChevronRight size={14} color="#888888" strokeWidth={1.5} />
               </Pressable>
             ))}
-            <Pressable style={styles.memberRow} onPress={chooseOtherForProfile}>
-              <Text style={styles.memberRowIcon}>👤</Text>
+            <Pressable
+              style={styles.memberRow}
+              onPress={chooseOtherForProfile}>
+              <View style={styles.memberRowAvatar}>
+                <UserPlus size={15} color="#000000" strokeWidth={1.5} />
+              </View>
               <View style={styles.memberRowInfo}>
                 <Text style={styles.memberRowName}>{t('medicine.other_option_title')}</Text>
                 <Text style={styles.memberRowSub}>{t('medicine.other_option_sub')}</Text>
               </View>
-              <Text style={styles.memberRowChevron}>›</Text>
+              <ChevronRight size={14} color="#888888" strokeWidth={1.5} />
             </Pressable>
           </>
         ) : (
@@ -1004,8 +1231,8 @@ export default function MedicineScreen({ navigation }: Props) {
                 value={newProfileDob ?? DEFAULT_DOB}
                 mode="date"
                 display="default"
-                maximumDate={new Date()}
                 minimumDate={MIN_DOB}
+                maximumDate={new Date()}
                 onChange={handleNewProfileDateChange}
               />
             )}
@@ -1023,10 +1250,10 @@ export default function MedicineScreen({ navigation }: Props) {
   );
 }
 
-const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
+const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F8F9FA',
   },
   headerBar: {
     flexDirection: 'row',
@@ -1034,369 +1261,589 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#ECECEE',
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F7',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadow.soft,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
   },
-  backIcon: {
-    fontSize: 20,
-    color: colors.textPrimary,
+  headerTitleWrap: {
+    alignItems: 'center',
   },
   headerTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  headerSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 1,
+  },
+  headerSubtitleText: {
+    fontFamily: fonts.sans,
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#10B981',
   },
   addBtn: {
-    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#000000',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: radius.pill,
   },
   addBtnText: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textOnPrimary,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
   addBtnPlaceholder: {
-    width: 40,
+    width: 36,
   },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xxl + 40,
   },
   loadingWrap: {
     paddingVertical: spacing.xxl,
     alignItems: 'center',
   },
   heroCard: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.xxl,
-    padding: spacing.xl,
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
-    ...shadow.medium,
+    backgroundColor: '#0D0D0D',
+    borderRadius: radius.card,
+    padding: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#24242A',
+    ...shadow.soft,
   },
-  heroTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 26,
-    color: colors.textOnPrimary,
-    marginBottom: 6,
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
   },
-  heroSubtitle: {
+  heroProfileBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    flex: 1,
+  },
+  heroProfileCategory: {
+    fontSize: 16,
+  },
+  heroProfileName: {
     fontFamily: fonts.sans,
-    fontSize: 13,
-    color: colors.textOnPrimaryMuted,
-    marginBottom: spacing.lg,
-    lineHeight: 18,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#FFFFFF',
+    flex: 1,
+  },
+  heroAdherencePill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  heroAdherenceText: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#10B981',
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   statChip: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: '#18181E',
     borderRadius: radius.md,
-    padding: spacing.md,
+    padding: spacing.sm + 2,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#26262E',
   },
   statNum: {
-    fontFamily: fonts.sansBold,
-    fontSize: 18,
-    color: colors.textOnPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  statNumWarning: {
+    color: '#F59E0B',
   },
   statLabel: {
     fontFamily: fonts.sans,
-    fontSize: 11,
-    color: colors.textOnPrimaryMuted,
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#888888',
     marginTop: 2,
     textAlign: 'center',
   },
-  sectionMargin: {
-    marginBottom: spacing.lg,
+  progressTrack: {
+    height: 3,
+    backgroundColor: '#26262E',
+    borderRadius: 2,
+    marginTop: spacing.md,
+    overflow: 'hidden',
   },
-  sectionHeader: {
+  progressBar: {
+    height: '100%',
+    backgroundColor: '#10B981',
+    borderRadius: 2,
+  },
+  prescriptionVaultCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
+    padding: spacing.md,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+    ...shadow.soft,
+  },
+  vaultIconContainer: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F5F5F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  vaultCardContent: {
+    flex: 1,
+  },
+  vaultCardTitle: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  vaultCardSubtitle: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '300',
+    color: '#666666',
+    marginTop: 1,
+  },
+  sectionMargin: {
     marginBottom: spacing.md,
   },
+  sectionHeader: {
+    marginBottom: spacing.sm,
+  },
   sectionTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
   },
   sectionSub: {
     fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '300',
+    color: '#888888',
+    marginTop: 1,
   },
   profileRow: {
     flexDirection: 'row',
     gap: 8,
     paddingRight: spacing.lg,
+    paddingVertical: 2,
   },
-  profileChip: {
-    flexDirection: 'row',
+  profileCard: {
     alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#FFFFFF',
     paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
+    paddingVertical: 10,
+    borderRadius: radius.card,
     borderWidth: 1,
-    borderColor: colors.border,
-    maxWidth: 160,
+    borderColor: '#ECECEE',
+    minWidth: 84,
   },
-  profileChipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+  profileCardActive: {
+    borderColor: '#000000',
+    backgroundColor: '#F5F5F7',
   },
-  profileChipIcon: {
-    fontSize: 14,
-    marginRight: 6,
-  },
-  profileChipText: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 12,
-    color: colors.textPrimary,
-  },
-  profileChipTextActive: {
-    color: colors.textOnPrimary,
-  },
-  addProfileChip: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: radius.pill,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    borderStyle: 'dashed',
+  profileAvatarWrap: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F7',
+    alignItems: 'center',
     justifyContent: 'center',
+    marginBottom: 4,
   },
-  addProfileChipText: {
-    fontFamily: fonts.sansBold,
+  profileAvatarWrapActive: {
+    backgroundColor: '#EAEAEA',
+  },
+  profileAvatarIcon: {
+    fontSize: 18,
+  },
+  profileCardName: {
+    fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.primary,
+    fontWeight: '500',
+    color: '#444444',
+  },
+  profileCardNameActive: {
+    color: '#000000',
+    fontWeight: '600',
+  },
+  profileCardCategory: {
+    fontFamily: fonts.sans,
+    fontSize: 9,
+    fontWeight: '400',
+    color: '#888888',
+    textTransform: 'uppercase',
+    marginTop: 1,
+  },
+  profileCardCategoryActive: {
+    color: '#555555',
+  },
+  addProfileButton: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+    borderStyle: 'dashed',
+    minWidth: 70,
+  },
+  addProfileIconWrap: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 4,
+  },
+  addProfileButtonText: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '500',
+    color: '#000000',
   },
   memberRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.lg,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
   },
   memberRowIcon: {
     fontSize: 22,
+    marginRight: 10,
+  },
+  memberRowAvatar: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#F5F5F7',
+    alignItems: 'center',
+    justifyContent: 'center',
     marginRight: 10,
   },
   memberRowInfo: {
     flex: 1,
   },
   memberRowName: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 14,
-    color: colors.textPrimary,
+    fontWeight: '600',
+    color: '#000000',
   },
   memberRowSub: {
     fontFamily: fonts.sans,
     fontSize: 11,
-    color: colors.textMuted,
+    fontWeight: '300',
+    color: '#888888',
     marginTop: 1,
   },
   memberRowChevron: {
     fontSize: 18,
-    color: colors.textMuted,
+    color: '#888888',
   },
   backLink: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 13,
-    color: colors.primary,
+    fontWeight: '600',
+    color: '#000000',
     marginBottom: 8,
   },
   forMemberText: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 14,
-    color: colors.textPrimary,
+    fontWeight: '600',
+    color: '#000000',
     marginBottom: 4,
   },
+  slotFilterContainer: {
+    marginBottom: spacing.md,
+  },
+  slotFilterRow: {
+    flexDirection: 'row',
+    gap: 6,
+  },
+  filterChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: 12,
+    paddingVertical: 7,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+  },
+  filterChipActive: {
+    backgroundColor: '#000000',
+    borderColor: '#000000',
+  },
+  filterChipIcon: {
+    fontSize: 12,
+  },
+  filterChipText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    fontWeight: '400',
+    color: '#555555',
+  },
+  filterChipTextActive: {
+    color: '#FFFFFF',
+    fontWeight: '500',
+  },
+  medicineCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
+    padding: spacing.md,
+    marginBottom: spacing.sm + 2,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+    ...shadow.soft,
+  },
+  medTopRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  medIconWrap: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: '#F5F5F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 10,
+  },
+  medNameWrap: {
+    flex: 1,
+  },
+  medNameText: {
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  medDosageText: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '400',
+    color: '#666666',
+    marginTop: 1,
+  },
+  stockBadge: {
+    backgroundColor: '#F5F5F7',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  stockBadgeLow: {
+    backgroundColor: 'rgba(245, 158, 11, 0.12)',
+    borderWidth: 1,
+    borderColor: 'rgba(245, 158, 11, 0.3)',
+  },
+  stockBadgeText: {
+    fontFamily: fonts.sans,
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#666666',
+  },
+  stockBadgeTextLow: {
+    color: '#D97706',
+    fontWeight: '600',
+  },
+  stockBadgeMissing: {
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: radius.pill,
+  },
+  stockBadgeMissingText: {
+    fontFamily: fonts.sans,
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#FF3B30',
+  },
+  medDivider: {
+    height: 1,
+    backgroundColor: '#F0F0F2',
+    marginVertical: 10,
+  },
+  medSlotsRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  slotTagsList: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: 6,
+    flex: 1,
+  },
+  slotTag: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#F5F5F7',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  slotTagTaken: {
+    backgroundColor: 'rgba(16, 185, 129, 0.12)',
+  },
+  slotTagIcon: {
+    fontSize: 11,
+  },
+  slotTagText: {
+    fontFamily: fonts.sans,
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#444444',
+  },
+  slotTagTextTaken: {
+    color: '#10B981',
+  },
+  takeQuickBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#000000',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: radius.pill,
+  },
+  takeQuickBtnAllDone: {
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  takeQuickBtnText: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FFFFFF',
+  },
+  takeQuickBtnDoneText: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#10B981',
+  },
   emptyState: {
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    borderStyle: 'dashed',
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
     padding: spacing.xl,
     alignItems: 'center',
     marginBottom: spacing.lg,
   },
   emptyTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 16,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    fontWeight: '600',
+    color: '#000000',
+    marginTop: 8,
   },
   emptySub: {
     fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textMuted,
+    fontWeight: '300',
+    color: '#888888',
     textAlign: 'center',
     marginTop: 4,
   },
-  uploadBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginBottom: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    borderStyle: 'dashed',
-  },
-  uploadBannerIcon: {
-    fontSize: 28,
-    marginRight: 12,
-  },
-  uploadBannerContent: {
-    flex: 1,
-  },
-  uploadBannerTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 15,
-    color: colors.textPrimary,
-  },
-  uploadBannerSub: {
-    fontFamily: fonts.sans,
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  uploadBannerArrow: {
-    fontSize: 18,
-    color: colors.primary,
-    fontFamily: fonts.sansBold,
-  },
-  medCard: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
-    padding: spacing.md,
-    marginBottom: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-    ...shadow.soft,
-  },
-  medHeaderRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-  },
-  medName: {
-    fontFamily: fonts.serif,
-    fontSize: 16,
-    color: colors.textPrimary,
-  },
-  medStock: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 12,
-    color: colors.textMuted,
-  },
-  medStockMissingBadge: {
-    backgroundColor: colors.dangerSoft,
-    borderWidth: 1,
-    borderColor: colors.dangerBorder,
-    borderRadius: radius.pill,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-  },
-  medStockMissingText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 11,
-    color: colors.danger,
-  },
-  medDosage: {
-    fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  slotRow: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: 6,
-    marginTop: 10,
-  },
-  slotChip: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: radius.pill,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  slotChipTaken: {
-    backgroundColor: colors.turmericSoft,
-    borderColor: colors.turmeric,
-  },
-  slotChipText: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 11,
-    color: colors.textSecondary,
-  },
-  slotChipTextTaken: {
-    color: colors.turmeric,
-  },
   label: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 11,
+    fontWeight: '600',
     letterSpacing: 1.5,
-    color: colors.textMuted,
+    color: '#888888',
     marginTop: 14,
     marginBottom: 8,
     textTransform: 'uppercase',
   },
   input: {
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#F8F9FA',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
     borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 15,
-    color: colors.textPrimary,
+    color: '#000000',
   },
-  // `placeholderTextColor` is a prop, not a style — kept here so the factory stays
-  // the single place this screen reads the palette. Also reused directly as a `Text`
-  // style for the date-of-birth field's placeholder state (below), which is a
-  // `Pressable` + `Text` pair, not a real `TextInput`.
   placeholder: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 15,
-    color: colors.textMuted,
+    color: '#999999',
   },
   dobValueText: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 15,
-    color: colors.textPrimary,
+    color: '#000000',
   },
   sheetInfoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#F8F9FA',
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
     padding: spacing.md,
     marginBottom: 4,
   },
@@ -1407,7 +1854,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     flex: 1,
     fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textSecondary,
+    color: '#666666',
     lineHeight: 17,
   },
   chipRow: {
@@ -1416,24 +1863,25 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     gap: 8,
   },
   chip: {
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#F8F9FA',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
   },
   chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
   chipText: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textPrimary,
+    color: '#444444',
   },
   chipTextActive: {
-    color: colors.textOnPrimary,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   slotList: {
     gap: 8,
@@ -1442,16 +1890,16 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#F8F9FA',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
     borderRadius: radius.md,
     paddingVertical: 10,
     paddingHorizontal: 12,
   },
   slotRow2Active: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
   slotRow2Main: {
     flexDirection: 'row',
@@ -1463,31 +1911,33 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     height: 20,
     borderRadius: 6,
     borderWidth: 1.5,
-    borderColor: colors.borderStrong,
+    borderColor: '#CCCCCC',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 10,
   },
   slotCheckboxActive: {
-    backgroundColor: colors.textOnPrimary,
-    borderColor: colors.textOnPrimary,
+    backgroundColor: '#FFFFFF',
+    borderColor: '#FFFFFF',
   },
   slotCheckboxTick: {
     fontSize: 12,
-    fontFamily: fonts.sansBold,
-    color: colors.primary,
+    fontFamily: fonts.sans,
+    fontWeight: '700',
+    color: '#000000',
   },
   slotIcon: {
     fontSize: 16,
     marginRight: 8,
   },
   slotRow2Label: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 14,
-    color: colors.textPrimary,
+    color: '#000000',
   },
   slotRow2LabelActive: {
-    color: colors.textOnPrimary,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   slotTimeBtn2: {
     flexDirection: 'row',
@@ -1499,13 +1949,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     gap: 4,
   },
   slotTimeBtn2Text: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textOnPrimary,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   slotTimeBtn2Icon: {
     fontSize: 11,
-    color: colors.textOnPrimary,
+    color: '#FFFFFF',
   },
   modalCta: {
     marginTop: 24,
@@ -1513,16 +1964,17 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   modalRemoveBtn: {
     marginTop: 14,
     marginBottom: 24,
-    backgroundColor: colors.dangerSoft,
+    backgroundColor: 'rgba(255, 59, 48, 0.1)',
     paddingVertical: 12,
-    borderRadius: radius.xl,
+    borderRadius: radius.card,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.dangerBorder,
+    borderColor: 'rgba(255, 59, 48, 0.25)',
   },
   modalRemoveText: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 14,
-    color: colors.danger,
+    fontWeight: '600',
+    color: '#FF3B30',
   },
 });

@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert, ActivityIndicator } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, TextInput, Alert, ActivityIndicator, RefreshControl } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../app/_layout';
@@ -8,7 +8,25 @@ import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
+import { SkeletonBox, SkeletonCard, SkeletonHeroCard } from '../../components/Skeleton';
 import useAuth from '../../hooks/useAuth';
+import {
+  ArrowLeft,
+  ChevronRight,
+  UserPlus,
+  HeartHandshake,
+  Sparkles,
+  ShieldCheck,
+  Phone,
+  User,
+  Users,
+  Mail,
+  Send,
+  Check,
+  X,
+  AlertCircle,
+  Plus,
+} from 'lucide-react-native';
 import {
   acceptInvite,
   addManagedMember,
@@ -51,6 +69,7 @@ export default function FamilyScreen({ navigation }: Props) {
   const { getAccessToken, getUserId } = useAuth();
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [family, setFamily] = useState<Family | null>(null);
   const [myMembership, setMyMembership] = useState<MyMembership>(EMPTY_MEMBERSHIP);
   // Needed to work out, for a card that isn't `myMembership.member` itself, "is this the
@@ -156,6 +175,15 @@ export default function FamilyScreen({ navigation }: Props) {
     }
   }, [getAccessToken, getUserId, showError]);
 
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      await reload({ silent: true });
+    } finally {
+      setRefreshing(false);
+    }
+  }, [reload]);
+
   useEffect(() => {
     setLoading(true);
     reload({ silent: true }).finally(() => setLoading(false));
@@ -163,8 +191,7 @@ export default function FamilyScreen({ navigation }: Props) {
     return () => {
       unsubscribe();
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [reload]);
 
   const handleCreateFamily = async () => {
     if (!newFamilyName.trim()) {
@@ -381,29 +408,14 @@ export default function FamilyScreen({ navigation }: Props) {
     ]);
   };
 
-  const managedCount = family?.members.filter((m) => m.managed).length ?? 0;
+  const managedCount = family ? family.members.filter((m) => m.managed).length : 0;
 
-  // `member.relation`/`relatedToName` describe one directed edge — "this member relates
-  // to relatedToUserId as relation" — recorded once, on the accepted-invite member's own
-  // row. That's enough to show a relation next to a member *I* invited (their row's
-  // `relatedToUserId` is my own userId, so `member.relation` already reads correctly as
-  // "their relation to me"). It is NOT enough, on its own, to label the person who
-  // invited *me* — that person's own row (often the OWNER) carries no relation fields at
-  // all, since nobody accepted an invite to become them. My own row's
-  // `reciprocalRelation` is the other half of that same edge, so borrowing it here is
-  // what makes their card show "Brother" instead of nothing. Only resolvable when the
-  // other side is the OWNER, since that's the one non-owner row whose userId this screen
-  // can actually confirm (`family.ownerUserId`) — see docs/BACKEND_CONTEXT.md's
-  // identity-resolution gap for why every other pairing can't be resolved this way.
-  const getDisplayRelation = (member: FamilyMember): FamilyRelation | null => {
-    if (!family || !myMembership.member || member.id === myMembership.member.id) {
-      return null;
-    }
-    if (myUserId && member.relatedToUserId === myUserId) {
-      return member.relation;
-    }
-    if (member.role === 'OWNER' && myMembership.member.relatedToUserId === family.ownerUserId) {
-      return myMembership.member.reciprocalRelation;
+  const getDisplayRelation = (member: FamilyMember): string | null => {
+    if (member.relation) return member.relation;
+    if (myMembership.member?.relatedToUserId && myUserId && member.id !== myMembership.member.id) {
+      if (myMembership.member.relatedToUserId === member.id || myMembership.member.relatedToUserId === family?.ownerUserId) {
+        return myMembership.member.relation ?? null;
+      }
     }
     return null;
   };
@@ -411,12 +423,19 @@ export default function FamilyScreen({ navigation }: Props) {
   return (
     <View style={styles.root} key={localeVersion}>
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <Text style={styles.backIcon}>←</Text>
+        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn} accessibilityLabel="Back">
+          <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
         </Pressable>
-        <Text style={styles.headerTitle}>{t('family.header_title')}</Text>
+        <View style={styles.headerTitleWrap}>
+          <Text style={styles.headerTitle}>{t('family.header_title')}</Text>
+          <View style={styles.headerSubtitleRow}>
+            <ShieldCheck size={11} color="#10B981" strokeWidth={1.8} />
+            <Text style={styles.headerSubtitleText}>Private & Encrypted Hub</Text>
+          </View>
+        </View>
         {family ? (
           <Pressable onPress={openInviteSheet} style={styles.addBtn}>
+            <UserPlus size={13} color="#FFFFFF" strokeWidth={2.2} />
             <Text style={styles.addBtnText}>{t('family.invite_btn')}</Text>
           </Pressable>
         ) : (
@@ -424,62 +443,47 @@ export default function FamilyScreen({ navigation }: Props) {
         )}
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#000000"
+            colors={['#000000']}
+          />
+        }>
         {loading ? (
-          <View style={styles.loadingWrap}>
-            <ActivityIndicator color={styles.addBtnText.color} />
+          <View style={{ paddingTop: 8 }}>
+            <SkeletonHeroCard />
+            <SkeletonCard />
+            <SkeletonCard />
           </View>
         ) : loadError ? (
           <View style={styles.emptyState}>
-            <Text style={styles.emptyStateIcon}>📡</Text>
+            <View style={{ marginBottom: 12 }}>
+              <AlertCircle size={28} color="#888888" strokeWidth={1.5} />
+            </View>
             <Text style={styles.emptyStateTitle}>{t('family.load_error_title')}</Text>
             <Text style={styles.emptyStateSub}>{t(errorMessageKey(loadError))}</Text>
             <Button
               title={t('family.retry_btn')}
-              onPress={() => {
-                setLoading(true);
-                reload({ silent: true }).finally(() => setLoading(false));
-              }}
+              onPress={() => reload()}
               style={styles.modalCta}
             />
           </View>
-        ) : (
-          <>
-            {invitesForMe.length > 0 && (
-              <View style={styles.inviteForMeSection}>
-                <Text style={styles.sectionTitle}>{t('family.invites_for_me_title')}</Text>
-                {invitesForMe.map((invite) => (
-                  <View key={invite.id} style={styles.inviteForMeCard}>
-                    <Text style={styles.inviteForMeText}>
-                      {t('family.invited_by', { name: invite.invitedByName, family: invite.familyName })}
-                    </Text>
-                    <Text style={styles.inviteForMeRelation}>
-                      {t('family.invited_as_relation', { relation: t(`family.relation_${invite.relation.toLowerCase()}`) })}
-                    </Text>
-                    <View style={styles.inviteResponseRow}>
-                      <Pressable style={styles.acceptBtn} onPress={() => openAcceptSheet(invite)}>
-                        <Text style={styles.acceptBtnText}>{t('family.accept')}</Text>
-                      </Pressable>
-                      <Pressable style={styles.declineBtn} onPress={() => handleDeclineInvite(invite)}>
-                        <Text style={styles.declineBtnText}>{t('family.decline')}</Text>
-                      </Pressable>
-                    </View>
-                  </View>
-                ))}
-              </View>
-            )}
-
-            {!family ? (
-              <View style={styles.emptyState}>
-                <Text style={styles.emptyStateIcon}>🏠</Text>
+        ) : !family ? (
+            <View style={styles.emptyState}>
+                <View style={{ marginBottom: 12 }}>
+                  <Users size={28} color="#888888" strokeWidth={1.5} />
+                </View>
                 <Text style={styles.emptyStateTitle}>{t('family.no_family_title')}</Text>
-                <Text style={styles.emptyStateSub}>{t('family.no_family_sub')}</Text>
                 <TextInput
                   style={styles.input}
                   value={newFamilyName}
                   onChangeText={setNewFamilyName}
                   placeholder={t('family.create_family_placeholder')}
-                  placeholderTextColor={styles.placeholder.color}
                 />
                 <Button
                   title={t('family.create_family_btn')}
@@ -487,127 +491,210 @@ export default function FamilyScreen({ navigation }: Props) {
                   loading={creatingFamily}
                   style={styles.modalCta}
                 />
-              </View>
-            ) : (
-              <>
-                <View style={styles.heroCard}>
+            </View>
+        ) : (
+          <>
+            <View style={styles.heroCard}>
+              <View style={styles.heroTopRow}>
+                <View style={styles.heroTitleWrap}>
                   <Text style={styles.heroTitle}>{family.name}</Text>
-                  <Text style={styles.heroSubtitle}>{t('family.hero_subtitle')}</Text>
-                  <View style={styles.statsRow}>
-                    <View style={styles.statChip}>
-                      <Text style={styles.statNum}>{family.members.length}</Text>
-                      <Text style={styles.statLabel}>{t('family.stat_members')}</Text>
-                    </View>
-                    <View style={styles.statChip}>
-                      <Text style={styles.statNum}>{managedCount}</Text>
-                      <Text style={styles.statLabel}>{t('family.stat_managed')}</Text>
-                    </View>
+                  <Text style={styles.heroSubtitle}>Shared Health & Household Sync</Text>
+                </View>
+                <View style={styles.heroSyncBadge}>
+                  <Sparkles size={11} color="#10B981" strokeWidth={2} />
+                  <Text style={styles.heroSyncText}>Active Hub</Text>
+                </View>
+              </View>
+
+              <View style={styles.avatarStackRow}>
+                {family.members.slice(0, 5).map((m, idx) => (
+                  <View key={m.id} style={[styles.stackAvatarBubble, { zIndex: 10 - idx, marginLeft: idx === 0 ? 0 : -10 }]}>
+                    <User size={13} color="#FFFFFF" strokeWidth={1.6} />
                   </View>
-                </View>
+                ))}
+                {family.members.length > 5 && (
+                  <View style={[styles.stackAvatarBubble, styles.stackAvatarBubbleMore, { zIndex: 4, marginLeft: -10 }]}>
+                    <Text style={styles.stackAvatarMoreText}>+{family.members.length - 5}</Text>
+                  </View>
+                )}
+              </View>
 
-                <View style={styles.sectionHeader}>
-                  <Text style={styles.sectionTitle}>{t('family.section_title')}</Text>
-                  <Text style={styles.sectionSub}>{t('family.section_sub')}</Text>
+              <View style={styles.statsRow}>
+                <View style={styles.statChip}>
+                  <Text style={styles.statNum}>{family.members.length}</Text>
+                  <Text style={styles.statLabel}>{t('family.stat_members')}</Text>
                 </View>
+                <View style={styles.statChip}>
+                  <Text style={styles.statNum}>{managedCount}</Text>
+                  <Text style={styles.statLabel}>{t('family.stat_managed')}</Text>
+                </View>
+                <View style={styles.statChip}>
+                  <Text style={styles.statNum}>{pendingInvitesAdmin.length}</Text>
+                  <Text style={styles.statLabel}>Invited</Text>
+                </View>
+              </View>
+            </View>
 
-                {family.members.map((member) => {
+            <View style={styles.sectionMargin}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Circle Members</Text>
+                <Text style={styles.sectionSub}>Active household members with app access</Text>
+              </View>
+
+              {family.members
+                .filter((m) => !m.managed)
+                .map((member) => {
                   const displayRelation = getDisplayRelation(member);
+                  const isOwner = member.role === 'OWNER';
                   return (
                     <Pressable key={member.id} style={styles.memberCard} onPress={() => openViewMember(member)}>
                       <View style={styles.memberAvatarWrap}>
-                        <Text style={styles.memberAvatar}>{member.managed ? '🧓' : '🧑'}</Text>
+                        <User size={18} color="#000000" strokeWidth={1.5} />
                       </View>
                       <View style={styles.memberInfo}>
                         <View style={styles.nameRow}>
                           <Text style={styles.memberName}>{member.name}</Text>
-                          <View style={[styles.roleBadge, member.role === 'OWNER' ? styles.roleOwner : styles.roleEditor]}>
-                            <Text style={styles.roleText}>{t(`family.role_${member.role.toLowerCase()}`)}</Text>
+                          <View style={[styles.roleBadge, isOwner ? styles.roleOwner : styles.roleEditor]}>
+                            <Text style={[styles.roleText, isOwner && styles.roleTextOwner]}>
+                              {t(`family.role_${member.role.toLowerCase()}`)}
+                            </Text>
                           </View>
-                          {displayRelation && (
-                            <View style={styles.relationBadge}>
-                              <Text style={styles.relationBadgeText}>
+                        </View>
+                        <View style={styles.memberSubRow}>
+                          {displayRelation ? (
+                            <View style={styles.relationPill}>
+                              <Text style={styles.relationPillText}>
                                 {t(`family.relation_${displayRelation.toLowerCase()}`)}
                               </Text>
                             </View>
-                          )}
-                          {member.managed && (
-                            <View style={styles.managedBadge}>
-                              <Text style={styles.managedBadgeText}>{t('family.managed_badge')}</Text>
-                            </View>
-                          )}
+                          ) : null}
+                          <Text style={styles.memberSubText}>Full App Access</Text>
                         </View>
                       </View>
-                      <View style={styles.editChevronWrap}>
-                        <Text style={styles.editChevron}>›</Text>
-                      </View>
+                      <ChevronRight size={16} color="#888888" strokeWidth={1.4} />
                     </Pressable>
                   );
                 })}
+            </View>
 
-                <Pressable style={styles.inviteBanner} onPress={openManagedSheet}>
-                  <Text style={styles.inviteBannerIcon}>👪</Text>
-                  <View style={styles.inviteBannerContent}>
-                    <Text style={styles.inviteBannerTitle}>{t('family.add_managed_title')}</Text>
-                    <Text style={styles.inviteBannerSub}>{t('family.add_managed_sub')}</Text>
-                  </View>
-                  <Text style={styles.inviteBannerArrow}>→</Text>
-                </Pressable>
+            <View style={styles.sectionMargin}>
+              <View style={styles.sectionHeader}>
+                <Text style={styles.sectionTitle}>Managed Dependents</Text>
+                <Text style={styles.sectionSub}>Children & elders managed by this household</Text>
+              </View>
 
-                {pendingInvitesAdmin.length > 0 && (
-                  <View style={styles.inviteForMeSection}>
-                    <Text style={styles.sectionTitle}>
-                      {t('family.pending_invites_admin_title')} ({pendingInvitesAdmin.length})
-                    </Text>
-                    {pendingInvitesAdmin.map((invite) => (
-                      <View key={invite.id} style={styles.pendingAdminRow}>
-                        <Text style={styles.pendingAdminText}>
-                          {invitedPhones[invite.id]
-                            ? t('family.pending_invite_sent_to', { phone: invitedPhones[invite.id] })
-                            : t('family.status_pending')}
-                        </Text>
-                        <Pressable onPress={() => handleCancelInvite(invite)}>
-                          <Text style={styles.cancelInviteText}>{t('family.cancel_invite')}</Text>
-                        </Pressable>
-                      </View>
-                    ))}
-                  </View>
-                )}
-
-                <View style={styles.inviteForMeSection}>
-                  <Pressable style={styles.historyToggleRow} onPress={toggleInviteHistory}>
-                    <Text style={styles.sectionTitle}>{t('family.invite_history_title')}</Text>
-                    <Text style={styles.historyToggleText}>
-                      {showHistory ? t('family.history_hide') : t('family.history_show')}
-                    </Text>
-                  </Pressable>
-                  {showHistory && (
-                    loadingHistory ? (
-                      <View style={styles.loadingWrap}>
-                        <ActivityIndicator color={styles.addBtnText.color} />
-                      </View>
-                    ) : inviteHistory.length === 0 ? (
-                      <Text style={styles.historyEmptyText}>{t('family.history_empty')}</Text>
-                    ) : (
-                      inviteHistory.map((invite) => (
-                        <View key={invite.id} style={styles.pendingAdminRow}>
-                          <Text style={styles.pendingAdminText}>
-                            {new Date(invite.createdAt).toLocaleDateString()}
-                          </Text>
-                          <Text style={[styles.historyStatusText, styles[`historyStatus_${invite.status}` as const]]}>
-                            {t(`family.status_${invite.status.toLowerCase()}`)}
-                          </Text>
-                        </View>
-                      ))
-                    )
-                  )}
+              {family.members.filter((m) => m.managed).length === 0 ? (
+                <View style={styles.emptyDependentCard}>
+                  <Text style={styles.emptyDependentText}>No managed dependents added yet</Text>
                 </View>
+              ) : (
+                family.members
+                  .filter((m) => m.managed)
+                  .map((member) => {
+                    const displayRelation = getDisplayRelation(member);
+                    return (
+                      <Pressable key={member.id} style={styles.memberCard} onPress={() => openViewMember(member)}>
+                        <View style={[styles.memberAvatarWrap, styles.memberAvatarWrapManaged]}>
+                          <User size={18} color="#000000" strokeWidth={1.5} />
+                        </View>
+                        <View style={styles.memberInfo}>
+                          <View style={styles.nameRow}>
+                            <Text style={styles.memberName}>{member.name}</Text>
+                            <View style={styles.managedBadge}>
+                              <Text style={styles.managedBadgeText}>{t('family.managed_badge')}</Text>
+                            </View>
+                          </View>
+                          <View style={styles.memberSubRow}>
+                            {displayRelation ? (
+                              <View style={styles.relationPill}>
+                                <Text style={styles.relationPillText}>
+                                  {t(`family.relation_${displayRelation.toLowerCase()}`)}
+                                </Text>
+                              </View>
+                            ) : null}
+                            <Text style={styles.memberSubText}>Managed Profile</Text>
+                          </View>
+                        </View>
+                        <ChevronRight size={16} color="#888888" strokeWidth={1.4} />
+                      </Pressable>
+                    );
+                  })
+              )}
 
-                {myMembership.member && myMembership.role !== 'OWNER' && (
-                  <Pressable style={styles.modalLeaveBtn} onPress={handleLeaveFamily}>
-                    <Text style={styles.modalLeaveText}>{t('family.leave_family')}</Text>
-                  </Pressable>
-                )}
-              </>
+              <Pressable style={styles.addManagedBanner} onPress={openManagedSheet}>
+                <View style={styles.addManagedIconWrap}>
+                  <HeartHandshake size={20} color="#000000" strokeWidth={1.5} />
+                </View>
+                <View style={styles.addManagedContent}>
+                  <Text style={styles.addManagedTitle}>{t('family.add_managed_title')}</Text>
+                  <Text style={styles.addManagedSub}>{t('family.add_managed_sub')}</Text>
+                </View>
+                <ChevronRight size={16} color="#888888" strokeWidth={1.4} />
+              </Pressable>
+            </View>
+
+            {pendingInvitesAdmin.length > 0 && (
+              <View style={styles.inviteForMeSection}>
+                <View style={styles.sectionHeader}>
+                  <Text style={styles.sectionTitle}>
+                    {t('family.pending_invites_admin_title')} ({pendingInvitesAdmin.length})
+                  </Text>
+                  <Text style={styles.sectionSub}>Invitations awaiting member acceptance</Text>
+                </View>
+                {pendingInvitesAdmin.map((invite) => (
+                  <View key={invite.id} style={styles.pendingAdminRow}>
+                    <View style={styles.pendingAdminInfo}>
+                      <Phone size={14} color="#555555" strokeWidth={1.5} />
+                      <Text style={styles.pendingAdminText}>
+                        {invitedPhones[invite.id]
+                          ? invitedPhones[invite.id]
+                          : t('family.status_pending')}
+                      </Text>
+                    </View>
+                    <Pressable style={styles.cancelInvitePill} onPress={() => handleCancelInvite(invite)}>
+                      <Text style={styles.cancelInviteText}>{t('family.cancel_invite')}</Text>
+                    </Pressable>
+                  </View>
+                ))}
+              </View>
+            )}
+
+            <View style={styles.inviteForMeSection}>
+              <Pressable style={styles.historyToggleRow} onPress={toggleInviteHistory}>
+                <View>
+                  <Text style={styles.sectionTitle}>{t('family.invite_history_title')}</Text>
+                  <Text style={styles.sectionSub}>Audit log of previous invitations</Text>
+                </View>
+                <Text style={styles.historyToggleText}>
+                  {showHistory ? t('family.history_hide') : t('family.history_show')}
+                </Text>
+              </Pressable>
+              {showHistory && (
+                loadingHistory ? (
+                  <View style={styles.loadingWrap}>
+                    <ActivityIndicator color="#000000" />
+                  </View>
+                ) : inviteHistory.length === 0 ? (
+                  <Text style={styles.historyEmptyText}>{t('family.history_empty')}</Text>
+                ) : (
+                  inviteHistory.map((invite) => (
+                    <View key={invite.id} style={styles.historyCard}>
+                      <Text style={styles.historyCardDate}>
+                        {new Date(invite.createdAt).toLocaleDateString()}
+                      </Text>
+                      <Text style={[styles.historyStatusText, styles[`historyStatus_${invite.status}` as const]]}>
+                        {t(`family.status_${invite.status.toLowerCase()}`)}
+                      </Text>
+                    </View>
+                  ))
+                )
+              )}
+            </View>
+
+            {myMembership.member && myMembership.role !== 'OWNER' && (
+              <Pressable style={styles.modalLeaveBtn} onPress={handleLeaveFamily}>
+                <Text style={styles.modalLeaveText}>{t('family.leave_family')}</Text>
+              </Pressable>
             )}
           </>
         )}
@@ -615,7 +702,7 @@ export default function FamilyScreen({ navigation }: Props) {
 
       <BottomSheet visible={showInviteSheet} onClose={() => setShowInviteSheet(false)} title={t('family.sheet_title_invite')}>
         <View style={styles.sheetInfoBox}>
-          <Text style={styles.sheetInfoIcon}>📨</Text>
+          <Mail size={16} color="#000000" strokeWidth={1.5} style={{ marginRight: 8 }} />
           <Text style={styles.sheetInfoText}>{t('family.invite_helper')}</Text>
         </View>
         <Text style={styles.label}>{t('family.label_phone')}</Text>
@@ -648,7 +735,7 @@ export default function FamilyScreen({ navigation }: Props) {
         {acceptingInvite && (
           <>
             <View style={styles.sheetInfoBox}>
-              <Text style={styles.sheetInfoIcon}>🤝</Text>
+              <HeartHandshake size={16} color="#000000" strokeWidth={1.5} style={{ marginRight: 8 }} />
               <Text style={styles.sheetInfoText}>
                 {t('family.accept_helper', {
                   name: acceptingInvite.invitedByName,
@@ -685,7 +772,7 @@ export default function FamilyScreen({ navigation }: Props) {
 
       <BottomSheet visible={showManagedSheet} onClose={() => setShowManagedSheet(false)} title={t('family.sheet_title_managed')}>
         <View style={styles.sheetInfoBox}>
-          <Text style={styles.sheetInfoIcon}>🧓</Text>
+          <UserPlus size={16} color="#000000" strokeWidth={1.5} style={{ marginRight: 8 }} />
           <Text style={styles.sheetInfoText}>{t('family.managed_helper')}</Text>
         </View>
         <Text style={styles.label}>{t('family.label_name')}</Text>
@@ -751,7 +838,7 @@ export default function FamilyScreen({ navigation }: Props) {
 const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
   root: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F8F9FA',
   },
   headerBar: {
     flexDirection: 'row',
@@ -759,304 +846,485 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.sm,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#ECECEE',
   },
   backBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.surface,
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: '#F5F5F7',
     alignItems: 'center',
     justifyContent: 'center',
-    ...shadow.soft,
+    borderWidth: 1,
+    borderColor: '#EAEAEA',
   },
-  backIcon: {
-    fontSize: 20,
-    color: colors.textPrimary,
+  headerTitleWrap: {
+    alignItems: 'center',
   },
   headerTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  headerSubtitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    marginTop: 1,
+  },
+  headerSubtitleText: {
+    fontFamily: fonts.sans,
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#10B981',
   },
   addBtn: {
-    backgroundColor: colors.primary,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: '#000000',
     paddingHorizontal: 12,
-    paddingVertical: 6,
+    paddingVertical: 7,
     borderRadius: radius.pill,
   },
   addBtnPlaceholder: {
-    width: 1,
+    width: 36,
   },
   addBtnText: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textOnPrimary,
+    fontWeight: '500',
+    color: '#FFFFFF',
   },
   content: {
     paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xxl,
+    paddingTop: spacing.sm,
+    paddingBottom: spacing.xxl + 40,
   },
   loadingWrap: {
     paddingVertical: spacing.xxl,
     alignItems: 'center',
   },
   emptyState: {
-    marginTop: spacing.xxl,
+    marginTop: spacing.xl,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+    padding: spacing.xl,
     alignItems: 'center',
-    paddingHorizontal: spacing.lg,
+    ...shadow.soft,
   },
   emptyStateIcon: {
-    fontSize: 40,
-    marginBottom: spacing.md,
+    fontSize: 36,
+    marginBottom: spacing.sm,
   },
   emptyStateTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
     textAlign: 'center',
   },
   emptyStateSub: {
     fontFamily: fonts.sans,
-    fontSize: 13,
-    color: colors.textMuted,
+    fontSize: 12,
+    fontWeight: '300',
+    color: '#888888',
     textAlign: 'center',
-    marginTop: 6,
-    marginBottom: spacing.lg,
+    marginTop: 4,
+    marginBottom: spacing.md,
   },
   inviteForMeSection: {
-    marginTop: spacing.md,
-    marginBottom: spacing.lg,
+    marginBottom: spacing.md,
   },
   inviteForMeCard: {
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
     padding: spacing.md,
-    marginTop: spacing.sm,
-    borderWidth: 1.5,
-    borderColor: colors.turmeric,
-    borderStyle: 'dashed',
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+    ...shadow.soft,
   },
   inviteForMeText: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 13,
-    color: colors.textPrimary,
+    fontWeight: '600',
+    color: '#000000',
   },
   inviteForMeRelation: {
     fontFamily: fonts.sans,
     fontSize: 11,
-    color: colors.textMuted,
+    fontWeight: '400',
+    color: '#666666',
     marginTop: 2,
   },
   heroCard: {
-    backgroundColor: colors.primary,
-    borderRadius: radius.xxl,
-    padding: spacing.xl,
-    marginTop: spacing.md,
-    marginBottom: spacing.xl,
-    ...shadow.medium,
+    backgroundColor: '#0D0D0D',
+    borderRadius: radius.card,
+    padding: spacing.lg,
+    marginTop: spacing.xs,
+    marginBottom: spacing.md,
+    borderWidth: 1,
+    borderColor: '#24242A',
+    ...shadow.soft,
+  },
+  heroTopRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+  },
+  heroTitleWrap: {
+    flex: 1,
   },
   heroTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 26,
-    color: colors.textOnPrimary,
-    marginBottom: 6,
+    fontFamily: fonts.sans,
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   heroSubtitle: {
     fontFamily: fonts.sans,
-    fontSize: 13,
-    color: colors.textOnPrimaryMuted,
-    marginBottom: spacing.lg,
-    lineHeight: 18,
+    fontSize: 11,
+    fontWeight: '300',
+    color: '#999999',
+    marginTop: 2,
+  },
+  heroSyncBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: 'rgba(16, 185, 129, 0.15)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+    borderWidth: 1,
+    borderColor: 'rgba(16, 185, 129, 0.3)',
+  },
+  heroSyncText: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#10B981',
+  },
+  avatarStackRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+    paddingLeft: 4,
+  },
+  stackAvatarBubble: {
+    width: 32,
+    height: 32,
+    borderRadius: 16,
+    backgroundColor: '#222228',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#0D0D0D',
+  },
+  stackAvatarBubbleMore: {
+    backgroundColor: '#33333E',
+  },
+  stackAvatarEmoji: {
+    fontSize: 14,
+  },
+  stackAvatarMoreText: {
+    fontFamily: fonts.sans,
+    fontSize: 10,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   statsRow: {
     flexDirection: 'row',
-    gap: 10,
+    gap: 8,
   },
   statChip: {
     flex: 1,
-    backgroundColor: 'rgba(255,255,255,0.16)',
+    backgroundColor: '#18181E',
     borderRadius: radius.md,
-    padding: spacing.md,
+    padding: spacing.sm + 2,
     alignItems: 'center',
+    borderWidth: 1,
+    borderColor: '#26262E',
   },
   statNum: {
-    fontFamily: fonts.sansBold,
-    fontSize: 20,
-    color: colors.textOnPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   statLabel: {
     fontFamily: fonts.sans,
-    fontSize: 11,
-    color: colors.textOnPrimaryMuted,
+    fontSize: 10,
+    fontWeight: '400',
+    color: '#888888',
     marginTop: 2,
+    textAlign: 'center',
   },
-  sectionHeader: {
+  sectionMargin: {
     marginBottom: spacing.md,
   },
+  sectionHeader: {
+    marginBottom: spacing.sm,
+  },
   sectionTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 20,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
   },
   sectionSub: {
     fontFamily: fonts.sans,
-    fontSize: 12,
-    color: colors.textMuted,
-    marginTop: 2,
+    fontSize: 11,
+    fontWeight: '300',
+    color: '#888888',
+    marginTop: 1,
   },
   memberCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.xl,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
     padding: spacing.md,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
     ...shadow.soft,
   },
   memberAvatarWrap: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.blush,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: '#F5F5F7',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
+  memberAvatarWrapManaged: {
+    backgroundColor: '#F0F0F5',
+  },
   memberAvatar: {
-    fontSize: 24,
+    fontSize: 20,
   },
   memberInfo: {
     flex: 1,
   },
   viewMemberName: {
-    fontFamily: fonts.serif,
-    fontSize: 18,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 16,
+    fontWeight: '600',
+    color: '#000000',
   },
   viewRelationValue: {
-    fontFamily: fonts.sansMedium,
-    fontSize: 15,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    color: '#000000',
   },
   nameRow: {
     flexDirection: 'row',
     alignItems: 'center',
     flexWrap: 'wrap',
-    gap: 8,
+    gap: 6,
   },
   memberName: {
-    fontFamily: fonts.serif,
-    fontSize: 16,
-    color: colors.textPrimary,
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#000000',
   },
   roleBadge: {
+    paddingHorizontal: 7,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: '#F5F5F7',
+  },
+  roleOwner: {
+    backgroundColor: '#000000',
+  },
+  roleEditor: {
+    backgroundColor: '#F5F5F7',
+  },
+  roleText: {
+    fontFamily: fonts.sans,
+    fontSize: 9,
+    fontWeight: '600',
+    color: '#666666',
+    textTransform: 'uppercase',
+  },
+  roleTextOwner: {
+    color: '#FFFFFF',
+  },
+  memberSubRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    marginTop: 3,
+  },
+  relationPill: {
+    backgroundColor: 'rgba(0, 0, 0, 0.05)',
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.pill,
   },
-  roleOwner: {
-    backgroundColor: colors.primary,
+  relationPillText: {
+    fontFamily: fonts.sans,
+    fontSize: 10,
+    fontWeight: '500',
+    color: '#333333',
   },
-  roleEditor: {
-    backgroundColor: colors.turmeric,
-  },
-  roleText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 9,
-    color: colors.textOnPrimary,
-    textTransform: 'uppercase',
+  memberSubText: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '300',
+    color: '#888888',
   },
   managedBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.pill,
-    backgroundColor: colors.surface,
-    borderWidth: 1,
-    borderColor: colors.border,
+    backgroundColor: 'rgba(16, 185, 129, 0.1)',
   },
   managedBadgeText: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 9,
-    color: colors.textMuted,
+    fontWeight: '600',
+    color: '#10B981',
     textTransform: 'uppercase',
   },
-  // How this member relates to *the current viewer* (`getDisplayRelation`), not the raw
-  // relation off the member row — deliberately styled distinctly from `roleBadge`
-  // (fill) and `managedBadge` (neutral outline) so all three read as different kinds of
-  // fact about the same person.
   relationBadge: {
     paddingHorizontal: 6,
     paddingVertical: 2,
     borderRadius: radius.pill,
-    backgroundColor: colors.blush,
+    backgroundColor: '#F5F5F7',
   },
   relationBadgeText: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 9,
-    color: colors.primaryDark,
+    fontWeight: '500',
+    color: '#444444',
     textTransform: 'uppercase',
+  },
+  emptyDependentCard: {
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  emptyDependentText: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    fontWeight: '300',
+    color: '#888888',
+  },
+  addManagedBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+    ...shadow.soft,
+  },
+  addManagedIconWrap: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: '#F5F5F7',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
+  },
+  addManagedContent: {
+    flex: 1,
+  },
+  addManagedTitle: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    fontWeight: '600',
+    color: '#000000',
+  },
+  addManagedSub: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '300',
+    color: '#666666',
+    marginTop: 1,
   },
   inviteResponseRow: {
     flexDirection: 'row',
     gap: 8,
-    marginTop: 8,
+    marginTop: 10,
   },
   acceptBtn: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#000000',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: radius.pill,
   },
   acceptBtnText: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 11,
-    color: colors.textOnPrimary,
+    fontWeight: '600',
+    color: '#FFFFFF',
   },
   declineBtn: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 12,
-    paddingVertical: 6,
+    backgroundColor: '#F5F5F7',
+    paddingHorizontal: 14,
+    paddingVertical: 7,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
   },
   declineBtnText: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 11,
-    color: colors.textSecondary,
-  },
-  editChevronWrap: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: 8,
-  },
-  editChevron: {
-    fontSize: 14,
+    fontWeight: '500',
+    color: '#555555',
   },
   pendingAdminRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    backgroundColor: colors.surfaceElevated,
-    borderRadius: radius.md,
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
     padding: spacing.md,
-    marginTop: spacing.sm,
+    marginTop: spacing.xs,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
+  },
+  pendingAdminInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 8,
+    flex: 1,
   },
   pendingAdminText: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textMuted,
+    fontWeight: '500',
+    color: '#000000',
+  },
+  cancelInvitePill: {
+    backgroundColor: 'rgba(255, 59, 48, 0.08)',
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: radius.pill,
+  },
+  cancelInviteText: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#FF3B30',
   },
   historyToggleRow: {
     flexDirection: 'row',
@@ -1064,78 +1332,58 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     justifyContent: 'space-between',
   },
   historyToggleText: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.primary,
+    fontWeight: '600',
+    color: '#000000',
   },
   historyEmptyText: {
     fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textMuted,
+    fontWeight: '300',
+    color: '#888888',
     marginTop: spacing.sm,
   },
+  historyCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: '#FFFFFF',
+    borderRadius: radius.card,
+    padding: spacing.md,
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: '#ECECEE',
+  },
+  historyCardDate: {
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: '#444444',
+  },
   historyStatusText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 11,
+    fontFamily: fonts.sans,
+    fontSize: 10,
+    fontWeight: '600',
     textTransform: 'uppercase',
   },
   historyStatus_PENDING: {
-    color: colors.turmeric,
+    color: '#F59E0B',
   },
   historyStatus_ACCEPTED: {
-    color: colors.primary,
+    color: '#10B981',
   },
   historyStatus_DECLINED: {
-    color: colors.danger,
+    color: '#FF3B30',
   },
   historyStatus_CANCELLED: {
-    color: colors.textMuted,
-  },
-  cancelInviteText: {
-    fontFamily: fonts.sansBold,
-    fontSize: 12,
-    color: colors.danger,
-  },
-  inviteBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: radius.xl,
-    padding: spacing.lg,
-    marginTop: spacing.sm,
-    marginBottom: spacing.md,
-    borderWidth: 1.5,
-    borderColor: colors.borderStrong,
-    borderStyle: 'dashed',
-  },
-  inviteBannerIcon: {
-    fontSize: 32,
-    marginRight: 12,
-  },
-  inviteBannerContent: {
-    flex: 1,
-  },
-  inviteBannerTitle: {
-    fontFamily: fonts.serif,
-    fontSize: 15,
-    color: colors.textPrimary,
-  },
-  inviteBannerSub: {
-    fontFamily: fonts.sans,
-    fontSize: 11,
-    color: colors.textMuted,
-    marginTop: 2,
-  },
-  inviteBannerArrow: {
-    fontSize: 18,
-    color: colors.primary,
-    fontFamily: fonts.sansBold,
+    color: '#888888',
   },
   label: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 11,
+    fontWeight: '600',
     letterSpacing: 1.5,
-    color: colors.textMuted,
+    color: '#888888',
     marginTop: 14,
     marginBottom: 8,
     textTransform: 'uppercase',
@@ -1143,36 +1391,35 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   helperText: {
     fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textSecondary,
+    fontWeight: '300',
+    color: '#666666',
     marginTop: -4,
     marginBottom: 8,
     lineHeight: 16,
   },
   input: {
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#F8F9FA',
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
     borderRadius: radius.md,
     paddingHorizontal: 14,
     paddingVertical: 12,
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 15,
-    color: colors.textPrimary,
+    color: '#000000',
     width: '100%',
   },
-  // `placeholderTextColor` is a prop, not a style — the colour is kept here so
-  // the factory stays the single place this screen reads the palette.
   placeholder: {
-    color: colors.textMuted,
+    color: '#999999',
   },
   sheetInfoBox: {
     flexDirection: 'row',
     alignItems: 'flex-start',
     gap: 10,
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#F8F9FA',
     borderRadius: radius.md,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
     padding: spacing.md,
     marginBottom: 4,
   },
@@ -1183,7 +1430,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     flex: 1,
     fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textSecondary,
+    color: '#666666',
     lineHeight: 17,
   },
   chipRow: {
@@ -1192,30 +1439,28 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     gap: 8,
   },
   chip: {
-    backgroundColor: colors.surfaceElevated,
+    backgroundColor: '#F8F9FA',
     paddingHorizontal: 12,
     paddingVertical: 8,
     borderRadius: radius.pill,
     borderWidth: 1,
-    borderColor: colors.border,
+    borderColor: '#ECECEE',
   },
   chipActive: {
-    backgroundColor: colors.primary,
-    borderColor: colors.primary,
+    backgroundColor: '#000000',
+    borderColor: '#000000',
   },
-  // Marks a chip among relationOptions' `suggestedReciprocals` for the invite being
-  // accepted — a border-only accent so it stays visually distinct from `chipActive`
-  // (the actually-selected value) even when a suggested chip is also the selection.
   chipSuggested: {
-    borderColor: colors.turmeric,
+    borderColor: '#F59E0B',
   },
   chipText: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 12,
-    color: colors.textPrimary,
+    color: '#444444',
   },
   chipTextActive: {
-    color: colors.textOnPrimary,
+    color: '#FFFFFF',
+    fontWeight: '600',
   },
   modalCta: {
     marginTop: 24,
@@ -1223,17 +1468,18 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   modalRemoveBtn: {
     marginTop: 14,
     marginBottom: 24,
-    backgroundColor: colors.dangerSoft,
+    backgroundColor: 'rgba(255, 59, 48, 0.08)',
     paddingVertical: 12,
-    borderRadius: radius.xl,
+    borderRadius: radius.card,
     alignItems: 'center',
     borderWidth: 1,
-    borderColor: colors.dangerBorder,
+    borderColor: 'rgba(255, 59, 48, 0.2)',
   },
   modalRemoveText: {
-    fontFamily: fonts.sansBold,
+    fontFamily: fonts.sans,
     fontSize: 14,
-    color: colors.danger,
+    fontWeight: '600',
+    color: '#FF3B30',
   },
   modalLeaveBtn: {
     marginTop: 4,
@@ -1242,9 +1488,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
     alignItems: 'center',
   },
   modalLeaveText: {
-    fontFamily: fonts.sansMedium,
+    fontFamily: fonts.sans,
     fontSize: 13,
-    color: colors.textMuted,
+    color: '#888888',
     textDecorationLine: 'underline',
   },
 });
