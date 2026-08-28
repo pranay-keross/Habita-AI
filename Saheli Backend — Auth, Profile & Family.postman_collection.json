@@ -1822,19 +1822,39 @@
         },
         {
           "name": "List My Families",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "const resp = pm.response.json();\r",
+                  "pm.collectionVariables.set(\"familyId\", resp[0].id);"
+                ],
+                "type": "text/javascript",
+                "packages": {},
+                "requests": {}
+              }
+            }
+          ],
           "request": {
             "auth": {
-              "type": "noauth"
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
             },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/families",
+              "raw": "{{baseUrl}}/families",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
-                "api",
                 "families"
               ]
             },
@@ -3985,11 +4005,17 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{family}}/{{familyId}}/profiles",
+              "raw": "https://ikon-vpm.keross.com/saheli/api/families/{{familyId}}/profiles",
+              "protocol": "https",
               "host": [
-                "{{family}}"
+                "ikon-vpm",
+                "keross",
+                "com"
               ],
               "path": [
+                "saheli",
+                "api",
+                "families",
                 "{{familyId}}",
                 "profiles"
               ]
@@ -6711,6 +6737,1443 @@
           ]
         }
       ]
+    },
+    {
+      "name": "Household Operations",
+      "item": [
+        {
+          "name": "Staff Service",
+          "item": [
+            {
+              "name": "Get available staff services list",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{staff}}/services/list",
+                  "host": [
+                    "{{staff}}"
+                  ],
+                  "path": [
+                    "services",
+                    "list"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-Available services list",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{staff}}/services/list",
+                      "host": [
+                        "{{staff}}"
+                      ],
+                      "path": [
+                        "services",
+                        "list"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Mon, 24 Aug 2026 08:02:02 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "[\n    {\n        \"id\": 1,\n        \"serviceName\": \"Housekeeping\",\n        \"active\": true\n    },\n    {\n        \"id\": 2,\n        \"serviceName\": \"Cooking\",\n        \"active\": true\n    },\n    {\n        \"id\": 3,\n        \"serviceName\": \"Childcare / nanny\",\n        \"active\": true\n    },\n    {\n        \"id\": 4,\n        \"serviceName\": \"Elderly care\",\n        \"active\": true\n    },\n    {\n        \"id\": 5,\n        \"serviceName\": \"Patient care\",\n        \"active\": true\n    },\n    {\n        \"id\": 6,\n        \"serviceName\": \"Companion care\",\n        \"active\": true\n    },\n    {\n        \"id\": 7,\n        \"serviceName\": \"Driver\",\n        \"active\": true\n    },\n    {\n        \"id\": 8,\n        \"serviceName\": \"Gardening\",\n        \"active\": true\n    },\n    {\n        \"id\": 9,\n        \"serviceName\": \"Laundry\",\n        \"active\": true\n    },\n    {\n        \"id\": 10,\n        \"serviceName\": \"Security\",\n        \"active\": true\n    },\n    {\n        \"id\": 11,\n        \"serviceName\": \"Custom\",\n        \"active\": true\n    }\n]"
+                },
+                {
+                  "name": "403 Forbidden - No accesstoken given",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{staff}}/services/list",
+                      "host": [
+                        "{{staff}}"
+                      ],
+                      "path": [
+                        "services",
+                        "list"
+                      ]
+                    }
+                  },
+                  "status": "Forbidden",
+                  "code": 403,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Length",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Mon, 24 Aug 2026 08:02:32 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": null
+                }
+              ]
+            },
+            {
+              "name": "Add Staff",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"serviceId\": 11,\r\n  \"name\": \"Ramesh Kumar\",\r\n  \"customRole\": \"Sweeper\",\r\n  \"phone\": \"9876543210\",\r\n  \"monthlySalary\": 15000.00,\r\n  \"joiningDate\": \"2026-08-01\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/staff",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "staff"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-added staff",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"serviceId\": 11,\r\n  \"name\": \"Ramesh Kumar\",\r\n  \"customRole\": \"Senior Driver\",\r\n  \"phone\": \"9876543210\",\r\n  \"monthlySalary\": 15000.00,\r\n  \"joiningDate\": \"2026-08-01\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/staff",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "staff"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Mon, 24 Aug 2026 09:03:03 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"id\": \"f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830\",\n    \"familyId\": \"1e10adce-49ea-489c-8ac1-aefa4bcbc275\",\n    \"name\": \"Ramesh Kumar\",\n    \"role\": \"Senior Driver\",\n    \"phone\": \"9876543210\",\n    \"monthlySalary\": 15000,\n    \"joiningDate\": \"2026-08-01\",\n    \"active\": true\n}"
+                },
+                {
+                  "name": "200 OK-Custom Role",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"serviceId\": 11,\r\n  \"name\": \"Ramesh Kumar\",\r\n  \"customRole\": \"Sweeper\",\r\n  \"phone\": \"9876543210\",\r\n  \"monthlySalary\": 15000.00,\r\n  \"joiningDate\": \"2026-08-01\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/staff",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "staff"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Mon, 24 Aug 2026 09:04:47 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"id\": \"284913ed-5441-4dd0-95e1-62897d3ec4aa\",\n    \"familyId\": \"1e10adce-49ea-489c-8ac1-aefa4bcbc275\",\n    \"name\": \"Ramesh Kumar\",\n    \"role\": \"Sweeper\",\n    \"phone\": \"9876543210\",\n    \"monthlySalary\": 15000,\n    \"joiningDate\": \"2026-08-01\",\n    \"active\": true\n}"
+                },
+                {
+                  "name": "404 Not Found-Wrong family id given",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"serviceId\": 11,\r\n  \"name\": \"Ramesh Kumar\",\r\n  \"customRole\": \"Sweeper\",\r\n  \"phone\": \"9876543210\",\r\n  \"monthlySalary\": 15000.00,\r\n  \"joiningDate\": \"2026-08-01\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/staff",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "staff"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Mon, 24 Aug 2026 09:08:14 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-24T09:08:13.729885400Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family not found\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/staff\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Get Staffs List",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/staff?page=0&size=10",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "staff"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "size",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "401 Unauthorized-Wrong family id given",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/staff",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "staff"
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Mon, 24 Aug 2026 09:11:25 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-24T09:11:25.164867100Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/staff\",\n    \"details\": []\n}"
+                },
+                {
+                  "name": "200 OK -staff list",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/staff?page=0&size=10",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "staff"
+                      ],
+                      "query": [
+                        {
+                          "key": "page",
+                          "value": "0"
+                        },
+                        {
+                          "key": "size",
+                          "value": "10"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Mon, 24 Aug 2026 11:22:14 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"content\": [\n        {\n            \"id\": \"f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830\",\n            \"familyId\": \"1e10adce-49ea-489c-8ac1-aefa4bcbc275\",\n            \"name\": \"Ramesh Kumar\",\n            \"role\": \"Senior Driver\",\n            \"rateType\": \"Monthly\",\n            \"phone\": \"9876543210\",\n            \"monthlySalary\": 15000,\n            \"joiningDate\": \"2026-08-01\",\n            \"active\": true\n        },\n        {\n            \"id\": \"284913ed-5441-4dd0-95e1-62897d3ec4aa\",\n            \"familyId\": \"1e10adce-49ea-489c-8ac1-aefa4bcbc275\",\n            \"name\": \"Ramesh Kumar\",\n            \"role\": \"Sweeper\",\n            \"rateType\": \"Monthly\",\n            \"phone\": \"9876543210\",\n            \"monthlySalary\": 15000,\n            \"joiningDate\": \"2026-08-01\",\n            \"active\": true\n        },\n        {\n            \"id\": \"c1f676b2-9e3a-4de3-b8b4-09d6bd3490a0\",\n            \"familyId\": \"1e10adce-49ea-489c-8ac1-aefa4bcbc275\",\n            \"name\": \"Ramesh Kumar\",\n            \"role\": \"Security\",\n            \"rateType\": \"Hourly\",\n            \"phone\": \"9876543210\",\n            \"monthlySalary\": 15000,\n            \"joiningDate\": \"2026-08-01\",\n            \"active\": true\n        }\n    ],\n    \"empty\": false,\n    \"first\": true,\n    \"last\": true,\n    \"number\": 0,\n    \"numberOfElements\": 3,\n    \"pageable\": {\n        \"offset\": 0,\n        \"pageNumber\": 0,\n        \"pageSize\": 10,\n        \"paged\": true,\n        \"sort\": {\n            \"empty\": true,\n            \"sorted\": false,\n            \"unsorted\": true\n        },\n        \"unpaged\": false\n    },\n    \"size\": 10,\n    \"sort\": {\n        \"empty\": true,\n        \"sorted\": false,\n        \"unsorted\": true\n    },\n    \"totalElements\": 3,\n    \"totalPages\": 1\n}"
+                }
+              ]
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Expense Groups & Multi-Currency Splitting",
+      "description": "SRS Module 11 (§11 'Multi-Currency Expense Groups') & REST endpoints for /api/expense-groups and /api/expenses.\n\nCapabilities:\n- Group lifecycle: Create, List, Get, Update, Soft-Delete\n- Group Membership: Add, Remove (requires settled 0.00 balance)\n- Dynamic bill splitting: EQUAL, PERCENTAGE, SHARES with 1-paise rounding\n- Multi-currency normalization (INR, USD, EUR, AED, GBP)\n- Debt settlement tracking (UPI, Cash, Bank Transfer)\n- Pairwise debt minimization algorithm & group sync (/sync)\n- Rolling 30-day spend rollup for Dashboard tile (/api/expenses/summary/30-day)",
+      "item": [
+        {
+          "name": "List Expense Groups",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Has summary & groups', function () {",
+                  "        pm.expect(json.summary).to.be.an('object');",
+                  "        pm.expect(json.groups).to.be.an('array');",
+                  "    });",
+                  "    if (json.groups && json.groups.length > 0) {",
+                  "        pm.collectionVariables.set('groupId', json.groups[0].id);",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups"
+              ]
+            },
+            "description": "Retrieves all expense groups for the authenticated user, along with the user's net balance in each group and an overall summary (totalSpentINR, youAreOwedINR, youOweINR)."
+          }
+        },
+        {
+          "name": "Create Expense Group",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('groupId', json.id);",
+                  "    if (json.members && json.members.length > 0) {",
+                  "        const owner = json.members.find(m => m.isOwner) || json.members[0];",
+                  "        pm.collectionVariables.set('ownerMemberId', owner.id);",
+                  "        const other = json.members.find(m => !m.isOwner);",
+                  "        if (other) {",
+                  "            pm.collectionVariables.set('memberId', other.id);",
+                  "        }",
+                  "    }",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Weekend Goa Trip\",\n  \"emoji\": \"🏖️\",\n  \"category\": \"Travel & Fun\",\n  \"defaultCurrency\": \"INR\",\n  \"members\": [\n    {\n      \"name\": \"Rahul Sharma\",\n      \"avatar\": \"👨‍🦱\",\n      \"phone\": \"+919876543210\"\n    },\n    {\n      \"name\": \"Priya Patel\",\n      \"avatar\": \"👩‍🦰\"\n    }\n  ]\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups"
+              ]
+            },
+            "description": "Creates a new expense group. The creator is automatically added as the owner and first member."
+          }
+        },
+        {
+          "name": "Get Expense Group Details",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Has valid group id and members', function () {",
+                  "        pm.expect(json.id).to.eql(pm.collectionVariables.get('groupId'));",
+                  "        pm.expect(json.members).to.be.an('array');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}"
+              ]
+            },
+            "description": "Fetches details of a specific expense group including all member profiles."
+          }
+        },
+        {
+          "name": "Update Expense Group",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Goa Trip 2026\",\n  \"emoji\": \"🌴\",\n  \"category\": \"Vacation\",\n  \"defaultCurrency\": \"INR\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}"
+              ]
+            },
+            "description": "Updates group metadata (name, emoji, category, default currency)."
+          }
+        },
+        {
+          "name": "Add Group Member",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('newMemberId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Rohan Gupta\",\n  \"avatar\": \"🧔\",\n  \"phone\": \"+919123456789\",\n  \"userId\": null\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "members"
+              ]
+            },
+            "description": "Adds a member to an existing group (either an existing registered user or an ad-hoc member name)."
+          }
+        },
+        {
+          "name": "Remove Group Member",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/members/{{newMemberId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "members",
+                "{{newMemberId}}"
+              ]
+            },
+            "description": "Removes a member from a group. Precondition: Member's net balance must be 0.00."
+          }
+        },
+        {
+          "name": "List Group Expenses",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Has content and pagination', function () {",
+                  "        pm.expect(json.content).to.be.an('array');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses?page=0&size=50",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "expenses"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "50"
+                },
+                {
+                  "key": "category",
+                  "value": "food",
+                  "disabled": true
+                }
+              ]
+            },
+            "description": "List expenses for the group with optional pagination and category filtering."
+          }
+        },
+        {
+          "name": "Add Expense (Equal Split)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('expenseId', json.id);",
+                  "    pm.test('Shares calculated', function () {",
+                  "        pm.expect(json.shares).to.be.an('array');",
+                  "        pm.expect(json.shares.length).to.be.above(0);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Monthly Rent Payment\",\n  \"amount\": 36000,\n  \"currency\": \"INR\",\n  \"payerId\": \"{{ownerMemberId}}\",\n  \"splitMode\": \"EQUAL\",\n  \"category\": \"rent\",\n  \"date\": \"2026-08-01\",\n  \"notes\": \"Paid via NetBanking for August\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "expenses"
+              ]
+            },
+            "description": "Adds an expense split equally among all group members with 1-paise remainder distribution."
+          }
+        },
+        {
+          "name": "Add Expense (Percentage Split)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Seafood Dinner & Drinks\",\n  \"amount\": 6400.00,\n  \"currency\": \"INR\",\n  \"payerId\": \"{{ownerMemberId}}\",\n  \"splitMode\": \"percentage\",\n  \"category\": \"food\",\n  \"date\": \"2026-08-07\",\n  \"notes\": \"Beach shack dinner\",\n  \"splits\": {\n    \"{{ownerMemberId}}\": 50.0,\n    \"{{memberId}}\": 50.0\n  }\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "expenses"
+              ]
+            },
+            "description": "Adds an expense and itemizes exact percentages across group members (validated to strictly sum to 100%)."
+          }
+        },
+        {
+          "name": "Add Expense (Multi-Currency USD)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Multi-currency converted to INR', function () {",
+                  "        pm.expect(json.currency).to.eql('USD');",
+                  "        pm.expect(json.exchangeRate).to.eql(83.5);",
+                  "        pm.expect(json.baseAmountINR).to.eql(8350);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"title\": \"Software Subscription\",\n  \"amount\": 100,\n  \"currency\": \"USD\",\n  \"payerId\": \"{{ownerMemberId}}\",\n  \"splitMode\": \"EQUAL\",\n  \"category\": \"bills\",\n  \"date\": \"2026-08-10\",\n  \"notes\": \"Annual cloud hosting in USD\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "expenses"
+              ]
+            },
+            "description": "Adds an expense in foreign currency (USD, EUR, AED, GBP) which is automatically converted to base INR using exchange rates."
+          }
+        },
+        {
+          "name": "Get Single Expense",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Valid expense id', function () {",
+                  "        pm.expect(json.id).to.eql(pm.collectionVariables.get('expenseId'));",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses/{{expenseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "expenses",
+                "{{expenseId}}"
+              ]
+            },
+            "description": "Gets single expense details with full split itemization and payer metadata."
+          }
+        },
+        {
+          "name": "Record Debt Settlement",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('settlementId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"payerMemberId\": \"{{memberId}}\",\n  \"payeeMemberId\": \"{{ownerMemberId}}\",\n  \"amount\": 5000,\n  \"currency\": \"INR\",\n  \"method\": \"UPI\",\n  \"date\": \"2026-08-03\",\n  \"notes\": \"Partial payment towards August rent via Google Pay\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/settlements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "settlements"
+              ]
+            },
+            "description": "Records a payment made between two members to settle debt."
+          }
+        },
+        {
+          "name": "List Debt Settlements",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Is array of settlements', function () {",
+                  "        pm.expect(json).to.be.an('array');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/settlements",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "settlements"
+              ]
+            },
+            "description": "List all settlements recorded for the group."
+          }
+        },
+        {
+          "name": "Get Group Sync & Analytics",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Has group, balances, pairwiseDebts and categoryBreakdown', function () {",
+                  "        pm.expect(json.group).to.be.an('object');",
+                  "        pm.expect(json.balances).to.be.an('array');",
+                  "        pm.expect(json.pairwiseDebts).to.be.an('array');",
+                  "        pm.expect(json.categoryBreakdown).to.be.an('object');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/sync",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "sync"
+              ]
+            },
+            "description": "Crucial for GroupDetailsScreen.tsx: Returns group metadata, active expenses, settlements, computed balances, pairwise debts, and category spending analytics in a single performant payload."
+          }
+        },
+        {
+          "name": "Rolling 30-Day Spend Rollup",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 200', function () {",
+                  "    pm.response.to.have.status(200);",
+                  "});",
+                  "if (pm.response.code === 200) {",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Has spend metric and dates', function () {",
+                  "        pm.expect(json.rolling30DaysSpendINR).to.be.a('number');",
+                  "        pm.expect(json.currency).to.eql('INR');",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expenses/summary/30-day",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expenses",
+                "summary",
+                "30-day"
+              ]
+            },
+            "description": "Used by dashboard spend tile: Returns user's rolling 30-day spend total in INR."
+          }
+        },
+        {
+          "name": "Soft-Delete Expense",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses/{{expenseId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "expenses",
+                "{{expenseId}}"
+              ]
+            },
+            "description": "Soft-deletes the expense, triggering recalculation of balances."
+          }
+        },
+        {
+          "name": "Soft-Delete Expense Group",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 204', function () {",
+                  "    pm.response.to.have.status(204);",
+                  "});"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}"
+              ]
+            },
+            "description": "Soft-deletes an expense group."
+          }
+        }
+      ]
     }
   ],
   "auth": {
@@ -6841,6 +8304,40 @@
     {
       "key": "medicineId",
       "value": ""
+    },
+    {
+      "key": "staff",
+      "value": ""
+    },
+    {
+      "key": "groupId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "ownerMemberId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "memberId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "newMemberId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "expenseId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "settlementId",
+      "value": "",
+      "type": "string"
     }
   ]
 }

@@ -52,6 +52,7 @@ import { loadQuickTapItems, saveResourceLogs } from '../features/resources/resou
 import type { QuickTapItem, ResourceLog } from '../features/resources/types';
 import useAuth from '../hooks/useAuth';
 import { apiFetch } from '../features/auth/api';
+import { getRolling30DaySpend, loadExpenses } from '../features/money';
 
 type Props = StackScreenProps<RootStackParamList, 'Dashboard'>;
 
@@ -112,6 +113,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
   const [localeVersion, setLocaleVersion] = useState(0);
   const [refreshing, setRefreshing] = useState(false);
   const [adherence, setAdherence] = useState<number | null>(null);
+  const [monthlySpend, setMonthlySpend] = useState<number | null>(null);
+  const [weeklySpend, setWeeklySpend] = useState<number[]>([0, 0, 0, 0, 0, 0, 0]);
   const [resourceItems, setResourceItems] = useState<QuickTapItem[]>([]);
   const [selectedInsightsTab, setSelectedInsightsTab] = useState<InsightsTab>('adherence');
   const [selectedDayIndex, setSelectedDayIndex] = useState(5);
@@ -127,12 +130,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
           return true;
         }
         lastBackPress = now;
-        if (Platform.OS === 'android') {
-          ToastAndroid.show(
-            t('dashboard.press_back_again_to_exit') || 'Press back again to exit',
-            ToastAndroid.SHORT,
-          );
-        }
+        ToastAndroid.show(t('dashboard.press_back_again_to_exit'), ToastAndroid.SHORT);
         return true;
       };
 
@@ -211,10 +209,13 @@ export default function DashboardScreen({ navigation, route }: Props) {
   ];
 
   const chartData = useMemo(() => {
-    if (selectedInsightsTab === 'spend') return [3200, 4800, 2900, 6100, 4300, 5200, 4900];
+    if (selectedInsightsTab === 'spend') {
+      const hasSpend = weeklySpend.some((v) => v > 0);
+      return hasSpend ? weeklySpend : [0, 0, 0, 0, 0, 0, 0];
+    }
     if (selectedInsightsTab === 'activity') return [65, 80, 72, 90, 85, 95, 88];
     return [78, 85, 92, 88, 96, 94, 98];
-  }, [selectedInsightsTab]);
+  }, [selectedInsightsTab, weeklySpend]);
 
   const valueFormatter = useCallback(
     (val: number) => {
@@ -253,12 +254,52 @@ export default function DashboardScreen({ navigation, route }: Props) {
     }
   }, [getAccessToken]);
 
+  const fetchSpendRollup = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      const exps = await loadExpenses(undefined, token);
+
+      // Compute dynamic 7-day spend distribution across Mon..Sun
+      const now = new Date();
+      const days = [0, 0, 0, 0, 0, 0, 0];
+      exps.forEach((e) => {
+        if (!e.date) return;
+        const d = new Date(e.date);
+        if (isNaN(d.getTime())) return;
+        const diffMs = now.getTime() - d.getTime();
+        const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+        if (diffDays >= 0 && diffDays < 30) {
+          const dayIdx = (d.getDay() + 6) % 7; // Mon=0 .. Sun=6
+          days[dayIdx] += (e.baseAmountINR || e.amount || 0);
+        }
+      });
+      setWeeklySpend(days);
+
+      if (token) {
+        try {
+          const remote = await getRolling30DaySpend(token);
+          if (remote && typeof remote.rolling30DaysSpendINR === 'number') {
+            setMonthlySpend(remote.rolling30DaysSpendINR);
+            return;
+          }
+        } catch {
+          // Fall through to local fallback
+        }
+      }
+      const sum = exps.reduce((acc, e) => acc + (e.baseAmountINR || e.amount || 0), 0);
+      setMonthlySpend(sum);
+    } catch {
+      setMonthlySpend(0);
+    }
+  }, [getAccessToken]);
+
   useEffect(() => {
     let mounted = true;
     (async () => {
       try {
         await Promise.all([
           fetchLiveProfile(),
+          fetchSpendRollup(),
           getItem(PROFILE_STORAGE_KEY, { name: 'Pranay', photoUri: null }).then((data) => {
             if (data && data.name && mounted) setUserName(data.name);
             if (mounted) setPhotoUri((current) => current ?? data?.photoUri ?? null);
@@ -280,7 +321,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
     return () => {
       mounted = false;
     };
-  }, [fetchLiveProfile]);
+  }, [fetchLiveProfile, fetchSpendRollup]);
 
   useEffect(() => {
     if (route.params?.profileUpdated) {
@@ -291,6 +332,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
 
   useEffect(() => {
     const unsubFocus = navigation.addListener('focus', () => {
+      fetchSpendRollup();
       getItem(PROFILE_STORAGE_KEY, { name: 'Pranay', photoUri: null }).then((data) => {
         if (data && data.name) setUserName(data.name);
         setPhotoUri((current) => current ?? data?.photoUri ?? null);
@@ -312,13 +354,14 @@ export default function DashboardScreen({ navigation, route }: Props) {
       unsubFocus();
       unsubLang();
     };
-  }, [navigation]);
+  }, [navigation, fetchSpendRollup]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
       await Promise.all([
         fetchLiveProfile(),
+        fetchSpendRollup(),
         getItem(PROFILE_STORAGE_KEY, { name: 'Pranay', photoUri: null }).then((data) => {
           if (data && data.name) setUserName(data.name);
           setPhotoUri((current) => current ?? data?.photoUri ?? null);
@@ -333,7 +376,8 @@ export default function DashboardScreen({ navigation, route }: Props) {
     } finally {
       setRefreshing(false);
     }
-  }, [fetchLiveProfile]);
+  }, [fetchLiveProfile, fetchSpendRollup]);
+
 
   const handleLifeOsPress = (id: LifeOsId) => {
     if (id === 'pantry') navigation.navigate('Pantry');
@@ -582,7 +626,9 @@ export default function DashboardScreen({ navigation, route }: Props) {
                   <View style={styles.statDivider} />
 
                   <View style={styles.statPillar}>
-                    <Text style={styles.statPillarValue}>₹12,450</Text>
+                    <Text style={styles.statPillarValue}>
+                      ₹{(monthlySpend ?? 0).toLocaleString('en-IN')}
+                    </Text>
                     <Text style={styles.statPillarLabel} numberOfLines={1}>
                       {t('dashboard.monthly_budget')}
                     </Text>

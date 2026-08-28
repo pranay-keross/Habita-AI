@@ -76,6 +76,7 @@ export type RootStackParamList = {
     expenseId?: string;
     settlePayerId?: string;
     settlePayeeId?: string;
+    settleAmount?: number;
   };
   DocHub: undefined;
   DocDetails: { docId: string };

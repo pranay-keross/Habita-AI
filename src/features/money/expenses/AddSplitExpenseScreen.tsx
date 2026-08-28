@@ -8,6 +8,8 @@ import {
   TextInput,
   Alert,
   ActivityIndicator,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -19,6 +21,7 @@ import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import IndianRupee from 'lucide-react-native/icons/indian-rupee';
 import DollarSign from 'lucide-react-native/icons/dollar-sign';
 import Check from 'lucide-react-native/icons/check';
+import useAuth from '../../../hooks/useAuth';
 import { addExpenseToGroup, getGroupById } from '../expenseStore';
 import type { Currency, ExpenseGroup } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
@@ -39,6 +42,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { groupId } = route.params;
+  const { getAccessToken } = useAuth();
   const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -46,7 +50,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [currency, setCurrency] = useState<Currency>('INR');
-  const [payerId, setPayerId] = useState('m_1');
+  const [payerId, setPayerId] = useState('');
   const [splitMode, setSplitMode] = useState<SplitMode>('equal');
   const [category, setCategory] = useState('food');
   const [saving, setSaving] = useState(false);
@@ -59,10 +63,13 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
     const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     const fetchGroup = async () => {
       setLoading(true);
-      const g = await getGroupById(groupId);
+      const token = await getAccessToken().catch(() => null);
+      const g = await getGroupById(groupId, token);
       setGroup(g);
       if (g) {
+        setPayerId((prev) => prev || g.members[0]?.id || 'usr_me');
         const initPct: Record<string, string> = {};
+
         const initShares: Record<string, string> = {};
         const equalShare = (100 / g.members.length).toFixed(1);
         g.members.forEach((m) => {
@@ -131,22 +138,32 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
     }
 
     setSaving(true);
-    await addExpenseToGroup(group.id, {
-      title: title.trim(),
-      amount: amountInINR,
-      currency,
-      payerId,
-      splitMode,
-      splits,
-      category,
-      date: new Date().toISOString().split('T')[0],
-    });
+    const token = await getAccessToken().catch(() => null);
+    await addExpenseToGroup(
+      group.id,
+      {
+        title: title.trim(),
+        amount: amt,
+        currency,
+        baseAmountINR: amountInINR,
+        payerId,
+        splitMode,
+        splits,
+        category,
+        date: new Date().toISOString().split('T')[0],
+      },
+      token,
+    );
     setSaving(false);
+
+    const displayAmount = currency !== 'INR'
+      ? `${currency} ${amt.toLocaleString()} (~₹${amountInINR.toLocaleString('en-IN')})`
+      : `₹${amountInINR.toLocaleString('en-IN')}`;
 
     Alert.alert(
       t('expenses.expense_added'),
       t('expenses.expense_added_msg', {
-        amount: amountInINR.toLocaleString('en-IN'),
+        amount: displayAmount,
         group: group.name,
       }),
     );
@@ -172,7 +189,19 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardContainer}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 54 : 0}>
+        <ScrollView
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: insets.bottom + 160 },
+          ]}
+          showsVerticalScrollIndicator={false}
+          keyboardShouldPersistTaps="handled"
+          keyboardDismissMode="on-drag"
+          automaticallyAdjustKeyboardInsets={true}>
         {/* Group Pill Header */}
         <View style={styles.groupPill}>
           <Text style={styles.groupPillText}>
@@ -247,7 +276,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
                   styles.payerText,
                   payerId === member.id && styles.payerTextActive,
                 ]}>
-                {member.name} {member.id === 'm_1' ? '(You)' : ''}
+                {member.name}{!member.name.toLowerCase().includes('(you)') && member.isOwner ? ' (You)' : ''}
               </Text>
               {payerId === member.id && <Check size={18} color={styles.payerTextActive.color} />}
             </Pressable>
@@ -279,7 +308,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
         {/* Mode Specific Custom Inputs */}
         {splitMode === 'percentage' && (
           <View style={styles.card}>
-            <Text style={styles.splitNoticeText}>Enter percentage share per member (Sum must be 100%)</Text>
+            <Text style={styles.splitNoticeText}>{t('expenses.split_percentage_notice')}</Text>
             {group.members.map((m) => (
               <View key={m.id} style={styles.splitInputRow}>
                 <Text style={styles.splitMemberLabel}>{m.name}</Text>
@@ -297,7 +326,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
 
         {splitMode === 'shares' && (
           <View style={styles.card}>
-            <Text style={styles.splitNoticeText}>Enter weight multiplier (e.g. 1 share, 2 shares)</Text>
+            <Text style={styles.splitNoticeText}>{t('expenses.split_shares_notice')}</Text>
             {group.members.map((m) => (
               <View key={m.id} style={styles.splitInputRow}>
                 <Text style={styles.splitMemberLabel}>{m.name}</Text>
@@ -306,7 +335,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
                   value={shares[m.id] || '1'}
                   onChangeText={(val) => setShares({ ...shares, [m.id]: val })}
                   keyboardType="number-pad"
-                  placeholder="Shares"
+                  placeholder={t('expenses.shares_placeholder')}
                 />
               </View>
             ))}
@@ -321,6 +350,7 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
           style={{ marginTop: 24 }}
         />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -358,9 +388,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textPrimary,
     },
     headerTitle: {
+      flex: 1,
+      textAlign: 'center',
       fontFamily: fonts.sansBold,
       fontSize: 18,
       color: colors.textPrimary,
+    },
+    keyboardContainer: {
+      flex: 1,
     },
     content: {
       paddingHorizontal: spacing.lg,

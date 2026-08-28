@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,6 +6,7 @@ import {
   StyleSheet,
   Pressable,
   ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -18,7 +19,11 @@ import Receipt from 'lucide-react-native/icons/receipt';
 import Users from 'lucide-react-native/icons/users';
 import PieChart from 'lucide-react-native/icons/chart-pie';
 import HandCoins from 'lucide-react-native/icons/hand-coins';
+import { SkeletonCard, SkeletonHeroCard } from '../../../components/Skeleton';
+import useAuth from '../../../hooks/useAuth';
+import { getItem } from '../../../utils/storage';
 import {
+  findCurrentUserMember,
   getGroupSyncDetails,
 } from '../expenseStore';
 import type { Expense, ExpenseGroup, MemberBalance, PairwiseDebt } from '../types';
@@ -32,26 +37,59 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { groupId } = route.params;
+  const { getAccessToken } = useAuth();
   const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [currentUserName, setCurrentUserName] = useState('You');
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
   const [group, setGroup] = useState<ExpenseGroup | undefined>();
   const [expenses, setExpenses] = useState<Expense[]>([]);
   const [balances, setBalances] = useState<MemberBalance[]>([]);
   const [pairwiseDebts, setPairwiseDebts] = useState<PairwiseDebt[]>([]);
+  const [categoryBreakdown, setCategoryBreakdown] = useState<Record<string, number>>({});
+  const [remoteTotalSpend, setRemoteTotalSpend] = useState<number | null>(null);
+  const [remoteUserNet, setRemoteUserNet] = useState<number | null>(null);
   const [activeTab, setActiveTab] = useState<TabKey>('expenses');
 
   const fetchDetail = async () => {
-    setLoading(true);
-    const details = await getGroupSyncDetails(groupId);
+    const token = await getAccessToken().catch(() => null);
+    const prof = await getItem<{ name?: string }>('habita.user_profile', {});
+    if (prof?.name) setCurrentUserName(prof.name);
+    const sess = await getItem<{ userId?: string }>('habita.session', {});
+    if (sess?.userId) setCurrentUserId(sess.userId);
+
+    const details = await getGroupSyncDetails(groupId, token);
     if (details) {
       setGroup(details.group);
       setExpenses(details.expenses);
       setBalances(details.balances);
       setPairwiseDebts(details.pairwiseDebts);
+      if ('totalSpendINR' in details && typeof details.totalSpendINR === 'number') {
+        setRemoteTotalSpend(details.totalSpendINR);
+      }
+      if ('userNetBalanceINR' in details && typeof details.userNetBalanceINR === 'number') {
+        setRemoteUserNet(details.userNetBalanceINR);
+      }
+      if ('categoryBreakdown' in details && details.categoryBreakdown && Object.keys(details.categoryBreakdown).length > 0) {
+        setCategoryBreakdown(details.categoryBreakdown);
+      } else {
+        const computedCats: Record<string, number> = {};
+        details.expenses.forEach((e) => {
+          computedCats[e.category] = (computedCats[e.category] || 0) + (e.baseAmountINR || e.amount || 0);
+        });
+        setCategoryBreakdown(computedCats);
+      }
     }
     setLoading(false);
   };
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchDetail();
+    setRefreshing(false);
+  }, [groupId]);
 
   useEffect(() => {
     const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
@@ -66,8 +104,20 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
 
   if (loading) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <ActivityIndicator size="large" color={styles.tabTextActive.color} />
+      <View style={styles.root}>
+        <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
+          <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
+            <ArrowLeft size={20} color={styles.headerIcon.color} />
+          </Pressable>
+          <View style={{ width: 40 }} />
+        </View>
+        <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+          <View style={{ paddingTop: 8 }}>
+            <SkeletonHeroCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
+        </ScrollView>
       </View>
     );
   }
@@ -80,15 +130,11 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
     );
   }
 
-  const totalSpend = expenses.reduce((sum, e) => sum + e.baseAmountINR, 0);
-  const myBal = balances.find((b) => b.memberId === 'usr_me');
-  const myNet = myBal ? myBal.netBalanceINR : 0;
+  const totalSpend = remoteTotalSpend ?? expenses.reduce((sum, e) => sum + (e.baseAmountINR || e.amount || 0), 0);
+  const myMember = findCurrentUserMember(group.members, currentUserId, currentUserName);
+  const myBal = myMember ? balances.find((b) => b.memberId === myMember.id) : null;
+  const myNet = remoteUserNet !== null ? remoteUserNet : (myBal ? myBal.netBalanceINR : 0);
 
-  // Category breakdown
-  const categoryBreakdown: Record<string, number> = {};
-  expenses.forEach((e) => {
-    categoryBreakdown[e.category] = (categoryBreakdown[e.category] || 0) + e.baseAmountINR;
-  });
 
   return (
     <View style={styles.root}>
@@ -152,7 +198,16 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor={styles.tabTextActive.color}
+          />
+        }>
         {/* TAB 1: EXPENSES LOG */}
         {activeTab === 'expenses' && (
           <View>
@@ -164,8 +219,9 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
               </View>
             ) : (
               expenses.map((expense) => {
-                const payerMember = group.members.find((m) => m.id === expense.paidByMemberId);
-                const isPaidByMe = expense.paidByMemberId === 'usr_me';
+                const payerMember = (group.members || []).find((m) => m.id === expense.paidByMemberId);
+                const isPaidByMe = myMember ? expense.paidByMemberId === myMember.id : false;
+                const displayAmt = expense.baseAmountINR ?? expense.amount ?? 0;
 
                 return (
                   <Pressable
@@ -185,12 +241,12 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
                         <Text style={styles.expenseTitle}>{expense.title}</Text>
                         <Text style={styles.expenseSub}>
                           {isPaidByMe
-                            ? `${t('expenses.you_paid')} ₹${expense.baseAmountINR.toLocaleString('en-IN')}`
-                            : `${t('expenses.someone_paid', { name: payerMember?.name || 'Someone' })} ₹${expense.baseAmountINR.toLocaleString('en-IN')}`}
+                            ? `${t('expenses.you_paid')} ₹${displayAmt.toLocaleString('en-IN')}`
+                            : `${t('expenses.someone_paid', { name: payerMember?.name || 'Someone' })} ₹${displayAmt.toLocaleString('en-IN')}`}
                         </Text>
                       </View>
                       <Text style={styles.expenseAmountText}>
-                        ₹{expense.baseAmountINR.toLocaleString('en-IN')}
+                        ₹{displayAmt.toLocaleString('en-IN')}
                       </Text>
                     </View>
                   </Pressable>
@@ -229,6 +285,7 @@ export default function GroupDetailsScreen({ navigation, route }: Props) {
                             groupId: group.id,
                             settlePayerId: debt.payerId,
                             settlePayeeId: debt.payeeId,
+                            settleAmount: debt.amountINR,
                           })
                         }>
                         <Text style={styles.settleBtnText}>{t('expenses.settle_up_btn')}</Text>

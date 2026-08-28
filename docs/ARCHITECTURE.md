@@ -421,7 +421,7 @@ Ordered by how much they will hurt later. All are tracked in `docs/BACKLOG.md`.
 5. **Fonts not bundled** — the visual design in the palette definitions is not what renders. (`M1-T4`)
 6. **Two navigation typing sources** (`native-stack` navigator vs `stack` prop types). (`M1-T5`)
 7. **Test coverage is theming plus one smoke test** — `__tests__/App.test.tsx`, `theme.test.tsx`, `themedScreens.test.tsx` (34 tests). No storage, i18n, or interaction tests, and no React Native Testing Library. The harness itself was repaired in `M1-T1` (2026-07-30) — see §10. (`M9-T1`)
-8. **One dashboard number is still hardcoded** — `₹12,450` (30-day spend) in the dashboard stat card. `2`/`4` in the greeting's `Pending`/`Due` status line are also still placeholders, pending `M5-T11`'s Events module and `M6-T3`'s spend rollup. Medicine adherence (the card next to it) went live in `M4-T3`.
+8. ~~One dashboard number is still hardcoded — `₹12,450` (30-day spend) in the dashboard stat card~~ — **Resolved 2026-08-27 (D-052):** Dynamically rolled up via `getRolling30DaySpend(token)` with local fallback to `loadExpenses()`. `2`/`4` in the greeting's `Pending`/`Due` status line remain pending `M5-T11`'s Events module.
 9. **Family's "which member is me" is a name-match heuristic, not a real identity lookup** (§7, `docs/DECISIONS.md` D-023). `FamilyMemberResponse` has no `userId` for a non-owner row, so `resolveMyMembership()` falls back to matching the caller's own cached profile name — wrong if two members share a display name, or if the caller renamed since joining (falls back to a plain `MEMBER` read in that case, not a crash, but still not a correct answer — since D-039 this only affects whether "Remove"/"Leave" render, not read/write access anywhere). Fixing this needs a backend change (a `userId` per member, or a "my membership" endpoint) — see `docs/BACKEND_CONTEXT.md`.
 10. **No multi-family switcher.** The backend supports a user belonging to several families; the client only ever shows `families[0]` (`getMyPrimaryFamily()`). Joining a second family (by accepting an invite) works, but there is no UI to switch to it afterward. (§7)
 
@@ -491,3 +491,27 @@ Added in **D-044** (2026-08-23) to transform the application's visual architectu
    - Modern search & voice prompt pill with search icon and voice shortcut.
 6. **Responsive Layout Container (`src/components/ResponsiveContainer.tsx`):**
    - Device and tablet-responsive wrapper applying dynamic max-width constraints (`contentMaxWidth: 640`) to maintain optimal reading widths on tablets and foldable devices.
+
+---
+
+## 13. Multi-Currency Expense Groups and Split Settlement Engine (D-050 / D-052)
+
+Added in **D-050 / D-052** (2026-08-27) matching Module 11 of the SRS and the updated `Saheli Backend — Auth, Profile & Family.postman_collection.json` folder (`Expense Groups & Multi-Currency Splitting`):
+
+1. **Architecture & Separation of Concerns:**
+   - **REST Client (`src/features/money/expenses/api.ts`):** 15 endpoints wrapping `apiFetch` with Bearer auth:
+     - Group lifecycle (`GET /api/expense-groups`, `POST /api/expense-groups`, `GET/PUT/DELETE /api/expense-groups/{id}`)
+     - Group members (`POST /api/expense-groups/{id}/members`, `DELETE /api/expense-groups/{id}/members/{memberId}`)
+     - Group expenses (`GET /api/expense-groups/{id}/expenses`, `POST /api/expense-groups/{id}/expenses`, `GET/DELETE .../{expenseId}`)
+     - Debt settlements (`POST /api/expense-groups/{id}/settlements`, `GET /api/expense-groups/{id}/settlements`)
+     - Complete Group Sync (`GET /api/expense-groups/{id}/sync`)
+     - Rolling 30-day Spend rollup (`GET /api/expenses/summary/30-day`)
+   - **Resilient Store (`src/features/money/expenseStore.ts`):** Transparently accepts an optional Bearer `token`. When present and the backend is reachable, responses update the local cache in `AsyncStorage`. On 403, 500, or network failure, it falls back seamlessly to local storage (`habita.expense_groups`, `habita.expenses`, `habita.settlements`) and client-side calculations.
+   - **Screen Controllers:** `ExpenseGroupsScreen.tsx`, `GroupDetailsScreen.tsx`, `AddSplitExpenseScreen.tsx`, and `ExpenseDetailsSettleUpScreen.tsx` invoke `useAuth().getAccessToken()` and pass tokens through to store and API methods.
+   - **Dashboard Integration (`src/app/dashboard.tsx`):** Calls `getRolling30DaySpend(token)` on mount, focus, and pull-to-refresh to dynamically drive the 30-day spend stat tile.
+
+2. **Data Model & Conversions:**
+   - Multi-currency conversions support `INR` (base 1.0), `USD` (83.5), `EUR` (90.2), `AED` (22.7), `GBP` (105.8).
+   - Three split algorithms: `EQUAL`, `PERCENTAGE` (must sum to 100%), and `SHARES`.
+   - Greedy debt minimization matches creditors with debtors in $O(N \log N)$ to minimize total transaction count.
+   - Complete technical specification and PostgreSQL DDL live in `docs/EXPENSES_API_SPEC.md`.

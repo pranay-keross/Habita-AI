@@ -1011,6 +1011,63 @@ Following the CRED-inspired UI overhaul, specific issues required thorough remed
 
 ---
 
+## D-052 — Multi-Currency Expense Groups & Split Settlement Engine API Implementation
+
+**Status:** Accepted · **Date:** 2026-08-27
+
+**Context.**
+The user provided the updated Postman collection (`Saheli Backend — Auth, Profile & Family.postman_collection.json`) containing the complete `Expense Groups & Multi-Currency Splitting` collection folder (15 REST endpoints) and requested:
+1. Complete implementation of all expense-related API methods and types.
+2. Full wiring of the local calculation engine and screens with live backend calls and offline fallback to `AsyncStorage`.
+3. Complete technical specification (`docs/EXPENSES_API_SPEC.md`) with PostgreSQL Flyway migration DDL, algorithms, and models so backend developers can build the Spring Boot side seamlessly.
+4. Dynamic dashboard 30-day spend rollup replacing the hardcoded `₹12,450`.
+5. Comprehensive updates to all project markdown documentation files (`docs/BACKEND_CONTEXT.md`, `docs/ARCHITECTURE.md`, `docs/DECISIONS.md`, `docs/BACKLOG.md`, `AI_CONTEXT.md`).
+
+**Decision.**
+1. **Types & DTO Layer (`src/features/money/types.ts`):**
+   - Added DTO interfaces matching the backend: `CreateExpenseGroupRequest`, `UpdateExpenseGroupRequest`, `AddGroupMemberRequest`, `CreateExpenseRequest`, `RecordSettlementRequest`, `ExpenseGroupListResponse`, `ExpenseSummaryStats`, `GroupSyncResponse`, `SpendSummaryResponse`, `PaginatedExpensesResponse`.
+   - Extended core models (`ExpenseGroup`, `Expense`, `Settlement`, `GroupMember`) with optional backend fields (`ownerUserId`, `exchangeRate`, `userNetBalanceINR`, `memberCount`, `status`, etc.).
+2. **API Client (`src/features/money/expenses/api.ts` & `src/features/money/index.ts`):**
+   - Implemented all 15 REST endpoints using `apiFetch` with Bearer auth:
+     - Groups CRUD: `listExpenseGroups`, `createExpenseGroup`, `getExpenseGroup`, `updateExpenseGroup`, `deleteExpenseGroup`.
+     - Members: `addExpenseGroupMember`, `removeExpenseGroupMember`.
+     - Expenses: `listGroupExpenses`, `createGroupExpense`, `getGroupExpense`, `deleteGroupExpense`.
+     - Settlements & Sync: `recordSettlement`, `listGroupSettlements`, `getGroupSync`, `getRolling30DaySpend`.
+   - Re-exported all API functions from `src/features/money/index.ts`.
+3. **Resilient Local Store Layer (`src/features/money/expenseStore.ts`):**
+   - Enhanced `loadGroups`, `loadExpenseSummary`, `getGroupById`, `createGroup`, `addExpenseToGroup`, `settlePairwiseDebt`, and `getGroupSyncDetails` to accept `token?: string | null`.
+   - Remote calls execute when `token` is present; on success, cache is persisted to `AsyncStorage`. On network error, 403, 500, or offline state, methods fall back seamlessly to local calculation.
+4. **UI Screens Wiring (`ExpenseGroupsScreen`, `GroupDetailsScreen`, `AddSplitExpenseScreen`, `ExpenseDetailsSettleUpScreen`, `dashboard.tsx`):**
+   - Wired `useAuth().getAccessToken()` to all expense store and API calls across the money feature.
+   - Dashboard dynamically rolls up monthly spend via `getRolling30DaySpend(token)` on mount, focus, and pull-to-refresh, replacing the static `₹12,450` with the actual value.
+5. **Backend Specification Document (`docs/EXPENSES_API_SPEC.md`):**
+   - Created full Spring Boot architecture guide, Flyway PostgreSQL DDL schema (`V11__multi_currency_expenses.sql`), greedy debt minimization algorithm, multi-currency conversion rates, and integration contracts.
+6. **Verification & Testing (`__tests__/expenseApi.test.ts`):**
+   - Added unit test suite covering net balance calculations, pairwise debt settlement, and mock API client calls.
+   - `npx tsc --noEmit` clean with 0 errors.
+   - `npm test` passes all 175 tests across 7 test suites.
+
+---
+
+## D-053 — Java 25 Runtime Compatibility via Gradle Daemon JVM Criteria
+
+**Status:** Accepted · **Date:** 2026-08-27
+
+**Context.**
+The user has Java 25 (`jdk-25.0.4.1`) installed on the host system as the primary/default Java on `PATH`. When Gradle commands (`./gradlew assembleDebug`, `npm run android`, or `npx react-native run-android`) were executed directly inside a Java 25 daemon, the Kotlin Gradle Plugin's embedded IntelliJ parser threw an unhandled exception:
+`java.lang.IllegalArgumentException: 25.0.4.1`
+at `org.jetbrains.kotlin.com.intellij.util.lang.JavaVersion.parse` because current Kotlin compiler versions (2.1.20) do not support running the compiler daemon on Java 25.
+
+**Decision.**
+- Utilize Gradle 8.8+ Daemon JVM Criteria via `android/gradle/gradle-daemon-jvm.properties` (`toolchainVersion=17`).
+- This decouples the **Launcher JVM** (which runs on Java 25 via user PATH or `$env:JAVA_HOME="C:\Program Files\Java\jdk-25.0.4.1"`) from the **Gradle Daemon/Worker JVM** (which utilizes the compatible local JDK 17 runtime for Kotlin and Android Gradle Plugin compilation).
+- Verified:
+  - `.\gradlew --version` succeeds with `Launcher JVM: 25.0.4.1 (Oracle Corporation 25.0.4.1+1-LTS-5)`.
+  - `.\gradlew assembleDebug` completes with `BUILD SUCCESSFUL` generating `app-debug.apk`.
+  - `npx react-native run-android` successfully compiles, builds native CMake modules, installs `app-debug.apk`, and launches `com.sahelicli/.MainActivity` on `emulator-5554`.
+
+---
+
 ## Open decisions
 
 Tracked in `docs/BACKLOG.md` → Open questions. Move each here once answered.

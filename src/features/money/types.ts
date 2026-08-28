@@ -30,6 +30,7 @@ export interface GroupMember {
   name: string;
   avatar: string;
   phone?: string;
+  userId?: string | null;
   isOwner?: boolean;
 }
 
@@ -47,26 +48,32 @@ export interface Expense {
   amount: number;
   currency: Currency;
   baseAmountINR: number;
+  exchangeRate?: number;
   category: ExpenseCategory;
   paidByMemberId: string;
+  paidByName?: string;
   splitType: SplitType;
   shares: SplitShare[];
   date: string; // YYYY-MM-DD
   notes?: string;
   receiptUri?: string;
+  createdAt?: string;
 }
 
 export interface Settlement {
   id: string;
   groupId: string;
   payerMemberId: string;
+  payerName?: string;
   payeeMemberId: string;
+  payeeName?: string;
   amount: number;
   currency: Currency;
   amountINR: number;
   method: 'UPI' | 'CASH' | 'BANK_TRANSFER';
   date: string; // YYYY-MM-DD
   notes?: string;
+  createdAt?: string;
 }
 
 export interface ExpenseGroup {
@@ -77,6 +84,11 @@ export interface ExpenseGroup {
   defaultCurrency: Currency;
   members: GroupMember[];
   createdAt: string;
+  ownerUserId?: string;
+  memberCount?: number;
+  expenseCount?: number;
+  userNetBalanceINR?: number;
+  status?: 'YOU_GET_BACK' | 'YOU_OWE' | 'SETTLED_UP';
 }
 
 export interface MemberBalance {
@@ -96,3 +108,84 @@ export interface PairwiseDebt {
   payeeAvatar: string;
   amountINR: number;
 }
+
+export interface ExpenseSummaryStats {
+  totalSpentINR: number;
+  youAreOwedINR: number;
+  youOweINR: number;
+}
+
+export interface ExpenseGroupListResponse {
+  summary: ExpenseSummaryStats;
+  groups: ExpenseGroup[];
+}
+
+export interface CreateExpenseGroupRequest {
+  name: string;
+  emoji?: string;
+  category?: string;
+  defaultCurrency?: Currency;
+  members?: { name: string; avatar?: string; phone?: string }[];
+}
+
+export interface UpdateExpenseGroupRequest {
+  name?: string;
+  emoji?: string;
+  category?: string;
+  defaultCurrency?: Currency;
+}
+
+export interface AddGroupMemberRequest {
+  name: string;
+  avatar?: string;
+  phone?: string;
+  userId?: string | null;
+}
+
+export interface CreateExpenseRequest {
+  title: string;
+  amount: number;
+  currency: Currency;
+  payerId: string;
+  splitMode: SplitType | 'equal' | 'percentage' | 'shares';
+  category: string;
+  date: string;
+  notes?: string;
+  receiptUri?: string;
+  splits?: Record<string, number>;
+}
+
+export interface RecordSettlementRequest {
+  payerMemberId: string;
+  payeeMemberId: string;
+  amount: number;
+  currency: Currency;
+  method: 'UPI' | 'CASH' | 'BANK_TRANSFER';
+  date: string;
+  notes?: string;
+}
+
+export interface GroupSyncResponse {
+  group: ExpenseGroup;
+  totalSpendINR?: number;
+  userNetBalanceINR?: number;
+  expenses: Expense[];
+  settlements: Settlement[];
+  balances: MemberBalance[];
+  pairwiseDebts: PairwiseDebt[];
+  categoryBreakdown: Record<string, number>;
+}
+
+export interface SpendSummaryResponse {
+  rolling30DaysSpendINR: number;
+  currency: string;
+  periodStart: string;
+  periodEnd: string;
+}
+
+export interface PaginatedExpensesResponse {
+  content: Expense[];
+  totalElements: number;
+  totalPages: number;
+}
+

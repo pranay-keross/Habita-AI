@@ -2,7 +2,7 @@
 
 **Read this first if you are picking up Spring Boot backend work.** This repo does not contain that backend — it is the React Native client (`AI_CONTEXT.md`, `docs/ARCHITECTURE.md`). This document exists because a real Spring Boot backend already exists *somewhere else* and has been live-tested against this client (`docs/DECISIONS.md` D-012–D-018): it consolidates everything this repo has learned about that backend's actual behavior, separately from `Habita AI Software Requirements Specification.md`'s description of where it's *supposed* to end up. Read both — they disagree in places, and this file says where.
 
-**Status:** current as of 2026-08-18. Auth (`register`/`login`/`verify-otp`/`refresh`/`logout`) and Profile (`create`/`details`/`profilePhoto`/update/`deletion/request`) are confirmed **live**. Family & Managed Members (`create`/`list`/`get`/invite-and-consent/managed-members/invite-history/relations, `/api/families/**`) is a real, documented contract, and the client is built against all of it (`docs/DECISIONS.md` D-023, D-024, D-030, D-039) — but unlike auth/profile, **nobody has run it against a live server yet**, so it's "contract only" until someone does. The collection's `Medchest` folder — flagged 2026-08-11 as unsafe, unfinished scaffolding — has since grown into a real, documented contract too (`§2`'s Medchest subsection, `docs/DECISIONS.md` D-032), confirmed **deployed** (not just `localhost`) via a direct `curl` check against the same `403`-on-no-token shape `GET /families` already returns, and `MedicineScreen.tsx` is now wired against it (`docs/DECISIONS.md` D-035) when the caller has a family — falling back to local storage, unchanged, when they don't. **D-039 (2026-08-18)** simplified Family's role model from `OWNER/ADMIN/MEMBER/VIEWER` to `OWNER` (creator)/`MEMBER`, fixed a real security hole in the Medicine delete endpoint (no access check at all), and closed three gaps in the prescription-upload pipeline. Everything else in §3 below is unbuilt (or at least, this repo has no evidence it's built).
+**Status:** current as of 2026-08-27. Auth (`register`/`login`/`verify-otp`/`refresh`/`logout`) and Profile (`create`/`details`/`profilePhoto`/update/`deletion/request`) are confirmed **live**. Family & Managed Members (`create`/`list`/`get`/invite-and-consent/managed-members/invite-history/relations, `/api/families/**`) is a real, documented contract, and the client is built against all of it (`docs/DECISIONS.md` D-023, D-024, D-030, D-039). Medchest (`profiles/medicines/documents`, `/api/families/{id}/profiles`, `/api/profiles/{id}/medicines`, `/api/profiles/{id}/documents`) is a documented, deployed contract, and `MedicineScreen.tsx` is wired against it (`docs/DECISIONS.md` D-035). **Expense Groups & Multi-Currency Splitting (`/api/expense-groups/**`, `/api/expenses/**`)** was added to `Saheli Backend — Auth, Profile & Family.postman_collection.json` (2026-08-27, D-050) covering 15 endpoints: groups lifecycle, member management, dynamic split types (EQUAL, PERCENTAGE, SHARES), multi-currency normalization to INR, pairwise debt settlement (UPI, Cash, Bank Transfer), group sync (`/sync`), and 30-day dashboard spend rollup (`/api/expenses/summary/30-day`). The React Native client is fully integrated against this contract (`src/features/money/expenses/api.ts`, `expenseStore.ts`, and screens) with resilient local storage fallback.
 
 ---
 
@@ -95,6 +95,30 @@ Added to `Saheli Backend — Auth, Profile & Family.postman_collection.json` 202
 
 **Documents, wired 2026-08-13 (`docs/DECISIONS.md` D-037), OCR lifecycle fixed 2026-08-18 (D-039), deletion added 2026-08-21 (D-041/D-042):** `documentType` is fixed client-side to `"PRESCRIPTION"` — the only value that appears anywhere in the collection's examples, so the only one confirmed accepted; the full enum (if there is one) is unconfirmed. `ocrStatus` used to be hardcoded to `"PENDING"` forever, regardless of whether the AI extraction step behind it succeeded or failed — D-039 wraps that extraction in a try/catch and sets `ocrStatus` to `PROCESSED` on success or `FAILED` on any exception (a bad/unreadable image, an AI response that isn't valid JSON, etc.), so the value now genuinely reflects what happened, and the client shows a translated label instead of the raw enum. **Also fixed the same day:** a duplicate medicine name found during AI extraction used to throw `BadRequestException`, and because the whole `uploadDocument` call is `@Transactional`, that aborted the entire upload — including the S3 file write and the `MedicalDocument` row, for a document that otherwise parsed fine. It now just skips that one medicine and keeps going, returning whatever *did* get created via the new `extractedMedicineNames` field. Documents can now be removed via `DELETE /api/profiles/{familyProfileId}/documents`.
 
+### Expense Groups & Multi-Currency Splitting — documented contract, client integrated
+
+**Added 2026-08-27 (`docs/DECISIONS.md` D-050):** The `Expense Groups & Multi-Currency Splitting` folder was added to `Saheli Backend — Auth, Profile & Family.postman_collection.json` (lines 7450–8177) defining 15 endpoints for SRS Module 11 (§11 'Multi-Currency Expense Groups'). All endpoints require Bearer auth. The React Native client is fully integrated via `src/features/money/expenses/api.ts`, `expenseStore.ts`, and screens, with automatic offline fallback to `AsyncStorage`.
+
+| Method | Path | Notes |
+| --- | --- | --- |
+| `GET` | `/api/expense-groups` | Returns all groups for caller + summary (`totalSpentINR`, `youAreOwedINR`, `youOweINR`) + per-group `userNetBalanceINR` & status (`YOU_GET_BACK` \| `YOU_OWE` \| `SETTLED_UP`). Feeds `ExpenseGroupsScreen.tsx` |
+| `POST` | `/api/expense-groups` | `{name, emoji, category, defaultCurrency, members: [{name, avatar, phone}]}` → 201 Created. Caller is automatically `isOwner = true` |
+| `GET` | `/api/expense-groups/{id}` | Full group details with all member profiles |
+| `PUT` | `/api/expense-groups/{id}` | `{name, emoji, category, defaultCurrency}` → updates group metadata |
+| `DELETE` | `/api/expense-groups/{id}` | Soft-deletes group |
+| `POST` | `/api/expense-groups/{id}/members` | `{name, avatar, phone, userId}` → adds group member |
+| `DELETE` | `/api/expense-groups/{id}/members/{memberId}` | Removes member. **Precondition:** net balance must be `0.00` |
+| `GET` | `/api/expense-groups/{id}/expenses` | Paginated list of expenses (`?page=0&size=50&category=...`) |
+| `POST` | `/api/expense-groups/{id}/expenses` | Supports 3 split modes (`EQUAL`, `PERCENTAGE` summing to 100%, `SHARES`) and multi-currency (`INR`, `USD`, `EUR`, `AED`, `GBP`) with automated conversion to base `INR` |
+| `GET` | `/api/expense-groups/{id}/expenses/{expenseId}` | Single expense details with itemized member shares |
+| `DELETE` | `/api/expense-groups/{id}/expenses/{expenseId}` | Soft-deletes expense, triggering balance recomputation |
+| `POST` | `/api/expense-groups/{id}/settlements` | `{payerMemberId, payeeMemberId, amount, currency, method: 'UPI'\|'CASH'\|'BANK_TRANSFER', date, notes}` → records debt payment |
+| `GET` | `/api/expense-groups/{id}/settlements` | List all settlements in group |
+| `GET` | `/api/expense-groups/{id}/sync` | **Crucial mobile sync endpoint:** returns `{group, expenses, settlements, balances, pairwiseDebts, categoryBreakdown, totalSpendINR, userNetBalanceINR}` in a single call |
+| `GET` | `/api/expenses/summary/30-day` | Rolling 30-day user spend in INR, feeding Dashboard spend tile |
+
+Full specification, PostgreSQL Flyway DDL (`V11__multi_currency_expenses.sql`), and algorithm details live in `docs/EXPENSES_API_SPEC.md`.
+
 ---
 
 ## 3. Known backend bugs and inconsistencies (not fixable from this repo)
@@ -129,7 +153,7 @@ Found via live testing, documented here so they aren't rediscovered from scratch
 | `resources` | Resource & Utility Logistics | `M5-T9/T10` | Not built |
 | `events` | Shared Family Events & Budgeting | `M5-T11` | Not built |
 | `vehicles` | Property Asset Vault & Vehicle Upkeep | `M5-T12` | Not built |
-| `expensegroups` | Multi-Currency Expense Groups | `M6-T1..T4` | Not built |
+| `expensegroups` | Multi-Currency Expense Groups | `M6-T1..T4` | Client fully integrated against Postman contract (D-050, `src/features/money/expenses/api.ts`, `expenseStore.ts`, screens); full backend spec in `docs/EXPENSES_API_SPEC.md` |
 | `payments`, `upi` | Payment Rails & Global Subscriptions | `M6-T6` | Not built; blocked on gateway decision (`docs/BACKLOG.md` open question 3) |
 | `pantry` | Smart Pantry & Allergen Radar | `M7-T1/T2` | Not built |
 | `wardrobe` | Wardrobe & Weather-Adaptive Style Mirror | `M7-T3/T4` | Not built |

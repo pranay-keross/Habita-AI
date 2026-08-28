@@ -4,3 +4,4 @@ export { default as AddSplitExpenseScreen } from './expenses/AddSplitExpenseScre
 export { default as ExpenseDetailsSettleUpScreen } from './expenses/ExpenseDetailsSettleUpScreen';
 export * from './expenseStore';
 export * from './types';
+export * from './expenses/api';

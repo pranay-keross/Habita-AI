@@ -1,9 +1,22 @@
 import { getItem, setItem } from '../../utils/storage';
+import {
+  createExpenseGroup,
+  createGroupExpense,
+  deleteExpenseGroup,
+  deleteGroupExpense,
+  getExpenseGroup,
+  getGroupSync,
+  listExpenseGroups,
+  listGroupExpenses,
+  listGroupSettlements,
+  recordSettlement,
+} from './expenses/api';
 import type {
   Currency,
   Expense,
   ExpenseCategory,
   ExpenseGroup,
+  ExpenseSummaryStats,
   GroupMember,
   MemberBalance,
   PairwiseDebt,
@@ -12,174 +25,146 @@ import type {
   SplitType,
 } from './types';
 
-const GROUPS_STORAGE_KEY = 'habita.expense_groups';
-const EXPENSES_STORAGE_KEY = 'habita.expenses';
-const SETTLEMENTS_STORAGE_KEY = 'habita.settlements';
+export const GROUPS_STORAGE_KEY = 'habita.expense_groups';
+export const EXPENSES_STORAGE_KEY = 'habita.expenses';
+export const SETTLEMENTS_STORAGE_KEY = 'habita.settlements';
 
-// Default initial sample data
-const INITIAL_MEMBERS: GroupMember[] = [
-  { id: 'usr_me', name: 'Animesh (You)', avatar: '👨‍💻', isOwner: true },
-  { id: 'usr_2', name: 'Rahul Sharma', avatar: '👨‍🦱' },
-  { id: 'usr_3', name: 'Priya Patel', avatar: '👩‍🦰' },
-  { id: 'usr_4', name: 'Rohan Gupta', avatar: '🧔' },
-];
+// Legacy mock IDs to automatically filter out from previous runs
+const LEGACY_MOCK_GROUP_IDS = new Set(['grp_1', 'grp_2', 'grp_3']);
+const LEGACY_MOCK_EXPENSE_IDS = new Set(['exp_1', 'exp_2', 'exp_3', 'exp_4']);
+const LEGACY_MOCK_SETTLEMENT_IDS = new Set(['set_1']);
 
-const INITIAL_GROUPS: ExpenseGroup[] = [
-  {
-    id: 'grp_1',
-    name: 'Home Rent & Bills',
-    emoji: '🏠',
-    category: 'Rent & Living',
-    defaultCurrency: 'INR',
-    members: [INITIAL_MEMBERS[0], INITIAL_MEMBERS[1], INITIAL_MEMBERS[2]],
-    createdAt: '2026-08-01',
-  },
-  {
-    id: 'grp_2',
-    name: 'Weekend Goa Trip',
-    emoji: '🏖️',
-    category: 'Travel & Fun',
-    defaultCurrency: 'INR',
-    members: INITIAL_MEMBERS,
-    createdAt: '2026-08-05',
-  },
-  {
-    id: 'grp_3',
-    name: 'Office Lunch Crew',
-    emoji: '🥗',
-    category: 'Food & Dining',
-    defaultCurrency: 'INR',
-    members: [INITIAL_MEMBERS[0], INITIAL_MEMBERS[1], INITIAL_MEMBERS[3]],
-    createdAt: '2026-08-10',
-  },
-];
-
-const INITIAL_EXPENSES: Expense[] = [
-  {
-    id: 'exp_1',
-    groupId: 'grp_1',
-    title: 'Monthly Rent Payment',
-    amount: 36000,
-    currency: 'INR',
-    baseAmountINR: 36000,
-    category: 'rent',
-    paidByMemberId: 'usr_me',
-    splitType: 'EQUAL',
-    shares: [
-      { memberId: 'usr_me', amount: 12000 },
-      { memberId: 'usr_2', amount: 12000 },
-      { memberId: 'usr_3', amount: 12000 },
-    ],
-    date: '2026-08-01',
-    notes: 'Paid via NetBanking for August',
-  },
-  {
-    id: 'exp_2',
-    groupId: 'grp_1',
-    title: 'Electricity & Wifi Bill',
-    amount: 4500,
-    currency: 'INR',
-    baseAmountINR: 4500,
-    category: 'bills',
-    paidByMemberId: 'usr_2',
-    splitType: 'EQUAL',
-    shares: [
-      { memberId: 'usr_me', amount: 1500 },
-      { memberId: 'usr_2', amount: 1500 },
-      { memberId: 'usr_3', amount: 1500 },
-    ],
-    date: '2026-08-05',
-  },
-  {
-    id: 'exp_3',
-    groupId: 'grp_2',
-    title: 'Beach Resort Booking',
-    amount: 24000,
-    currency: 'INR',
-    baseAmountINR: 24000,
-    category: 'travel',
-    paidByMemberId: 'usr_me',
-    splitType: 'EQUAL',
-    shares: [
-      { memberId: 'usr_me', amount: 6000 },
-      { memberId: 'usr_2', amount: 6000 },
-      { memberId: 'usr_3', amount: 6000 },
-      { memberId: 'usr_4', amount: 6000 },
-    ],
-    date: '2026-08-06',
-  },
-  {
-    id: 'exp_4',
-    groupId: 'grp_2',
-    title: 'Seafood Dinner & Drinks',
-    amount: 6400,
-    currency: 'INR',
-    baseAmountINR: 6400,
-    category: 'food',
-    paidByMemberId: 'usr_3',
-    splitType: 'PERCENTAGE',
-    shares: [
-      { memberId: 'usr_me', amount: 1600, percentage: 25 },
-      { memberId: 'usr_2', amount: 1600, percentage: 25 },
-      { memberId: 'usr_3', amount: 1600, percentage: 25 },
-      { memberId: 'usr_4', amount: 1600, percentage: 25 },
-    ],
-    date: '2026-08-07',
-  },
-];
-
-const INITIAL_SETTLEMENTS: Settlement[] = [
-  {
-    id: 'set_1',
-    groupId: 'grp_1',
-    payerMemberId: 'usr_2',
-    payeeMemberId: 'usr_me',
-    amount: 5000,
-    currency: 'INR',
-    amountINR: 5000,
-    method: 'UPI',
-    date: '2026-08-03',
-    notes: 'Partial payment towards August rent',
-  },
-];
-
-export async function loadGroups(): Promise<ExpenseGroup[]> {
-  const data = await getItem<ExpenseGroup[]>(GROUPS_STORAGE_KEY, INITIAL_GROUPS);
-  if (!data || data.length === 0) {
-    await saveGroups(INITIAL_GROUPS);
-    return INITIAL_GROUPS;
+export async function loadGroups(token?: string | null): Promise<ExpenseGroup[]> {
+  if (token) {
+    try {
+      const res = await listExpenseGroups(token);
+      if (res && Array.isArray(res.groups)) {
+        const normalized: ExpenseGroup[] = res.groups.map((g) => ({
+          ...g,
+          members: Array.isArray(g.members) ? g.members : [],
+          defaultCurrency: g.defaultCurrency || 'INR',
+        }));
+        await saveGroups(normalized);
+        return normalized;
+      }
+    } catch {
+      // Remote call failed, fallback to local storage
+    }
   }
-  return data;
+  const data = await getItem<ExpenseGroup[] | null>(GROUPS_STORAGE_KEY, null);
+  if (!data) return [];
+  // Filter out legacy static mock data
+  const cleaned = data.filter((g) => !LEGACY_MOCK_GROUP_IDS.has(g.id));
+  if (cleaned.length !== data.length) {
+    await saveGroups(cleaned);
+  }
+  return cleaned.map((g) => ({
+    ...g,
+    members: Array.isArray(g.members) ? g.members : [],
+  }));
+}
+
+export async function loadExpenseSummary(token?: string | null): Promise<ExpenseSummaryStats | null> {
+  if (token) {
+    try {
+      const res = await listExpenseGroups(token);
+      if (res && res.summary) {
+        return res.summary;
+      }
+    } catch {
+      // Fall through to null
+    }
+  }
+  return null;
 }
 
 export async function saveGroups(groups: ExpenseGroup[]): Promise<void> {
   await setItem(GROUPS_STORAGE_KEY, groups);
 }
 
-export async function loadExpenses(groupId?: string): Promise<Expense[]> {
-  const data = await getItem<Expense[]>(EXPENSES_STORAGE_KEY, INITIAL_EXPENSES);
-  const list = data && data.length > 0 ? data : INITIAL_EXPENSES;
-  if (!data || data.length === 0) {
-    await saveExpenses(INITIAL_EXPENSES);
+export async function loadExpenses(groupId?: string, token?: string | null): Promise<Expense[]> {
+  if (token && groupId) {
+    try {
+      const res = await listGroupExpenses(groupId, token);
+      const items: Expense[] = Array.isArray(res)
+        ? res
+        : res && 'content' in res
+        ? res.content
+        : [];
+      const all = await getItem<Expense[] | null>(EXPENSES_STORAGE_KEY, null);
+      const otherGroups = (all || []).filter(
+        (e) => e.groupId !== groupId && !LEGACY_MOCK_EXPENSE_IDS.has(e.id),
+      );
+      await saveExpenses([...otherGroups, ...items]);
+      return items;
+    } catch {
+      // Fall through to local storage
+    }
   }
-  return groupId ? list.filter((e) => e.groupId === groupId) : list;
+  const data = await getItem<Expense[] | null>(EXPENSES_STORAGE_KEY, null);
+  if (!data) return [];
+  const cleaned = data.filter((e) => !LEGACY_MOCK_EXPENSE_IDS.has(e.id));
+  if (cleaned.length !== data.length) {
+    await saveExpenses(cleaned);
+  }
+  return groupId ? cleaned.filter((e) => e.groupId === groupId) : cleaned;
 }
 
 export async function saveExpenses(expenses: Expense[]): Promise<void> {
   await setItem(EXPENSES_STORAGE_KEY, expenses);
 }
 
-export async function loadSettlements(groupId?: string): Promise<Settlement[]> {
-  const data = await getItem<Settlement[]>(SETTLEMENTS_STORAGE_KEY, INITIAL_SETTLEMENTS);
-  const list = data && data.length > 0 ? data : INITIAL_SETTLEMENTS;
-  if (!data || data.length === 0) {
-    await saveSettlements(INITIAL_SETTLEMENTS);
+export async function loadSettlements(groupId?: string, token?: string | null): Promise<Settlement[]> {
+  if (token && groupId) {
+    try {
+      const res = await listGroupSettlements(groupId, token);
+      if (Array.isArray(res)) {
+        const all = await getItem<Settlement[] | null>(SETTLEMENTS_STORAGE_KEY, null);
+        const otherGroups = (all || []).filter(
+          (s) => s.groupId !== groupId && !LEGACY_MOCK_SETTLEMENT_IDS.has(s.id),
+        );
+        await saveSettlements([...otherGroups, ...res]);
+        return res;
+      }
+    } catch {
+      // Fall through to local storage
+    }
   }
-  return groupId ? list.filter((s) => s.groupId === groupId) : list;
+  const data = await getItem<Settlement[] | null>(SETTLEMENTS_STORAGE_KEY, null);
+  if (!data) return [];
+  const cleaned = data.filter((s) => !LEGACY_MOCK_SETTLEMENT_IDS.has(s.id));
+  if (cleaned.length !== data.length) {
+    await saveSettlements(cleaned);
+  }
+  return groupId ? cleaned.filter((s) => s.groupId === groupId) : cleaned;
 }
 
 export async function saveSettlements(settlements: Settlement[]): Promise<void> {
   await setItem(SETTLEMENTS_STORAGE_KEY, settlements);
+}
+
+/**
+ * Dynamically resolves the member representing the current user in a group.
+ */
+export function findCurrentUserMember(
+  members?: GroupMember[],
+  currentUserId?: string | null,
+  currentUserName?: string | null,
+): GroupMember | undefined {
+  if (!members || members.length === 0) return undefined;
+  if (currentUserId) {
+    const found = members.find((m) => m.userId === currentUserId || m.id === currentUserId);
+    if (found) return found;
+  }
+  const owner = members.find((m) => m.isOwner);
+  if (owner) return owner;
+  const hasYou = members.find(
+    (m) =>
+      m.name.toLowerCase().includes('(you)') ||
+      (currentUserName && m.name.toLowerCase().includes(currentUserName.toLowerCase())),
+  );
+  if (hasYou) return hasYou;
+  return members[0];
 }
 
 // Calculate overall net balance for each member in a group
@@ -189,36 +174,35 @@ export function calculateGroupBalances(
   settlements: Settlement[],
 ): { balances: MemberBalance[]; pairwiseDebts: PairwiseDebt[] } {
   const netBalances: Record<string, number> = {};
+  const members = Array.isArray(group?.members) ? group.members : [];
 
   // Initialize
-  group.members.forEach((m) => {
+  members.forEach((m) => {
     netBalances[m.id] = 0;
   });
 
   // Account for expenses
-  expenses
-    .filter((e) => e.groupId === group.id)
+  (expenses || [])
+    .filter((e) => e.groupId === group?.id)
     .forEach((e) => {
-      // Paid amount adds to payer's net balance
-      netBalances[e.paidByMemberId] = (netBalances[e.paidByMemberId] || 0) + e.baseAmountINR;
+      const baseAmt = e.baseAmountINR ?? e.amount ?? 0;
+      netBalances[e.paidByMemberId] = (netBalances[e.paidByMemberId] || 0) + baseAmt;
 
-      // Deduct each share from the respective member's net balance
-      e.shares.forEach((share) => {
+      (e.shares || []).forEach((share) => {
         netBalances[share.memberId] = (netBalances[share.memberId] || 0) - share.amount;
       });
     });
 
   // Account for settlements
-  settlements
-    .filter((s) => s.groupId === group.id)
+  (settlements || [])
+    .filter((s) => s.groupId === group?.id)
     .forEach((s) => {
-      // Payer paid -> net balance increases
-      netBalances[s.payerMemberId] = (netBalances[s.payerMemberId] || 0) + s.amountINR;
-      // Payee received -> net balance decreases
-      netBalances[s.payeeMemberId] = (netBalances[s.payeeMemberId] || 0) - s.amountINR;
+      const amt = s.amountINR ?? s.amount ?? 0;
+      netBalances[s.payerMemberId] = (netBalances[s.payerMemberId] || 0) + amt;
+      netBalances[s.payeeMemberId] = (netBalances[s.payeeMemberId] || 0) - amt;
     });
 
-  const balances: MemberBalance[] = group.members.map((m) => ({
+  const balances: MemberBalance[] = members.map((m) => ({
     memberId: m.id,
     memberName: m.name,
     avatar: m.avatar,
@@ -264,7 +248,22 @@ export function calculateGroupBalances(
   return { balances, pairwiseDebts };
 }
 
-export async function getGroupById(groupId: string): Promise<ExpenseGroup | undefined> {
+export async function getGroupById(
+  groupId: string,
+  token?: string | null,
+): Promise<ExpenseGroup | undefined> {
+  if (token) {
+    try {
+      const remote = await getExpenseGroup(groupId, token);
+      if (remote) {
+        const groups = await loadGroups();
+        await saveGroups([remote, ...groups.filter((g) => g.id !== remote.id)]);
+        return remote;
+      }
+    } catch {
+      // Fall through to local
+    }
+  }
   const groups = await loadGroups();
   return groups.find((g) => g.id === groupId);
 }
@@ -273,14 +272,55 @@ export async function createGroup(
   name: string,
   emoji: string,
   memberNames: string[],
+  token?: string | null,
+  currentUserId?: string | null,
+  currentUserName?: string | null,
 ): Promise<ExpenseGroup> {
-  const groups = await loadGroups();
-  const newMembers: GroupMember[] = memberNames.map((n, i) => ({
-    id: i === 0 ? 'usr_me' : `usr_added_${Date.now()}_${i}`,
-    name: n,
-    avatar: i === 0 ? '👨‍💻' : '👤',
-    isOwner: i === 0,
-  }));
+  const otherMemberNames = memberNames.filter(
+    (n) =>
+      !n.toLowerCase().includes('(you)') &&
+      !(currentUserName && n.toLowerCase() === currentUserName.toLowerCase()),
+  );
+  const memberPayload = otherMemberNames.map((n) => ({ name: n }));
+
+  if (token) {
+    try {
+      const created = await createExpenseGroup(
+        {
+          name,
+          emoji: emoji || '👥',
+          category: 'General',
+          defaultCurrency: 'INR',
+          members: memberPayload,
+        },
+        token,
+      );
+      if (created) {
+        const groups = await loadGroups();
+        await saveGroups([created, ...groups.filter((g) => g.id !== created.id)]);
+        return created;
+      }
+    } catch {
+      // Fall through to local fallback
+    }
+  }
+
+  const myName = currentUserName ? `${currentUserName} (You)` : memberNames[0] || 'You (You)';
+  const newMembers: GroupMember[] = [
+    {
+      id: currentUserId || `usr_me_${Date.now()}`,
+      userId: currentUserId || undefined,
+      name: myName,
+      avatar: '👨‍💻',
+      isOwner: true,
+    },
+    ...otherMemberNames.map((n, i) => ({
+      id: `usr_${Date.now()}_${i + 1}`,
+      name: n,
+      avatar: '👤',
+      isOwner: false,
+    })),
+  ];
 
   const newGroup: ExpenseGroup = {
     id: `grp_${Date.now()}`,
@@ -289,13 +329,26 @@ export async function createGroup(
     category: 'General',
     defaultCurrency: 'INR',
     members: newMembers,
+    memberCount: newMembers.length,
+    expenseCount: 0,
+    userNetBalanceINR: 0,
+    ownerUserId: currentUserId || undefined,
     createdAt: new Date().toISOString().split('T')[0],
   };
 
+  const groups = await loadGroups();
   const updated = [newGroup, ...groups];
   await saveGroups(updated);
   return newGroup;
 }
+
+const CURRENCY_RATES: Record<Currency, number> = {
+  INR: 1,
+  USD: 83.5,
+  EUR: 90.2,
+  AED: 22.7,
+  GBP: 105.8,
+};
 
 export async function addExpenseToGroup(
   groupId: string,
@@ -303,13 +356,48 @@ export async function addExpenseToGroup(
     title: string;
     amount: number;
     currency: Currency;
+    baseAmountINR?: number;
     payerId: string;
     splitMode: 'equal' | 'percentage' | 'shares';
     splits: Record<string, number>;
     category: string;
     date: string;
+    notes?: string;
+    receiptUri?: string;
   },
+  token?: string | null,
 ): Promise<Expense> {
+  const rate = CURRENCY_RATES[expenseData.currency] || 1;
+  const baseINR = expenseData.baseAmountINR ?? Math.round(expenseData.amount * rate);
+
+  if (token) {
+    try {
+      const created = await createGroupExpense(
+        groupId,
+        {
+          title: expenseData.title,
+          amount: expenseData.amount,
+          currency: expenseData.currency,
+          payerId: expenseData.payerId,
+          splitMode: expenseData.splitMode,
+          category: expenseData.category,
+          date: expenseData.date,
+          notes: expenseData.notes,
+          receiptUri: expenseData.receiptUri,
+          splits: expenseData.splits,
+        },
+        token,
+      );
+      if (created) {
+        const expenses = await loadExpenses();
+        await saveExpenses([created, ...expenses.filter((e) => e.id !== created.id)]);
+        return created;
+      }
+    } catch {
+      // Fall through to local fallback
+    }
+  }
+
   const expenses = await loadExpenses();
   const splitType: SplitType =
     expenseData.splitMode === 'percentage'
@@ -329,12 +417,15 @@ export async function addExpenseToGroup(
     title: expenseData.title,
     amount: expenseData.amount,
     currency: expenseData.currency,
-    baseAmountINR: expenseData.amount,
+    baseAmountINR: baseINR,
+    exchangeRate: rate,
     category: (expenseData.category.toLowerCase() as ExpenseCategory) || 'food',
     paidByMemberId: expenseData.payerId,
     splitType,
     shares,
     date: expenseData.date || new Date().toISOString().split('T')[0],
+    notes: expenseData.notes,
+    receiptUri: expenseData.receiptUri,
   };
 
   const updated = [newExp, ...expenses];
@@ -342,32 +433,108 @@ export async function addExpenseToGroup(
   return newExp;
 }
 
+export async function deleteExpenseFromGroup(
+  groupId: string,
+  expenseId: string,
+  token?: string | null,
+): Promise<void> {
+  if (token) {
+    try {
+      await deleteGroupExpense(groupId, expenseId, token);
+    } catch {
+      // ignore
+    }
+  }
+  const all = await loadExpenses();
+  const updated = all.filter((e) => e.id !== expenseId);
+  await saveExpenses(updated);
+}
+
+export async function deleteGroup(groupId: string, token?: string | null): Promise<void> {
+  if (token) {
+    try {
+      await deleteExpenseGroup(groupId, token);
+    } catch {
+      // ignore
+    }
+  }
+  const all = await loadGroups();
+  await saveGroups(all.filter((g) => g.id !== groupId));
+  const exps = await loadExpenses();
+  await saveExpenses(exps.filter((e) => e.groupId !== groupId));
+  const sets = await loadSettlements();
+  await saveSettlements(sets.filter((s) => s.groupId !== groupId));
+}
+
 export async function settlePairwiseDebt(
   groupId: string,
   payerId: string,
   payeeId: string,
-  method: 'upi' | 'cash' | 'bank_transfer',
+  amountOrMethod?: number | 'upi' | 'cash' | 'bank_transfer',
+  methodOrToken?: 'upi' | 'cash' | 'bank_transfer' | string | null,
+  token?: string | null,
 ): Promise<Settlement> {
-  const settlements = await loadSettlements();
-  const groups = await loadGroups();
-  const group = groups.find((g) => g.id === groupId);
+  let specifiedAmount = typeof amountOrMethod === 'number' ? amountOrMethod : 0;
+  let method: 'upi' | 'cash' | 'bank_transfer' =
+    typeof amountOrMethod === 'string'
+      ? amountOrMethod
+      : typeof methodOrToken === 'string' &&
+        ['upi', 'cash', 'bank_transfer'].includes(methodOrToken)
+      ? (methodOrToken as 'upi' | 'cash' | 'bank_transfer')
+      : 'upi';
+  let authToken: string | null =
+    typeof methodOrToken === 'string' &&
+    !['upi', 'cash', 'bank_transfer'].includes(methodOrToken)
+      ? methodOrToken
+      : token ?? null;
 
-  let amt = 0;
-  if (group) {
-    const expenses = await loadExpenses(groupId);
-    const { pairwiseDebts } = calculateGroupBalances(group, expenses, settlements);
-    const debt = pairwiseDebts.find((d) => d.payerId === payerId && d.payeeId === payeeId);
-    if (debt) amt = debt.amountINR;
+  if (specifiedAmount <= 0) {
+    const groups = await loadGroups();
+    const group = groups.find((g) => g.id === groupId);
+    if (group) {
+      const expenses = await loadExpenses(groupId);
+      const settlements = await loadSettlements(groupId);
+      const { pairwiseDebts } = calculateGroupBalances(group, expenses, settlements);
+      const debt = pairwiseDebts.find((d) => d.payerId === payerId && d.payeeId === payeeId);
+      if (debt) specifiedAmount = debt.amountINR;
+    }
   }
+
+  const finalAmount = specifiedAmount > 0 ? specifiedAmount : 1000;
+
+  if (authToken) {
+    try {
+      const remote = await recordSettlement(
+        groupId,
+        {
+          payerMemberId: payerId,
+          payeeMemberId: payeeId,
+          amount: finalAmount,
+          currency: 'INR',
+          method: method === 'upi' ? 'UPI' : method === 'cash' ? 'CASH' : 'BANK_TRANSFER',
+          date: new Date().toISOString().split('T')[0],
+        },
+        authToken,
+      );
+      if (remote) {
+        const settlements = await loadSettlements();
+        await saveSettlements([remote, ...settlements.filter((s) => s.id !== remote.id)]);
+        return remote;
+      }
+    } catch {
+      // Fall through to local fallback
+    }
+  }
+  const settlements = await loadSettlements();
 
   const newSet: Settlement = {
     id: `set_${Date.now()}`,
     groupId,
     payerMemberId: payerId,
     payeeMemberId: payeeId,
-    amount: amt || 1000,
+    amount: finalAmount,
     currency: 'INR',
-    amountINR: amt || 1000,
+    amountINR: finalAmount,
     method: method === 'upi' ? 'UPI' : method === 'cash' ? 'CASH' : 'BANK_TRANSFER',
     date: new Date().toISOString().split('T')[0],
   };
@@ -377,12 +544,59 @@ export async function settlePairwiseDebt(
   return newSet;
 }
 
-export async function getGroupSyncDetails(groupId: string) {
-  const group = await getGroupById(groupId);
+export async function getGroupSyncDetails(groupId: string, token?: string | null) {
+  if (token) {
+    try {
+      const syncRes = await getGroupSync(groupId, token);
+      if (syncRes && syncRes.group) {
+        if (syncRes.expenses) await saveExpenses(syncRes.expenses);
+        if (syncRes.settlements) await saveSettlements(syncRes.settlements);
+        return {
+          group: syncRes.group,
+          expenses: syncRes.expenses || [],
+          settlements: syncRes.settlements || [],
+          balances: syncRes.balances || [],
+          pairwiseDebts: syncRes.pairwiseDebts || [],
+          categoryBreakdown: syncRes.categoryBreakdown || {},
+          totalSpendINR: syncRes.totalSpendINR,
+          userNetBalanceINR: syncRes.userNetBalanceINR,
+        };
+      }
+    } catch {
+      // Fallback: try individual endpoints
+      try {
+        const [remoteGroup, remoteExpenses, remoteSettlements] = await Promise.all([
+          getExpenseGroup(groupId, token).catch(() => null),
+          listGroupExpenses(groupId, token).catch(() => null),
+          listGroupSettlements(groupId, token).catch(() => null),
+        ]);
+        if (remoteGroup) {
+          const expsList: Expense[] = Array.isArray(remoteExpenses)
+            ? remoteExpenses
+            : remoteExpenses && 'content' in remoteExpenses
+            ? remoteExpenses.content
+            : [];
+          const setsList: Settlement[] = Array.isArray(remoteSettlements) ? remoteSettlements : [];
+          const { balances, pairwiseDebts } = calculateGroupBalances(remoteGroup, expsList, setsList);
+          return {
+            group: remoteGroup,
+            expenses: expsList,
+            settlements: setsList,
+            balances,
+            pairwiseDebts,
+            categoryBreakdown: {},
+          };
+        }
+      } catch {
+        // Fall through to local computation
+      }
+    }
+  }
+
+  const group = await getGroupById(groupId, token);
   if (!group) return null;
-  const expenses = await loadExpenses(groupId);
-  const settlements = await loadSettlements(groupId);
+  const expenses = await loadExpenses(groupId, token);
+  const settlements = await loadSettlements(groupId, token);
   const { balances, pairwiseDebts } = calculateGroupBalances(group, expenses, settlements);
   return { group, expenses, settlements, balances, pairwiseDebts };
 }
-

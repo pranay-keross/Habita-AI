@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  TextInput,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -20,9 +21,14 @@ import CheckCircle2 from 'lucide-react-native/icons/circle-check';
 import HandCoins from 'lucide-react-native/icons/hand-coins';
 import Calendar from 'lucide-react-native/icons/calendar';
 import User from 'lucide-react-native/icons/user';
+import Trash2 from 'lucide-react-native/icons/trash-2';
+import useAuth from '../../../hooks/useAuth';
 import {
+  calculateGroupBalances,
+  deleteExpenseFromGroup,
   getGroupById,
   loadExpenses,
+  loadSettlements,
   settlePairwiseDebt,
 } from '../expenseStore';
 import type { Expense, ExpenseGroup } from '../types';
@@ -41,14 +47,17 @@ const PAYMENT_METHODS: { key: PaymentMethod; labelKey: string; icon: string }[] 
 export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
-  const { groupId, expenseId, settlePayerId, settlePayeeId } = route.params;
+  const { groupId, expenseId, settlePayerId, settlePayeeId, settleAmount: routeAmount } = route.params;
+  const { getAccessToken } = useAuth();
   const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<ExpenseGroup | undefined>();
   const [expense, setExpense] = useState<Expense | undefined>();
+  const [settleAmountStr, setSettleAmountStr] = useState<string>(routeAmount ? String(routeAmount) : '');
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('upi');
   const [settling, setSettling] = useState(false);
+  const [deleting, setDeleting] = useState(false);
 
   const isSettleMode = !!(settlePayerId && settlePayeeId);
 
@@ -56,12 +65,20 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
     const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     const fetchData = async () => {
       setLoading(true);
-      const g = await getGroupById(groupId);
+      const token = await getAccessToken().catch(() => null);
+      const g = await getGroupById(groupId, token);
       setGroup(g);
       if (expenseId) {
         const exps = await loadExpenses(groupId);
         const e = exps.find((item) => item.id === expenseId);
         setExpense(e);
+      }
+      if (isSettleMode && !routeAmount && g) {
+        const exps = await loadExpenses(groupId);
+        const sets = await loadSettlements(groupId);
+        const { pairwiseDebts } = calculateGroupBalances(g, exps, sets);
+        const debt = pairwiseDebts.find((d) => d.payerId === settlePayerId && d.payeeId === settlePayeeId);
+        if (debt) setSettleAmountStr(String(debt.amountINR));
       }
       setLoading(false);
     };
@@ -69,7 +86,7 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
     return () => {
       unsubLang();
     };
-  }, [groupId, expenseId]);
+  }, [groupId, expenseId, isSettleMode, routeAmount, settlePayerId, settlePayeeId, getAccessToken]);
 
   if (loading || !group) {
     return (
@@ -85,8 +102,15 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
   const handleConfirmSettleUp = async () => {
     if (!settlePayerId || !settlePayeeId) return;
 
+    const amt = parseFloat(settleAmountStr);
+    if (isNaN(amt) || amt <= 0) {
+      Alert.alert(t('expenses.invalid_settle_amount'), t('expenses.invalid_settle_amount_msg'));
+      return;
+    }
+
     setSettling(true);
-    await settlePairwiseDebt(group.id, settlePayerId, settlePayeeId, paymentMethod);
+    const token = await getAccessToken().catch(() => null);
+    await settlePairwiseDebt(group.id, settlePayerId, settlePayeeId, amt, paymentMethod, token);
     setSettling(false);
 
     const pmMeta = PAYMENT_METHODS.find((p) => p.key === paymentMethod);
@@ -102,6 +126,29 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
     );
     navigation.goBack();
   };
+
+  const handleDeleteExpense = () => {
+    if (!expense) return;
+    Alert.alert(
+      t('expenses.delete_expense_title'),
+      t('expenses.delete_expense_confirm', { title: expense.title }),
+      [
+        { text: t('expenses.cancel_btn'), style: 'cancel' },
+        {
+          text: t('expenses.delete_btn'),
+          style: 'destructive',
+          onPress: async () => {
+            setDeleting(true);
+            const token = await getAccessToken().catch(() => null);
+            await deleteExpenseFromGroup(groupId, expense.id, token);
+            setDeleting(false);
+            navigation.goBack();
+          },
+        },
+      ],
+    );
+  };
+
 
   return (
     <View style={styles.root}>
@@ -126,6 +173,21 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
               <Text style={styles.settleHeroSub}>
                 {t('expenses.is_paying_text', { payer: payerMember?.name, payee: payeeMember?.name })}
               </Text>
+            </View>
+
+            <Text style={styles.sectionTitle}>{t('expenses.settlement_amount_inr')}</Text>
+            <View style={styles.card}>
+              <View style={styles.amountInputRow}>
+                <Text style={styles.currencyPrefix}>₹</Text>
+                <TextInput
+                  style={styles.amountTextInput}
+                  value={settleAmountStr}
+                  onChangeText={setSettleAmountStr}
+                  keyboardType="numeric"
+                  placeholder="0"
+                  placeholderTextColor={styles.placeholder.color}
+                />
+              </View>
             </View>
 
             <Text style={styles.sectionTitle}>{t('expenses.select_payment_method')}</Text>
@@ -169,7 +231,9 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
                 </View>
                 <Text style={styles.expenseTitle}>{expense.title}</Text>
                 <Text style={styles.expenseAmountText}>
-                  ₹{expense.amount.toLocaleString('en-IN')}
+                  {expense.currency !== 'INR'
+                    ? `${expense.currency} ${expense.amount.toLocaleString()} (~₹${(expense.baseAmountINR || expense.amount).toLocaleString('en-IN')})`
+                    : `₹${expense.amount.toLocaleString('en-IN')}`}
                 </Text>
                 <Text style={styles.expenseCategoryPill}>{expense.category.toUpperCase()}</Text>
               </View>
@@ -211,6 +275,14 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
                   );
                 })}
               </View>
+
+              <Button
+                title={t('expenses.delete_expense_btn')}
+                variant="outline"
+                onPress={handleDeleteExpense}
+                loading={deleting}
+                style={{ marginTop: 24, borderColor: '#EF4444' }}
+              />
             </View>
           )
         )}
@@ -299,6 +371,24 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderColor: colors.border,
       padding: spacing.md,
       ...shadow.soft,
+    },
+    amountInputRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 4,
+    },
+    currencyPrefix: {
+      fontFamily: fonts.sansBold,
+      fontSize: 24,
+      color: colors.textPrimary,
+      marginRight: 8,
+    },
+    amountTextInput: {
+      flex: 1,
+      fontFamily: fonts.sansBold,
+      fontSize: 24,
+      color: colors.textPrimary,
+      padding: 0,
     },
     methodRow: {
       flexDirection: 'row',

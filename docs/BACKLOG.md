@@ -28,7 +28,7 @@ Every task is sized to be completed in one focused session and is executable wit
 | M5 | Household Ledger & Assets | ⏳ Ready | 0 / 12 | Documents, Staff/Caregivers, Resources, Events, Vehicles |
 | M4 | Health & Life-Stage Suite | 🚧 In progress | 5 / 10 | Medical Chest done, now backend-integrated when a family exists (`M4-T10`); Wellness/CBT, Cycle tracking next |
 | M5 | Household Ledger & Assets | 🚧 In progress | 2 / 12 | Documents, Staff/Caregivers, Resources, Events, Vehicles |
-| M6 | Global Finance & Commerce | ⏳ Ready | 0 / 6 | Multi-currency expenses, payment rails |
+| M6 | Global Finance & Commerce | 🚧 In progress | 4 / 6 | Multi-currency expenses, settlement engine, 30-day spend rollup, API client |
 | M7 | Lifestyle & Smart Living | ⏳ Ready | 0 / 6 | Pantry, Wardrobe, Voice, live dashboard |
 | M8 | Backend & AI integration | 🚧 In progress | 1 / 6 | Family sharing real (`M8-T3`); everything else still needs the backend reached (`M8-T1`) |
 | M9 | Quality & release | 🚧 In progress | 1 / 9 | Tests, a11y, CI, store builds |
@@ -169,12 +169,13 @@ Goal: SRS Module Group 4's finance pair — Multi-Currency Expense Groups and Pa
 
 | ID | Task | Acceptance criteria | Status |
 | --- | --- | --- | --- |
-| M6-T1 | `src/features/expenses/` scaffold + tile wiring, with a currency field on every entry (SRS Multi-Currency Expense Groups) | Tile navigates; currency field present and defaults sensibly per locale | ⏳ |
-| M6-T2 | Expense entry (amount, currency, category, date, payer, note) with local persistence | CRUD persists; key documented | 🔒 needs M6-T1 |
-| M6-T3 | 30-day spend rollup that replaces the hardcoded `₹12,450` on the dashboard | Dashboard reads a derived total, converted to the user's display currency | 🔒 needs M6-T2 |
-| M6-T4 | Shared expense groups with per-member weighted split, honouring the family `expenses` permission | Splits computed and displayed correctly across currencies | 🔒 needs M6-T2, M3-T5 |
+| M6-T1 | `src/features/money/` scaffold + tile wiring, with a currency field on every entry (SRS Multi-Currency Expense Groups) | Tile navigates; currency field present and defaults sensibly per locale (`INR`, `USD`, `EUR`, `AED`, `GBP`) | ✅ Done (2026-08-27, D-052) |
+| M6-T2 | Expense entry (amount, currency, category, date, payer, note, dynamic split types EQUAL/PERCENTAGE/SHARES) with local persistence and backend API client (`POST /api/expense-groups/{id}/expenses`) | CRUD persists; key documented; wired to backend with offline fallback | ✅ Done (2026-08-27, D-052) |
+| M6-T3 | 30-day spend rollup that replaces the hardcoded `₹12,450` on the dashboard (`GET /api/expenses/summary/30-day`) | Dashboard reads derived total converted to base display currency with fallback to `loadExpenses()` | ✅ Done (2026-08-27, D-052) |
+| M6-T4 | Shared expense groups with per-member split, greedy debt minimization, settlement logging (`POST /api/expense-groups/{id}/settlements`), full sync endpoint (`GET /api/expense-groups/{id}/sync`), and unit tests | Splits computed and displayed correctly across currencies; full sync and offline fallback active | ✅ Done (2026-08-27, D-052) |
 | M6-T5 | Bill scan entry point that routes to the OCR hook-point from M5-T5 | Scan → prefilled expense form | 🔒 needs M5-T5 |
 | M6-T6 | Payment rails: Razorpay (India UPI) plus Stripe and PayPal (global), per SRS §Module 12 | ❓ Needs decision: deep-link vs SDK per gateway; compliance review required for each | ❓ |
+
 
 ---
 

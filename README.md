@@ -28,6 +28,7 @@ This repository is the React Native 0.86 client. It is mostly still a **static, 
 | `AI_CONTEXT.md` | Single-source context brief for AI agents starting a session |
 | `docs/ARCHITECTURE.md` | Layers, navigation, theming, i18n, storage contracts, known gaps |
 | `docs/BACKEND_CONTEXT.md` | Continuing the Spring Boot backend (separate project) — confirmed-live contract, known backend bugs, target API surface |
+| `docs/EXPENSES_API_SPEC.md` | Multi-Currency Expense Groups backend specification, REST contracts, Flyway DDL migration, greedy debt minimization algorithm, and client integration guide |
 | `docs/BACKLOG.md` | Milestone-based backlog tracker — the source of truth for what to build next, in full detail |
 | `docs/DECISIONS.md` | Decision log (why things are the way they are) |
 | `agent.md` | How the AI agent works in this repo: workflow, guardrails, doc-sync duties |
@@ -73,9 +74,9 @@ This repository is the React Native 0.86 client. It is mostly still a **static, 
 
 **Both screens are device-private**: mood and cycle data are deliberately *not* shared with or gated by the Family module, unlike the Medicine Chest — see `docs/DECISIONS.md` D-030, which is explicit that this is a product call worth revisiting rather than a technical limit. Both are also the first screens built responsively, via `useResponsive()` (`docs/ARCHITECTURE.md` §8).
 ### Expense Groups & Money (`src/features/money/`)
-A complete 4-screen expense sharing, multi-currency conversion, and debt settlement system designed in accordance with Google Material UI guidelines & Habita AI's warm pastel design language. Tapping **"Money"** or **"Add expense"** on the Dashboard routes directly to:
-1. **Expense Groups (`ExpenseGroupsScreen.tsx`)**: Group list, net balance summary cards ("You owe" vs "You get back"), group creation modal with emoji icon selection and member management.
-2. **Group Details (`GroupDetailsScreen.tsx`)**: Segmented tabs for **Expenses** (itemized logs), **Balances** (simplified pairwise debt matrix: who owes whom), and **Summary** (category spend breakdown analytics).
+A complete 4-screen expense sharing, multi-currency conversion, and debt settlement system designed in accordance with CRED-grade high-contrast minimalism and Habita AI design tokens, fully wired against the 15-endpoint Spring Boot REST backend (`Saheli Backend — Auth, Profile & Family.postman_collection.json` folder `Expense Groups & Multi-Currency Splitting`, D-052) with Bearer token authentication and resilient `AsyncStorage` offline caching. Full Spring Boot DDL & API specification lives in `docs/EXPENSES_API_SPEC.md`. Tapping **"Money"** or **"Add expense"** on the Dashboard routes directly to:
+1. **Expense Groups (`ExpenseGroupsScreen.tsx`)**: Group list, live net balance summary cards ("You owe" vs "You get back"), group creation modal with emoji icon selection and member management.
+2. **Group Details (`GroupDetailsScreen.tsx`)**: Segmented tabs for **Expenses** (itemized logs), **Balances** (simplified pairwise debt matrix: who owes whom), and **Summary** (category spend breakdown analytics), backed by live `/api/expense-groups/{id}/sync`.
 3. **Add / Split Expense (`AddSplitExpenseScreen.tsx`)**: Form with multi-currency support (INR ₹, USD $, EUR €, AED, GBP) with live exchange rate conversion, category tags, paid-by selector, and 3 interactive split modes:
    - **Equal**: Automatic equal division among members.
    - **Percentage (%)**: Custom percentage input per member with real-time validation (must sum to 100%).

@@ -6,6 +6,11 @@ import { MOOD_STORAGE_KEY } from '../features/wellness/wellnessStore';
 import { CYCLE_STORAGE_KEY, CYCLE_SETTINGS_STORAGE_KEY } from '../features/cycle/cycleStore';
 import { CAREGIVER_STORAGE_KEY, CAREGIVER_TRANSACTION_STORAGE_KEY } from '../features/staff/staffStore';
 import { QUICK_TAP_STORAGE_KEY, RESOURCE_LOG_STORAGE_KEY } from '../features/resources/resourceStore';
+import {
+  GROUPS_STORAGE_KEY,
+  EXPENSES_STORAGE_KEY,
+  SETTLEMENTS_STORAGE_KEY,
+} from '../features/money/expenseStore';
 
 const SESSION_KEY = 'habita.session';
 
@@ -15,26 +20,22 @@ const SESSION_KEY = 'habita.session';
 const PROFILE_STORAGE_KEY = 'habita.user_profile';
 
 // Keys that belong to *this account*, not this device — cleared whenever a different
-// phone number signs in on the same device, or on an explicit sign-out. Deliberately
-// excludes `habita.user_phone`: onboarding/phone.tsx always overwrites it with the
-// number just entered, before this ever runs, so clearing it here would erase the value
-// the very next screen needs. `habita.lang`/`habita.theme.palette` are device
-// preferences, not account data, and are never touched by this.
-//
-// Mood and cycle data (added M4-T6/M4-T8) matter here more than anything else on the
-// list: leaving them behind would show a second person signing in on the same device
-// the first account's mood notes and period history.
-// const ACCOUNT_SCOPED_KEYS = [
-//   PROFILE_STORAGE_KEY,
-//   MEDICINE_STORAGE_KEY,
-//   INTAKE_LOG_STORAGE_KEY,
-//   MOOD_STORAGE_KEY,
-//   CYCLE_STORAGE_KEY,
-//   CYCLE_SETTINGS_STORAGE_KEY,
-// ];
-const ACCOUNT_SCOPED_KEYS = [PROFILE_STORAGE_KEY,  MOOD_STORAGE_KEY,
+// phone number signs in on the same device, or on an explicit sign-out.
+const ACCOUNT_SCOPED_KEYS = [
+  PROFILE_STORAGE_KEY,
+  MOOD_STORAGE_KEY,
   CYCLE_STORAGE_KEY,
-  CYCLE_SETTINGS_STORAGE_KEY, MEDICINE_STORAGE_KEY, INTAKE_LOG_STORAGE_KEY, CAREGIVER_STORAGE_KEY, CAREGIVER_TRANSACTION_STORAGE_KEY, RESOURCE_LOG_STORAGE_KEY, QUICK_TAP_STORAGE_KEY];
+  CYCLE_SETTINGS_STORAGE_KEY,
+  MEDICINE_STORAGE_KEY,
+  INTAKE_LOG_STORAGE_KEY,
+  CAREGIVER_STORAGE_KEY,
+  CAREGIVER_TRANSACTION_STORAGE_KEY,
+  RESOURCE_LOG_STORAGE_KEY,
+  QUICK_TAP_STORAGE_KEY,
+  GROUPS_STORAGE_KEY,
+  EXPENSES_STORAGE_KEY,
+  SETTLEMENTS_STORAGE_KEY,
+];
 
 async function clearAccountData(): Promise<void> {
   await Promise.all(ACCOUNT_SCOPED_KEYS.map((key) => removeItem(key)));

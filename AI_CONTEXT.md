@@ -2,9 +2,10 @@
 
 > **Read this first.** It is the cold-start brief for any AI agent working on this repo — enough to be productive without the user re-explaining the project. Depth lives elsewhere; this file points you there.
 >
-> **Last synced:** 2026-08-24 · branch `enhancement` · after the **Saheli → Habita AI rebrand** (D-019, D-020), `M2-T2` (resend timer), `M4-T1/T2/T3/T5` (Medical Chest), **real Family & Managed Members backend integration** (D-023), **Postman-collection reconciliation** (D-024), **silent session-token refresh** (D-027), **Medchest API integration** (D-032, D-035, D-038), **Prescription document OCR** (D-037, D-040, D-041, D-042), **Medicine normalization** (D-043), **Glassmorphic System** (D-044), **CRED Minimalist Light Mode** (D-045, D-046, D-047), **CRED Dark Profile Canvas & Sub-Screens Alignment** (D-048), and **Bottom Navigation, App Launcher Icons, Animated Splash Screen, Profile Photo Sync & Medicine Resilience** (D-049) · `npx tsc --noEmit`, `npm run lint` (zero errors on modified code) and `npm test` (169 tests) all pass.
+> **Last synced:** 2026-08-27 · branch `enhancement` · after the **Saheli → Habita AI rebrand** (D-019, D-020), `M2-T2` (resend timer), `M4-T1/T2/T3/T5` (Medical Chest), **real Family & Managed Members backend integration** (D-023), **Postman-collection reconciliation** (D-024), **silent session-token refresh** (D-027), **Medchest API integration** (D-032, D-035, D-038), **Prescription document OCR** (D-037, D-040, D-041, D-042), **Medicine normalization** (D-043), **Glassmorphic System** (D-044), **CRED Minimalist Light Mode** (D-045, D-046, D-047), **CRED Dark Profile Canvas & Sub-Screens Alignment** (D-048), **Bottom Navigation & App Icons** (D-049), and **Multi-Currency Expense Groups API Implementation** (D-050/D-052) · `npx tsc --noEmit` (0 errors), `npm run lint` and `npm test` (7 suites, 175 tests) all pass.
 >
-> **2026-08-24 addendum:** **D-049** fixed bottom navigation crash by adding missing `Button` import and route typing, generated crisp branded Habita AI launcher icons for all Android & iOS densities, built a luxury dark animated `SplashScreen` with native Android background support, fixed dashboard profile photo live sync via `GET /profile/details`, and eliminated "An unexpected error occurred" popups on entering the Medicine section with resilient fallback.
+> **2026-08-27 addendum:** **D-052** implemented all 15 endpoints from Postman collection folder `"Expense Groups & Multi-Currency Splitting"` (`src/features/money/expenses/api.ts`), updated DTOs (`types.ts`), connected `expenseStore.ts` and screens (`ExpenseGroupsScreen`, `GroupDetailsScreen`, `AddSplitExpenseScreen`, `ExpenseDetailsSettleUpScreen`) with Bearer token authentication and resilient `AsyncStorage` fallback, wired rolling 30-day spend (`GET /api/expenses/summary/30-day`) into the dashboard stat tile, produced the complete Spring Boot PostgreSQL Flyway specification (`docs/EXPENSES_API_SPEC.md`), and added unit test suite `__tests__/expenseApi.test.ts`.
+
 
 ---
 
@@ -42,6 +43,7 @@ Earlier versions of this document claimed several of these were done, and were w
 | `docs/ARCHITECTURE.md` | How it is built — navigation, theming, i18n, storage contract, auth (§6), family (§7), **known gaps (§9)** |
 | `docs/BACKEND_CONTEXT.md` | Continuing the **Spring Boot backend** (a separate project, not in this repo) — confirmed-live contract, known backend bugs, target API surface. Read this instead of re-deriving it from `docs/DECISIONS.md` D-012–D-018 |
 | `docs/BACKLOG.md` | What to build next in full detail — milestones M0–M9 with task IDs |
+| `docs/EXPENSES_API_SPEC.md` | Multi-Currency Expense Groups backend specification, REST endpoints, Flyway DDL migration, greedy settlement minimization algorithm, and client integration guide (D-052) |
 | `docs/DECISIONS.md` | Why things are the way they are; do not relitigate |
 | `agent.md` | The working agreement for AI sessions in this repo |
 | `prompts/` | Session start · task kickoff · doc sync, plus module/i18n/refactor prompts |
@@ -51,7 +53,7 @@ Earlier versions of this document claimed several of these were done, and were w
 ```
 App.tsx · index.js               entry
 src/app/_layout.tsx              NavigationContainer + native stack + RootStackParamList + auth guard
-src/app/dashboard.tsx            home dashboard (scroll-driven sticky header)
+src/app/dashboard.tsx            home dashboard (scroll-driven sticky header, dynamic 30-day spend)
 src/app/onboarding/              language · phone · otp · profile — phone/otp/profile call the real backend
 src/features/auth/auth.ts        register/login/verifyOtp/refresh — real backend calls (M2-T1)
 src/features/auth/api.ts         fetch wrapper, ApiError, parseAuthError (M2-T1)
@@ -59,14 +61,16 @@ src/config.ts                    API_BASE_URL — the one place the backend URL 
 src/hooks/useAuth.ts             session hook: signedIn/pending/login/verify/logout/getAccessToken/getUserId
 src/features/family/             FamilyScreen.tsx, types.ts, api.ts — real backend calls (D-023), no local storage
 src/features/medicine/           MedicineScreen.tsx, types.ts, medicineStore.ts — CRUD, intake log, adherence
-src/components/                  Button · Card · SectionHeader · BottomSheet
+src/features/money/              ExpenseGroupsScreen, GroupDetailsScreen, AddSplitExpense, SettleUp, expenseStore, api.ts (D-052)
+src/components/                  Button · Card · SectionHeader · BottomSheet · Skeleton · SplashScreen
 src/i18n/index.ts + locales/     6 locales, LTR enforced, manual change listeners
 src/theme.ts                     design tokens — 3 palettes (the only theme source)
 src/hooks/useThemedStyles.ts     style factory hook — the theming entry point for screens
 src/utils/storage.ts             AsyncStorage JSON helpers
 jest.config.js · jest.setup.js   test harness — transform allowlist + native mocks
-__tests__/                       App smoke · theme mechanism · themed screens + pattern guard
+__tests__/                       App smoke · theme mechanism · themed screens · health modules · expenseApi (175 tests)
 ```
+
 
 `M1-T1` (2026-07-30) deleted the four genuinely dead paths — `src/theme/`, `src/styles/`, `src/shared/`, `src/features/family/index.ts`. If a doc still mentions them, that doc is stale.
 
