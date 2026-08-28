@@ -116,12 +116,12 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
       group.members.forEach((m) => {
         const p = parseFloat(percentages[m.id] || '0');
         totalPct += p;
-        splits[m.id] = Math.round((amountInINR * p) / 100);
+        splits[m.id] = p;
       });
-      if (Math.abs(totalPct - 100) > 1) {
+      if (Math.abs(totalPct - 100) > 0.5) {
         Alert.alert(
           t('expenses.invalid_percentage'),
-          t('expenses.percentage_sum_msg', { sum: totalPct }),
+          t('expenses.percentage_sum_msg', { sum: totalPct.toFixed(1) }),
         );
         return;
       }
@@ -130,11 +130,12 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
       group.members.forEach((m) => {
         const s = parseFloat(shares[m.id] || '1');
         totalShares += s;
+        splits[m.id] = s;
       });
-      group.members.forEach((m) => {
-        const s = parseFloat(shares[m.id] || '1');
-        splits[m.id] = Math.round((amountInINR * s) / (totalShares || 1));
-      });
+      if (totalShares <= 0) {
+        Alert.alert(t('expenses.invalid_amount'), 'Total shares must be greater than 0.');
+        return;
+      }
     }
 
     setSaving(true);

@@ -276,13 +276,24 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
                 })}
               </View>
 
-              <Button
-                title={t('expenses.delete_expense_btn')}
-                variant="outline"
+              <Pressable
                 onPress={handleDeleteExpense}
-                loading={deleting}
-                style={{ marginTop: 24, borderColor: '#EF4444' }}
-              />
+                disabled={deleting}
+                style={({ pressed }) => [
+                  styles.deleteButton,
+                  { opacity: deleting ? 0.5 : pressed ? 0.8 : 1 },
+                ]}>
+                {deleting ? (
+                  <ActivityIndicator size="small" color={styles.deleteButtonText.color} />
+                ) : (
+                  <View style={styles.deleteButtonInner}>
+                    <Trash2 size={16} color={styles.deleteButtonText.color} />
+                    <Text style={styles.deleteButtonText}>
+                      {t('expenses.delete_expense_btn')}
+                    </Text>
+                  </View>
+                )}
+              </Pressable>
             </View>
           )
         )}
@@ -499,5 +510,28 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     placeholder: {
       color: colors.textMuted,
+    },
+    deleteButton: {
+      marginTop: spacing.xl,
+      height: 50,
+      backgroundColor: colors.dangerSoft || 'rgba(255, 59, 48, 0.10)',
+      borderWidth: 1,
+      borderColor: colors.dangerBorder || '#FF3B30',
+      borderRadius: radius.pill,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    deleteButtonInner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 8,
+    },
+    deleteButtonText: {
+      fontFamily: fonts.sansBold,
+      fontSize: 14,
+      color: colors.danger || '#FF3B30',
+      letterSpacing: 0.5,
+      textTransform: 'uppercase',
     },
   });

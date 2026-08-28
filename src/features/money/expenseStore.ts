@@ -406,10 +406,27 @@ export async function addExpenseToGroup(
       ? 'SHARES'
       : 'EQUAL';
 
-  const shares: SplitShare[] = Object.entries(expenseData.splits).map(([memId, amt]) => ({
-    memberId: memId,
-    amount: amt,
-  }));
+  let shares: SplitShare[] = [];
+  if (expenseData.splitMode === 'percentage') {
+    shares = Object.entries(expenseData.splits).map(([memId, pct]) => ({
+      memberId: memId,
+      amount: Math.round((baseINR * pct) / 100),
+      percentage: pct,
+    }));
+  } else if (expenseData.splitMode === 'shares') {
+    const totalWeight = Object.values(expenseData.splits).reduce((a, b) => a + b, 0) || 1;
+    shares = Object.entries(expenseData.splits).map(([memId, weight]) => ({
+      memberId: memId,
+      amount: Math.round((baseINR * weight) / totalWeight),
+    }));
+  } else {
+    const count = Object.keys(expenseData.splits).length || 1;
+    const perHead = Math.round((baseINR / count) * 100) / 100;
+    shares = Object.entries(expenseData.splits).map(([memId, amt]) => ({
+      memberId: memId,
+      amount: amt > 0 ? amt : perHead,
+    }));
+  }
 
   const newExp: Expense = {
     id: `exp_${Date.now()}`,
