@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -27,10 +27,19 @@ import Trash2 from 'lucide-react-native/icons/trash-2';
 import X from 'lucide-react-native/icons/x';
 import Check from 'lucide-react-native/icons/check';
 import UserPlus from 'lucide-react-native/icons/user-plus';
+import Phone from 'lucide-react-native/icons/phone';
+import User from 'lucide-react-native/icons/user';
+import AlertCircle from 'lucide-react-native/icons/circle-alert';
+import Sparkles from 'lucide-react-native/icons/sparkles';
+import Zap from 'lucide-react-native/icons/zap';
 import { SkeletonCard, SkeletonHeroCard } from '../../../components/Skeleton';
+import Avatar from '../../../components/Avatar';
+import Pagination from '../../../components/Pagination';
 
 import useAuth from '../../../hooks/useAuth';
+import { ApiError } from '../../auth/api';
 import { getItem, setItem } from '../../../utils/storage';
+import { showNetworkUnavailableAlert } from '../../../utils/networkStatus';
 import { listMyFamilies } from '../../family/api';
 import type { FamilyMember } from '../../family/types';
 import {
@@ -40,15 +49,18 @@ import {
   findCurrentUserMember,
   loadExpenses,
   loadExpenseSummary,
-  loadGroups,
+  loadGroupsPage,
   loadSettlements,
+  verifyMemberByPhone,
 } from '../expenseStore';
-import type { Expense, ExpenseGroup, ExpenseSummaryStats, Settlement } from '../types';
+import type { CreateGroupMemberInput, Expense, ExpenseGroup, ExpenseSummaryStats, Settlement } from '../types';
+import { GROUP_ICON_KEYS, getGroupIconComponent } from './groupIcons';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'ExpenseGroups'>;
 
-const EMOJI_OPTIONS = ['🏠', '🏖️', '🍿', '🚗', '🎓', '✈️', '🍔', '🎁'];
+const ICON_KEY_OPTIONS = GROUP_ICON_KEYS;
+const GROUPS_PAGE_SIZE = 8;
 
 export default function ExpenseGroupsScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
@@ -67,14 +79,33 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
   const [remoteSummary, setRemoteSummary] = useState<ExpenseSummaryStats | null>(null);
   const [showCreateModal, setShowCreateModal] = useState(false);
   const [newGroupName, setNewGroupName] = useState('');
-  const [newGroupEmoji, setNewGroupEmoji] = useState('🏠');
+  const [newGroupEmoji, setNewGroupEmoji] = useState<string>(ICON_KEY_OPTIONS[0]);
   const [newMemberName, setNewMemberName] = useState('');
-  const [members, setMembers] = useState<string[]>(['You (You)']);
+  const [members, setMembers] = useState<CreateGroupMemberInput[]>([{ name: 'You (You)' }]);
   const [creating, setCreating] = useState(false);
   const [availableFamilyMembers, setAvailableFamilyMembers] = useState<FamilyMember[]>([]);
   const [loadingFamily, setLoadingFamily] = useState(false);
   const [showOtherInput, setShowOtherInput] = useState(false);
   const [otherMemberName, setOtherMemberName] = useState('');
+  const [otherMemberPhone, setOtherMemberPhone] = useState('');
+  const [phoneVerifyStatus, setPhoneVerifyStatus] = useState<'idle' | 'checking' | 'verified' | 'not_found'>('idle');
+  const [verifiedMemberInfo, setVerifiedMemberInfo] = useState<{ userId: string; avatarUrl?: string | null } | null>(null);
+  const [manualNameMode, setManualNameMode] = useState(false);
+  const [groupsPage, setGroupsPage] = useState(1);
+  const [groupsTotalPages, setGroupsTotalPages] = useState(1);
+  const [groupsTotalElements, setGroupsTotalElements] = useState(0);
+  const groupsPageRef = useRef(1);
+  useEffect(() => {
+    groupsPageRef.current = groupsPage;
+  }, [groupsPage]);
+
+  const fetchGroupsPage = async (page: number, tokenOverride?: string | null) => {
+    const token = tokenOverride !== undefined ? tokenOverride : await getAccessToken().catch(() => null);
+    const result = await loadGroupsPage(page, GROUPS_PAGE_SIZE, token);
+    setGroups(result.groups);
+    setGroupsTotalPages(result.totalPages);
+    setGroupsTotalElements(result.totalElements);
+  };
 
   const fetchGroups = async () => {
     const token = await getAccessToken().catch(() => null);
@@ -84,14 +115,13 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
     const sess = await getItem<{ userId?: string }>('habita.session', {});
     if (sess?.userId) setCurrentUserId(sess.userId);
 
-    const data = await loadGroups(token);
     const summary = await loadExpenseSummary(token);
     const exps = await loadExpenses(undefined, token);
     const sets = await loadSettlements(undefined, token);
-    setGroups(data);
     setRemoteSummary(summary);
     setExpenses(exps);
     setSettlements(sets);
+    await fetchGroupsPage(groupsPageRef.current, token);
     setLoading(false);
   };
 
@@ -143,34 +173,155 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
     };
   }, [navigation]);
 
+  const didMountGroupsPageEffect = useRef(false);
+  useEffect(() => {
+    if (!didMountGroupsPageEffect.current) {
+      didMountGroupsPageEffect.current = true;
+      return;
+    }
+    fetchGroupsPage(groupsPage);
+  }, [groupsPage]);
+
+  // If a deletion shrinks the list below the page currently being viewed, drop back to
+  // the new last page — this also re-triggers the effect above to refetch it.
+  useEffect(() => {
+    if (groupsPage > groupsTotalPages) {
+      setGroupsPage(groupsTotalPages);
+    }
+  }, [groupsTotalPages]);
+
   const handleOpenCreate = () => {
-    setMembers([`${currentUserName} (You)`]);
+    setMembers([{ name: `${currentUserName} (You)` }]);
     setNewGroupName('');
     setNewMemberName('');
-    setOtherMemberName('');
+    resetOtherMemberInput();
     setShowOtherInput(false);
     setShowCreateModal(true);
     fetchFamilyMembers();
   };
 
+  const resetOtherMemberInput = () => {
+    setOtherMemberName('');
+    setOtherMemberPhone('');
+    setPhoneVerifyStatus('idle');
+    setVerifiedMemberInfo(null);
+    setManualNameMode(false);
+  };
+
+  const handleOtherPhoneChange = (text: string) => {
+    setOtherMemberPhone(text);
+    if (phoneVerifyStatus !== 'idle') {
+      setPhoneVerifyStatus('idle');
+      setVerifiedMemberInfo(null);
+    }
+  };
+
+  const handleToggleManualMode = (manual: boolean) => {
+    setManualNameMode(manual);
+    setOtherMemberName('');
+    setOtherMemberPhone('');
+    setPhoneVerifyStatus('idle');
+    setVerifiedMemberInfo(null);
+  };
+
+  const handleVerifyPhone = async () => {
+    const trimmedPhone = otherMemberPhone.trim();
+    const digits = trimmedPhone.replace(/[\s-]+/g, '');
+    if (!/^\+?[0-9]{10,13}$/.test(digits)) {
+      Alert.alert(t('onboarding.error_title'), t('expenses.invalid_phone_msg'));
+      return;
+    }
+    const cleanPhone = digits.startsWith('+') ? digits : `+91${digits}`;
+
+    if (members.some((m) => m.phone === cleanPhone)) {
+      Alert.alert(t('onboarding.error_title'), t('expenses.already_added'));
+      return;
+    }
+
+    const token = await getAccessToken().catch(() => null);
+    if (!token) {
+      Alert.alert(t('onboarding.error_title'), t('expenses.phone_verify_offline_msg'));
+      return;
+    }
+
+    setPhoneVerifyStatus('checking');
+    try {
+      const result = await verifyMemberByPhone(cleanPhone, token);
+      if (result) {
+        setVerifiedMemberInfo({ userId: result.userId, avatarUrl: result.avatarUrl });
+        setOtherMemberName(result.name);
+        setPhoneVerifyStatus('verified');
+      } else {
+        setVerifiedMemberInfo(null);
+        setPhoneVerifyStatus('not_found');
+      }
+    } catch (err) {
+      setPhoneVerifyStatus('idle');
+      const errorBody =
+        err instanceof ApiError && err.body && typeof err.body === 'object'
+          ? (err.body as { code?: string; message?: string })
+          : undefined;
+      if (errorBody?.code === 'CANNOT_ADD_SELF') {
+        Alert.alert(t('onboarding.error_title'), t('expenses.phone_is_self_msg'));
+      } else if (err instanceof ApiError && err.status === 400 && errorBody?.message) {
+        Alert.alert(t('onboarding.error_title'), errorBody.message);
+      } else {
+        Alert.alert(t('onboarding.error_title'), t('expenses.phone_verify_error'));
+      }
+    }
+  };
+
   const handleToggleFamilyMember = (fm: FamilyMember) => {
-    const isSelected = members.includes(fm.name);
+    const isSelected = members.some((m) => m.name.toLowerCase() === fm.name.toLowerCase());
     if (isSelected) {
-      setMembers(members.filter((m) => m !== fm.name));
+      setMembers(members.filter((m) => m.name.toLowerCase() !== fm.name.toLowerCase()));
     } else {
-      setMembers([...members, fm.name]);
+      setMembers([...members, { name: fm.name }]);
     }
   };
 
   const handleAddOtherMember = () => {
-    const trimmed = otherMemberName.trim();
-    if (!trimmed) return;
-    if (members.some((m) => m.toLowerCase() === trimmed.toLowerCase())) {
+    if (manualNameMode) {
+      const trimmedName = otherMemberName.trim();
+      if (!trimmedName) return;
+
+      if (members.some((m) => m.name.toLowerCase() === trimmedName.toLowerCase())) {
+        Alert.alert(t('onboarding.error_title'), t('expenses.already_added'));
+        return;
+      }
+
+      setMembers([...members, { name: trimmedName }]);
+      resetOtherMemberInput();
+      return;
+    }
+
+    if (phoneVerifyStatus !== 'verified' || !verifiedMemberInfo) {
+      Alert.alert(t('onboarding.error_title'), t('expenses.verify_phone_first'));
+      return;
+    }
+
+    const digits = otherMemberPhone.trim().replace(/[\s-]+/g, '');
+    const cleanPhone = digits.startsWith('+') ? digits : `+91${digits}`;
+    const memberName = otherMemberName.trim() || cleanPhone;
+
+    if (
+      members.some(
+        (m) => m.phone === cleanPhone || m.name.toLowerCase() === memberName.toLowerCase(),
+      )
+    ) {
       Alert.alert(t('onboarding.error_title'), t('expenses.already_added'));
       return;
     }
-    setMembers([...members, trimmed]);
-    setOtherMemberName('');
+
+    setMembers([
+      ...members,
+      {
+        name: memberName,
+        phone: cleanPhone,
+        userId: verifiedMemberInfo.userId,
+      },
+    ]);
+    resetOtherMemberInput();
   };
 
   const handleRemoveMember = (idx: number) => {
@@ -189,7 +340,8 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
           style: 'destructive',
           onPress: async () => {
             const token = await getAccessToken().catch(() => null);
-            await deleteGroup(groupId, token);
+            const { offline } = await deleteGroup(groupId, token);
+            if (offline) showNetworkUnavailableAlert();
             fetchGroups();
           },
         },
@@ -205,7 +357,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
     setCreating(true);
     try {
       const token = await getAccessToken().catch(() => null);
-      const created = await createGroup(
+      const { group: created, offline } = await createGroup(
         newGroupName.trim(),
         newGroupEmoji,
         members,
@@ -216,6 +368,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
       setShowCreateModal(false);
       setNewGroupName('');
       fetchGroups();
+      if (offline) showNetworkUnavailableAlert();
       navigation.navigate('GroupDetails', { groupId: created.id });
     } catch {
       Alert.alert(t('onboarding.error_title'), t('expenses.error_create_group'));
@@ -289,7 +442,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               <SkeletonCard />
               <SkeletonCard />
             </View>
-          ) : groups.length === 0 ? (
+          ) : groupsTotalElements === 0 ? (
             <View style={styles.emptyContainer}>
               <View style={styles.emptyIconCircle}>
                 <Users size={36} color={styles.primaryIcon.color} />
@@ -299,15 +452,15 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
 
               <View style={styles.emptyBenefitsCard}>
                 <View style={styles.benefitRow}>
-                  <Text style={styles.benefitBullet}>✨</Text>
+                  <Sparkles size={14} color={styles.primaryIcon.color} style={styles.benefitIcon} />
                   <Text style={styles.benefitText}>{t('expenses.benefit_split')}</Text>
                 </View>
                 <View style={styles.benefitRow}>
-                  <Text style={styles.benefitBullet}>👥</Text>
+                  <Users size={14} color={styles.primaryIcon.color} style={styles.benefitIcon} />
                   <Text style={styles.benefitText}>{t('expenses.benefit_family')}</Text>
                 </View>
                 <View style={styles.benefitRow}>
-                  <Text style={styles.benefitBullet}>⚡</Text>
+                  <Zap size={14} color={styles.primaryIcon.color} style={styles.benefitIcon} />
                   <Text style={styles.benefitText}>{t('expenses.benefit_settle')}</Text>
                 </View>
               </View>
@@ -354,7 +507,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
               </View>
 
               {/* Groups List */}
-              <Text style={styles.sectionTitle}>{t('expenses.your_groups', { count: groups.length })}</Text>
+              <Text style={styles.sectionTitle}>{t('expenses.your_groups', { count: groupsTotalElements })}</Text>
 
               {groups.map((group) => {
                 const { balances } = calculateGroupBalances(group, expenses, settlements);
@@ -366,6 +519,8 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
                 const memberCount = group.memberCount !== undefined ? group.memberCount : (group.members?.length || 0);
                 const expenseCount = group.expenseCount !== undefined ? group.expenseCount : expenses.filter((e) => e.groupId === group.id).length;
 
+                const GroupIcon = getGroupIconComponent(group.emoji);
+
                 return (
                   <Pressable
                     key={group.id}
@@ -373,7 +528,7 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
                     onPress={() => navigation.navigate('GroupDetails', { groupId: group.id })}>
                     <View style={styles.groupHeader}>
                       <View style={styles.emojiBadge}>
-                        <Text style={styles.emojiText}>{group.emoji || '👥'}</Text>
+                        <GroupIcon size={22} color={styles.primaryIcon.color} />
                       </View>
                       <View style={styles.groupInfoContainer}>
                         <Text style={styles.groupName}>{group.name}</Text>
@@ -412,6 +567,12 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
                   </Pressable>
                 );
               })}
+
+              <Pagination
+                currentPage={groupsPage}
+                totalPages={groupsTotalPages}
+                onPageChange={setGroupsPage}
+              />
             </>
           )}
         </View>
@@ -434,17 +595,18 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
 
           <Text style={styles.inputLabel}>{t('expenses.choose_icon_label')}</Text>
           <View style={styles.emojiRow}>
-            {EMOJI_OPTIONS.map((e) => (
-              <Pressable
-                key={e}
-                style={[
-                  styles.emojiChip,
-                  newGroupEmoji === e && styles.emojiChipActive,
-                ]}
-                onPress={() => setNewGroupEmoji(e)}>
-                <Text style={styles.emojiTextLarge}>{e}</Text>
-              </Pressable>
-            ))}
+            {ICON_KEY_OPTIONS.map((key) => {
+              const OptionIcon = getGroupIconComponent(key);
+              const isActive = newGroupEmoji === key;
+              return (
+                <Pressable
+                  key={key}
+                  style={[styles.emojiChip, isActive && styles.emojiChipActive]}
+                  onPress={() => setNewGroupEmoji(key)}>
+                  <OptionIcon size={20} color={isActive ? styles.primaryIcon.color : styles.placeholder.color} />
+                </Pressable>
+              );
+            })}
           </View>
 
           {/* Group Members Section */}
@@ -454,7 +616,13 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
           <View style={styles.memberChipsRow}>
             {members.map((m, idx) => (
               <View key={idx} style={styles.memberChip}>
-                <Text style={styles.memberChipText}>{m}</Text>
+                <Avatar name={m.name} size={18} style={{ marginRight: 5 }} />
+                {m.phone ? (
+                  <Phone size={11} color={styles.primaryIcon.color} style={{ marginRight: 4 }} />
+                ) : null}
+                <Text style={styles.memberChipText}>
+                  {m.name}{m.phone && m.name !== m.phone ? ` (${m.phone})` : ''}
+                </Text>
                 {idx > 0 && (
                   <Pressable
                     onPress={() => handleRemoveMember(idx)}
@@ -474,12 +642,13 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
           ) : availableFamilyMembers.length > 0 ? (
             <View style={styles.familyGrid}>
               {availableFamilyMembers.map((fm) => {
-                const isSelected = members.includes(fm.name);
+                const isSelected = members.some((m) => m.name.toLowerCase() === fm.name.toLowerCase());
                 return (
                   <Pressable
                     key={fm.id}
                     onPress={() => handleToggleFamilyMember(fm)}
                     style={[styles.familyChip, isSelected && styles.familyChipActive]}>
+                    <Avatar name={fm.name} size={18} style={{ marginRight: 2 }} />
                     <Text style={[styles.familyChipName, isSelected && styles.familyChipNameActive]}>
                       {fm.name}
                     </Text>
@@ -511,20 +680,102 @@ export default function ExpenseGroupsScreen({ navigation }: Props) {
             </Text>
           </Pressable>
 
-          {showOtherInput && (
-            <View style={styles.addMemberInputRow}>
-              <TextInput
-                style={[styles.textInput, styles.addMemberTextInput]}
-                value={otherMemberName}
-                onChangeText={setOtherMemberName}
-                placeholder={t('expenses.other_name_placeholder')}
-                placeholderTextColor={styles.placeholder.color}
-                autoFocus={true}
-                returnKeyType="done"
-                onSubmitEditing={handleAddOtherMember}
-              />
-              <Pressable onPress={handleAddOtherMember} style={styles.addMemberBtn}>
-                <Plus size={18} color="#FFFFFF" />
+          {showOtherInput && !manualNameMode && (
+            <View style={styles.otherInputCard}>
+              <View style={styles.otherInputFieldRow}>
+                <Phone size={15} color={styles.placeholder.color} style={styles.otherInputIcon} />
+                <TextInput
+                  style={[styles.textInput, styles.otherTextInput]}
+                  value={otherMemberPhone}
+                  onChangeText={handleOtherPhoneChange}
+                  placeholder={t('expenses.other_phone_placeholder')}
+                  placeholderTextColor={styles.placeholder.color}
+                  keyboardType="phone-pad"
+                  editable={phoneVerifyStatus !== 'verified' && phoneVerifyStatus !== 'checking'}
+                  autoFocus={true}
+                />
+                <Pressable
+                  onPress={handleVerifyPhone}
+                  disabled={
+                    phoneVerifyStatus === 'checking' ||
+                    phoneVerifyStatus === 'verified' ||
+                    !otherMemberPhone.trim()
+                  }
+                  style={[
+                    styles.verifyBtn,
+                    phoneVerifyStatus === 'verified' && styles.verifyBtnDone,
+                    (!otherMemberPhone.trim() || phoneVerifyStatus === 'checking') && styles.verifyBtnDisabled,
+                  ]}>
+                  {phoneVerifyStatus === 'checking' ? (
+                    <ActivityIndicator size="small" color="#FFFFFF" />
+                  ) : phoneVerifyStatus === 'verified' ? (
+                    <Check size={16} color="#FFFFFF" />
+                  ) : (
+                    <Text style={styles.verifyBtnText}>{t('expenses.verify_btn')}</Text>
+                  )}
+                </Pressable>
+              </View>
+
+              {phoneVerifyStatus === 'verified' && (
+                <View style={styles.verifiedBadgeRow}>
+                  <Check size={13} color={styles.getBackStatVal.color} />
+                  <Text style={styles.verifiedBadgeText}>{t('expenses.phone_verified_msg')}</Text>
+                </View>
+              )}
+              {phoneVerifyStatus === 'not_found' && (
+                <View style={styles.verifiedBadgeRow}>
+                  <AlertCircle size={13} color={styles.oweStatVal.color} />
+                  <Text style={styles.notFoundText}>{t('expenses.phone_not_found_msg')}</Text>
+                </View>
+              )}
+
+              <View style={styles.otherInputFieldRow}>
+                <User size={15} color={styles.placeholder.color} style={styles.otherInputIcon} />
+                <TextInput
+                  style={[styles.textInput, styles.otherTextInput]}
+                  value={otherMemberName}
+                  onChangeText={setOtherMemberName}
+                  placeholder={t('expenses.other_name_placeholder')}
+                  placeholderTextColor={styles.placeholder.color}
+                  editable={phoneVerifyStatus === 'verified'}
+                  returnKeyType="done"
+                  onSubmitEditing={handleAddOtherMember}
+                />
+                <Pressable
+                  onPress={handleAddOtherMember}
+                  disabled={phoneVerifyStatus !== 'verified'}
+                  style={[styles.addMemberBtn, phoneVerifyStatus !== 'verified' && styles.addMemberBtnDisabled]}>
+                  <Plus size={18} color="#FFFFFF" />
+                </Pressable>
+              </View>
+
+              <Pressable onPress={() => handleToggleManualMode(true)} hitSlop={6}>
+                <Text style={styles.manualLinkText}>{t('expenses.add_without_phone_link')}</Text>
+              </Pressable>
+            </View>
+          )}
+
+          {showOtherInput && manualNameMode && (
+            <View style={styles.otherInputCard}>
+              <View style={styles.otherInputFieldRow}>
+                <User size={15} color={styles.placeholder.color} style={styles.otherInputIcon} />
+                <TextInput
+                  style={[styles.textInput, styles.otherTextInput]}
+                  value={otherMemberName}
+                  onChangeText={setOtherMemberName}
+                  placeholder={t('expenses.other_name_placeholder_manual')}
+                  placeholderTextColor={styles.placeholder.color}
+                  autoFocus={true}
+                  returnKeyType="done"
+                  onSubmitEditing={handleAddOtherMember}
+                />
+                <Pressable onPress={handleAddOtherMember} style={styles.addMemberBtn}>
+                  <Plus size={18} color="#FFFFFF" />
+                </Pressable>
+              </View>
+
+              <Pressable onPress={() => handleToggleManualMode(false)} hitSlop={6}>
+                <Text style={styles.manualLinkText}>{t('expenses.use_phone_instead_link')}</Text>
               </Pressable>
             </View>
           )}
@@ -700,9 +951,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    emojiText: {
-      fontSize: 22,
-    },
     groupInfoContainer: {
       flex: 1,
       marginRight: spacing.xs,
@@ -825,9 +1073,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     placeholder: {
       color: colors.textMuted,
-    },
-    emojiTextLarge: {
-      fontSize: 20,
     },
     addMemberTextInput: {
       flex: 1,
@@ -962,8 +1207,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       alignItems: 'center',
       marginBottom: 8,
     },
-    benefitBullet: {
-      fontSize: 14,
+    benefitIcon: {
       marginRight: 8,
     },
     benefitText: {
@@ -972,5 +1216,76 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textSecondary,
       flex: 1,
       lineHeight: 18,
+    },
+    otherInputCard: {
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: radius.md || 14,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.sm,
+      marginBottom: spacing.md,
+      gap: 8,
+    },
+    otherInputFieldRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    otherInputIcon: {
+      marginLeft: 4,
+    },
+    otherTextInput: {
+      flex: 1,
+      backgroundColor: colors.surface,
+    },
+    verifyBtn: {
+      height: 40,
+      paddingHorizontal: 14,
+      borderRadius: radius.md,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    verifyBtnDone: {
+      backgroundColor: colors.forest,
+      paddingHorizontal: 0,
+      width: 40,
+    },
+    verifyBtnDisabled: {
+      opacity: 0.5,
+    },
+    verifyBtnText: {
+      fontFamily: fonts.sansBold,
+      fontSize: 12.5,
+      color: '#FFFFFF',
+    },
+    verifiedBadgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 2,
+      marginLeft: 4,
+    },
+    verifiedBadgeText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 11.5,
+      color: colors.forest,
+    },
+    notFoundText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 11.5,
+      color: colors.danger,
+      flexShrink: 1,
+    },
+    addMemberBtnDisabled: {
+      opacity: 0.4,
+    },
+    manualLinkText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.primary,
+      textDecorationLine: 'underline',
+      marginTop: 2,
+      marginLeft: 4,
     },
   });

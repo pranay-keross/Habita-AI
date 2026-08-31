@@ -22,9 +22,11 @@ import IndianRupee from 'lucide-react-native/icons/indian-rupee';
 import DollarSign from 'lucide-react-native/icons/dollar-sign';
 import Check from 'lucide-react-native/icons/check';
 import useAuth from '../../../hooks/useAuth';
-import { addExpenseToGroup, getGroupById } from '../expenseStore';
+import { addExpenseToGroup, computeEqualSplitAmounts, findCurrentUserMember, getGroupById } from '../expenseStore';
 import type { Currency, ExpenseGroup } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { getItem } from '../../../utils/storage';
+import { showNetworkUnavailableAlert } from '../../../utils/networkStatus';
 
 type Props = StackScreenProps<RootStackParamList, 'AddSplitExpense'>;
 
@@ -47,6 +49,8 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
 
   const [loading, setLoading] = useState(true);
   const [group, setGroup] = useState<ExpenseGroup | undefined>();
+  const [currentUserId, setCurrentUserId] = useState<string | null>(null);
+  const [currentUserName, setCurrentUserName] = useState('You');
   const [title, setTitle] = useState('');
   const [amountStr, setAmountStr] = useState('');
   const [currency, setCurrency] = useState<Currency>('INR');
@@ -64,10 +68,17 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
     const fetchGroup = async () => {
       setLoading(true);
       const token = await getAccessToken().catch(() => null);
+      const prof = await getItem<{ name?: string }>('habita.user_profile', {});
+      const myName = prof?.name || 'You';
+      setCurrentUserName(myName);
+      const sess = await getItem<{ userId?: string }>('habita.session', {});
+      const myUserId = sess?.userId ?? null;
+      setCurrentUserId(myUserId);
       const g = await getGroupById(groupId, token);
       setGroup(g);
       if (g) {
-        setPayerId((prev) => prev || g.members[0]?.id || 'usr_me');
+        const myMember = findCurrentUserMember(g.members, myUserId, myName);
+        setPayerId((prev) => prev || myMember?.id || g.members[0]?.id || 'usr_me');
         const initPct: Record<string, string> = {};
 
         const initShares: Record<string, string> = {};
@@ -107,21 +118,18 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
     const splits: Record<string, number> = {};
 
     if (splitMode === 'equal') {
-      const perHead = Math.round((amountInINR / group.members.length) * 100) / 100;
-      group.members.forEach((m) => {
-        splits[m.id] = perHead;
-      });
+      Object.assign(splits, computeEqualSplitAmounts(amountInINR, group.members.map((m) => m.id)));
     } else if (splitMode === 'percentage') {
       let totalPct = 0;
       group.members.forEach((m) => {
         const p = parseFloat(percentages[m.id] || '0');
         totalPct += p;
-        splits[m.id] = Math.round((amountInINR * p) / 100);
+        splits[m.id] = p;
       });
-      if (Math.abs(totalPct - 100) > 1) {
+      if (Math.abs(totalPct - 100) > 0.5) {
         Alert.alert(
           t('expenses.invalid_percentage'),
-          t('expenses.percentage_sum_msg', { sum: totalPct }),
+          t('expenses.percentage_sum_msg', { sum: totalPct.toFixed(1) }),
         );
         return;
       }
@@ -130,16 +138,17 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
       group.members.forEach((m) => {
         const s = parseFloat(shares[m.id] || '1');
         totalShares += s;
+        splits[m.id] = s;
       });
-      group.members.forEach((m) => {
-        const s = parseFloat(shares[m.id] || '1');
-        splits[m.id] = Math.round((amountInINR * s) / (totalShares || 1));
-      });
+      if (totalShares <= 0) {
+        Alert.alert(t('expenses.invalid_amount'), 'Total shares must be greater than 0.');
+        return;
+      }
     }
 
     setSaving(true);
     const token = await getAccessToken().catch(() => null);
-    await addExpenseToGroup(
+    const { offline } = await addExpenseToGroup(
       group.id,
       {
         title: title.trim(),
@@ -155,6 +164,12 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
       token,
     );
     setSaving(false);
+
+    if (offline) {
+      showNetworkUnavailableAlert();
+      navigation.goBack();
+      return;
+    }
 
     const displayAmount = currency !== 'INR'
       ? `${currency} ${amt.toLocaleString()} (~₹${amountInINR.toLocaleString('en-IN')})`
@@ -263,24 +278,27 @@ export default function AddSplitExpenseScreen({ navigation, route }: Props) {
         {/* Paid By Selector */}
         <Text style={styles.sectionTitle}>{t('expenses.paid_by_label')}</Text>
         <View style={styles.card}>
-          {group.members.map((member) => (
-            <Pressable
-              key={member.id}
-              style={[
-                styles.payerRow,
-                payerId === member.id && styles.payerRowActive,
-              ]}
-              onPress={() => setPayerId(member.id)}>
-              <Text
+          {(() => {
+            const myMemberId = findCurrentUserMember(group.members, currentUserId, currentUserName)?.id;
+            return group.members.map((member) => (
+              <Pressable
+                key={member.id}
                 style={[
-                  styles.payerText,
-                  payerId === member.id && styles.payerTextActive,
-                ]}>
-                {member.name}{!member.name.toLowerCase().includes('(you)') && member.isOwner ? ' (You)' : ''}
-              </Text>
-              {payerId === member.id && <Check size={18} color={styles.payerTextActive.color} />}
-            </Pressable>
-          ))}
+                  styles.payerRow,
+                  payerId === member.id && styles.payerRowActive,
+                ]}
+                onPress={() => setPayerId(member.id)}>
+                <Text
+                  style={[
+                    styles.payerText,
+                    payerId === member.id && styles.payerTextActive,
+                  ]}>
+                  {member.name}{member.id === myMemberId && !member.name.toLowerCase().includes('(you)') ? ' (You)' : ''}
+                </Text>
+                {payerId === member.id && <Check size={18} color={styles.payerTextActive.color} />}
+              </Pressable>
+            ));
+          })()}
         </View>
 
         {/* Split Mode Selector */}

@@ -8,6 +8,7 @@ import type {
   ExpenseGroupListResponse,
   GroupMember,
   GroupSyncResponse,
+  MemberLookupResult,
   PaginatedExpensesResponse,
   RecordSettlementRequest,
   Settlement,
@@ -25,12 +26,22 @@ import type {
  */
 
 /**
- * Retrieves all expense groups for the authenticated user along with
- * overall summary (totalSpentINR, youAreOwedINR, youOweINR).
- * GET /api/expense-groups
+ * Retrieves expense groups for the authenticated user along with the overall summary
+ * (totalSpentINR, youAreOwedINR, youOweINR — always aggregated across every group the
+ * caller belongs to, unaffected by `page`/`size`). Pass `page`/`size` to get one page
+ * of `groups`; omit both for the pre-pagination behavior (everything in one response).
+ * GET /api/expense-groups?page={page}&size={size}
  */
-export async function listExpenseGroups(token: string): Promise<ExpenseGroupListResponse> {
-  return apiFetch<ExpenseGroupListResponse>('/expense-groups', {
+export async function listExpenseGroups(
+  token: string,
+  options?: { page?: number; size?: number },
+): Promise<ExpenseGroupListResponse> {
+  let path = '/expense-groups';
+  const parts: string[] = [];
+  if (options?.page !== undefined) parts.push(`page=${options.page}`);
+  if (options?.size !== undefined) parts.push(`size=${options.size}`);
+  if (parts.length > 0) path += `?${parts.join('&')}`;
+  return apiFetch<ExpenseGroupListResponse>(path, {
     method: 'GET',
     token,
   });
@@ -103,6 +114,28 @@ export async function addExpenseGroupMember(
     body: data,
     token,
   });
+}
+
+/**
+ * Looks up whether a phone number belongs to a registered user, so the "add member by
+ * phone" flow can show a "Verified" state and prefill the real name before the member
+ * is actually added — instead of silently attaching an unverified phone number.
+ * Returns null when no registered user matches (backend responds 404).
+ * GET /api/expense-groups/members/lookup-by-phone?phone={phone}
+ */
+export async function lookupMemberByPhone(
+  phone: string,
+  token: string,
+): Promise<MemberLookupResult | null> {
+  try {
+    return await apiFetch<MemberLookupResult>(
+      `/expense-groups/members/lookup-by-phone?phone=${encodeURIComponent(phone)}`,
+      { method: 'GET', token },
+    );
+  } catch (err) {
+    if (err instanceof ApiError && err.status === 404) return null;
+    throw err;
+  }
 }
 
 /**

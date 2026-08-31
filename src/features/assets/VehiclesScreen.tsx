@@ -24,6 +24,8 @@ import CarFront from 'lucide-react-native/icons/car-front';
 import FileText from 'lucide-react-native/icons/file-text';
 import ShieldAlert from 'lucide-react-native/icons/shield-alert';
 import Tag from 'lucide-react-native/icons/tag';
+import ChevronUp from 'lucide-react-native/icons/chevron-up';
+import ChevronDown from 'lucide-react-native/icons/chevron-down';
 import type { RootStackParamList } from '../../app/_layout';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
@@ -526,9 +528,11 @@ export default function VehiclesScreen({ navigation }: Props) {
           <Text style={assetCategory ? styles.dateValue : styles.placeholder}>
             {assetCategory || t('assets.select_category')}
           </Text>
-          <Text style={styles.selectCaret}>
-            {showAssetCategoryList ? '▴' : '▾'}
-          </Text>
+          {showAssetCategoryList ? (
+            <ChevronUp size={15} color={styles.selectCaret.color} style={{ marginLeft: styles.selectCaret.marginLeft }} />
+          ) : (
+            <ChevronDown size={15} color={styles.selectCaret.color} style={{ marginLeft: styles.selectCaret.marginLeft }} />
+          )}
         </Pressable>
         {showAssetCategoryList ? (
           <View style={styles.categoryList}>

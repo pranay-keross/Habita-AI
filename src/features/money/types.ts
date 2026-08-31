@@ -28,7 +28,7 @@ export const CURRENCY_RATES: Record<Currency, CurrencyRate> = {
 export interface GroupMember {
   id: string;
   name: string;
-  avatar: string;
+  avatarUrl?: string | null;
   phone?: string;
   userId?: string | null;
   isOwner?: boolean;
@@ -79,6 +79,7 @@ export interface Settlement {
 export interface ExpenseGroup {
   id: string;
   name: string;
+  // A lucide icon key (e.g. "house"), not an emoji character — see groupIcons.ts.
   emoji: string;
   category: string;
   defaultCurrency: Currency;
@@ -94,7 +95,7 @@ export interface ExpenseGroup {
 export interface MemberBalance {
   memberId: string;
   memberName: string;
-  avatar: string;
+  avatarUrl?: string | null;
   netBalanceINR: number; // Positive = gets back, Negative = owes
 }
 
@@ -102,12 +103,22 @@ export interface PairwiseDebt {
   id: string;
   payerId: string;
   payerName: string;
-  payerAvatar: string;
+  payerAvatarUrl?: string | null;
   payeeId: string;
   payeeName: string;
-  payeeAvatar: string;
+  payeeAvatarUrl?: string | null;
   amountINR: number;
 }
+
+// Same shape as PairwiseDebt (the backend's ExpenseCalculationService literally reuses
+// its DTO for both — docs/EXPENSES_API_SPEC.md §5.2.1), but a different meaning:
+// PairwiseDebt is a *minimized settlement suggestion* that can route a payment between
+// two people who never shared an expense; RelationshipBalance is the *true, direct*
+// bilateral balance between a pair who actually transacted, opposite directions netted.
+// Only non-zero relationships are included — a settled or never-transacted pair simply
+// has no entry. Use this for "Owed by you"/"Owed to you"; reserve PairwiseDebt for the
+// "Settle Up" suggestion.
+export type RelationshipBalance = PairwiseDebt;
 
 export interface ExpenseSummaryStats {
   totalSpentINR: number;
@@ -118,6 +129,26 @@ export interface ExpenseSummaryStats {
 export interface ExpenseGroupListResponse {
   summary: ExpenseSummaryStats;
   groups: ExpenseGroup[];
+  // Pagination metadata (contract addition, 2026-08-29 — see docs/EXPENSES_API_SPEC.md
+  // §4.1). Optional so a backend that hasn't shipped pagination yet still validates —
+  // the client treats a response missing these as one big unpaginated page.
+  page?: number;
+  size?: number;
+  totalElements?: number;
+  totalPages?: number;
+}
+
+export interface MemberLookupResult {
+  userId: string;
+  name: string;
+  avatarUrl?: string | null;
+  phone: string;
+}
+
+export interface CreateGroupMemberInput {
+  name: string;
+  phone?: string;
+  userId?: string | null;
 }
 
 export interface CreateExpenseGroupRequest {
@@ -125,7 +156,7 @@ export interface CreateExpenseGroupRequest {
   emoji?: string;
   category?: string;
   defaultCurrency?: Currency;
-  members?: { name: string; avatar?: string; phone?: string }[];
+  members?: CreateGroupMemberInput[];
 }
 
 export interface UpdateExpenseGroupRequest {
@@ -137,7 +168,6 @@ export interface UpdateExpenseGroupRequest {
 
 export interface AddGroupMemberRequest {
   name: string;
-  avatar?: string;
   phone?: string;
   userId?: string | null;
 }
@@ -173,6 +203,10 @@ export interface GroupSyncResponse {
   settlements: Settlement[];
   balances: MemberBalance[];
   pairwiseDebts: PairwiseDebt[];
+  // New field (2026-08-29, docs/EXPENSES_API_SPEC.md §4.5/§5.2.1) — optional so the
+  // client keeps working against a backend that hasn't shipped it yet by computing it
+  // locally instead (see calculateRelationshipBalances() in expenseStore.ts).
+  relationshipBalances?: RelationshipBalance[];
   categoryBreakdown: Record<string, number>;
 }
 
@@ -187,5 +221,7 @@ export interface PaginatedExpensesResponse {
   content: Expense[];
   totalElements: number;
   totalPages: number;
+  page?: number;
+  size?: number;
 }
 

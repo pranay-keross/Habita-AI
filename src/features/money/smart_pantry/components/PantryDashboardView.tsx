@@ -5,6 +5,15 @@ import { ALLERGEN_DEFINITIONS } from '../data/mockPantryData';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
+import Clock from 'lucide-react-native/icons/clock';
+import Package from 'lucide-react-native/icons/package';
+import Camera from 'lucide-react-native/icons/camera';
+import Search from 'lucide-react-native/icons/search';
+import Radar from 'lucide-react-native/icons/radar';
+import ChefHat from 'lucide-react-native/icons/chef-hat';
+import Refrigerator from 'lucide-react-native/icons/refrigerator';
+import Snowflake from 'lucide-react-native/icons/snowflake';
+import Archive from 'lucide-react-native/icons/archive';
 
 interface Props {
   items: PantryItem[];
@@ -70,7 +79,7 @@ export const PantryDashboardView: React.FC<Props> = ({
       {expiringSoonItems.length > 0 && (
         <View style={styles.warningAlertCard}>
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            <Text style={{ fontSize: 24, marginRight: 10 }}>⏰</Text>
+            <Clock size={24} color={styles.warningAlertTitle.color} strokeWidth={2} style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
               <Text style={styles.warningAlertTitle}>
                 {t('smart_pantry.warning_title', { count: expiringSoonItems.length })}
@@ -90,27 +99,27 @@ export const PantryDashboardView: React.FC<Props> = ({
       <Text style={styles.sectionHeading}>{t('smart_pantry.nav_screens')}</Text>
       <View style={styles.actionGrid}>
         <Pressable style={styles.actionTile} onPress={() => onNavigateTab('inventory')}>
-          <Text style={styles.actionTileIcon}>📦</Text>
+          <Package size={24} color={styles.actionTileTitle.color} strokeWidth={1.8} style={styles.actionTileIcon} />
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_inventory', { count: items.length })}</Text>
           <Text style={styles.actionTileSub}>{t('smart_pantry.sub_inventory')}</Text>
         </Pressable>
         <Pressable style={styles.actionTile} onPress={() => onNavigateTab('add')}>
-          <Text style={styles.actionTileIcon}>📸</Text>
+          <Camera size={24} color={styles.actionTileTitle.color} strokeWidth={1.8} style={styles.actionTileIcon} />
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_add')}</Text>
           <Text style={styles.actionTileSub}>{t('smart_pantry.sub_add')}</Text>
         </Pressable>
         <Pressable style={styles.actionTile} onPress={() => onNavigateTab('details')}>
-          <Text style={styles.actionTileIcon}>🔍</Text>
+          <Search size={24} color={styles.actionTileTitle.color} strokeWidth={1.8} style={styles.actionTileIcon} />
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_details')}</Text>
           <Text style={styles.actionTileSub}>{t('smart_pantry.sub_details')}</Text>
         </Pressable>
         <Pressable style={styles.actionTile} onPress={() => onNavigateTab('radar')}>
-          <Text style={styles.actionTileIcon}>📡</Text>
+          <Radar size={24} color={styles.actionTileTitle.color} strokeWidth={1.8} style={styles.actionTileIcon} />
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_radar', { count: expiringSoonItems.length })}</Text>
           <Text style={styles.actionTileSub}>{t('smart_pantry.sub_radar')}</Text>
         </Pressable>
         <Pressable style={[styles.actionTile, { width: '100%' }]} onPress={() => onNavigateTab('recipes')}>
-          <Text style={styles.actionTileIcon}>🍳</Text>
+          <ChefHat size={24} color={styles.actionTileTitle.color} strokeWidth={1.8} style={styles.actionTileIcon} />
           <Text style={styles.actionTileTitle}>{t('smart_pantry.tab_recipes')}</Text>
           <Text style={styles.actionTileSub}>{t('smart_pantry.sub_recipes')}</Text>
         </Pressable>
@@ -121,7 +130,7 @@ export const PantryDashboardView: React.FC<Props> = ({
       <View style={styles.storageBreakdownCard}>
         {LOCATIONS.map((loc) => {
           const count = items.filter((i) => i.storageLocation === loc).length;
-          const emoji = loc === 'Fridge' ? '❄️' : loc === 'Freezer' ? '🧊' : '🧺';
+          const LocIcon = loc === 'Fridge' ? Refrigerator : loc === 'Freezer' ? Snowflake : Archive;
           return (
             <Pressable
               key={loc}
@@ -130,7 +139,7 @@ export const PantryDashboardView: React.FC<Props> = ({
                 onSelectLocation(loc);
                 onNavigateTab('inventory');
               }}>
-              <Text style={{ fontSize: 18, marginRight: 8 }}>{emoji}</Text>
+              <LocIcon size={18} color={styles.storageName.color} strokeWidth={1.8} style={{ marginRight: 8 }} />
               <Text style={styles.storageName}>{getLocName(loc)}</Text>
               <View style={styles.storageBadge}>
                 <Text style={styles.storageBadgeText}>{t('smart_pantry.items_count', { count })}</Text>

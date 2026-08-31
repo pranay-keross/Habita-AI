@@ -10,6 +10,7 @@ import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
 import ModernBottomNav, { type BottomNavTab } from '../../components/ModernBottomNav';
 import { SkeletonCard, SkeletonHeroCard } from '../../components/Skeleton';
+import Avatar from '../../components/Avatar';
 import useAuth from '../../hooks/useAuth';
 import {
   ChevronRight,
@@ -18,10 +19,10 @@ import {
   Sparkles,
   ShieldCheck,
   Phone,
-  User,
   Users,
   Mail,
   AlertCircle,
+  Trash2,
 } from 'lucide-react-native';
 import {
   acceptInvite,
@@ -516,7 +517,7 @@ export default function FamilyScreen({ navigation }: Props) {
               <View style={styles.avatarStackRow}>
                 {family.members.slice(0, 5).map((m, idx) => (
                   <View key={m.id} style={[styles.stackAvatarBubble, { zIndex: 10 - idx, marginLeft: idx === 0 ? 0 : -10 }]}>
-                    <User size={13} color="#FFFFFF" strokeWidth={1.6} />
+                    <Avatar name={m.name} size={28} />
                   </View>
                 ))}
                 {family.members.length > 5 && (
@@ -555,9 +556,7 @@ export default function FamilyScreen({ navigation }: Props) {
                   const isOwner = member.role === 'OWNER';
                   return (
                     <Pressable key={member.id} style={styles.memberCard} onPress={() => openViewMember(member)}>
-                      <View style={styles.memberAvatarWrap}>
-                        <User size={18} color="#000000" strokeWidth={1.5} />
-                      </View>
+                      <Avatar name={member.name} isOwner={isOwner} size={42} style={styles.memberAvatarMargin} />
                       <View style={styles.memberInfo}>
                         <View style={styles.nameRow}>
                           <Text style={styles.memberName}>{member.name}</Text>
@@ -601,9 +600,7 @@ export default function FamilyScreen({ navigation }: Props) {
                     const displayRelation = getDisplayRelation(member);
                     return (
                       <Pressable key={member.id} style={styles.memberCard} onPress={() => openViewMember(member)}>
-                        <View style={[styles.memberAvatarWrap, styles.memberAvatarWrapManaged]}>
-                          <User size={18} color="#000000" strokeWidth={1.5} />
-                        </View>
+                        <Avatar name={member.name} size={42} style={styles.memberAvatarMargin} />
                         <View style={styles.memberInfo}>
                           <View style={styles.nameRow}>
                             <Text style={styles.memberName}>{member.name}</Text>
@@ -861,7 +858,8 @@ export default function FamilyScreen({ navigation }: Props) {
                 row — matches the backend's removeMember rule exactly. */}
             {myMembership.isCreator && viewingMember.role !== 'OWNER' && (
               <Pressable style={styles.modalRemoveBtn} onPress={() => handleRemoveMember(viewingMember)}>
-                <Text style={styles.modalRemoveText}>🗑️ {t('family.remove_member')}</Text>
+                <Trash2 size={14} color="#FF3B30" strokeWidth={2} style={styles.modalRemoveIcon} />
+                <Text style={styles.modalRemoveText}>{t('family.remove_member')}</Text>
               </Pressable>
             )}
           </>
@@ -1069,9 +1067,6 @@ const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleShe
   stackAvatarBubbleMore: {
     backgroundColor: '#33333E',
   },
-  stackAvatarEmoji: {
-    fontSize: 14,
-  },
   stackAvatarMoreText: {
     fontFamily: fonts.sans,
     fontSize: 10,
@@ -1135,20 +1130,8 @@ const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleShe
     borderColor: '#ECECEE',
     ...shadow.soft,
   },
-  memberAvatarWrap: {
-    width: 42,
-    height: 42,
-    borderRadius: 21,
-    backgroundColor: '#F5F5F7',
-    alignItems: 'center',
-    justifyContent: 'center',
+  memberAvatarMargin: {
     marginRight: 12,
-  },
-  memberAvatarWrapManaged: {
-    backgroundColor: '#F0F0F5',
-  },
-  memberAvatar: {
-    fontSize: 20,
   },
   memberInfo: {
     flex: 1,
@@ -1509,9 +1492,14 @@ const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleShe
     backgroundColor: 'rgba(255, 59, 48, 0.08)',
     paddingVertical: 12,
     borderRadius: radius.card,
+    flexDirection: 'row',
     alignItems: 'center',
+    justifyContent: 'center',
     borderWidth: 1,
     borderColor: 'rgba(255, 59, 48, 0.2)',
+  },
+  modalRemoveIcon: {
+    marginRight: 6,
   },
   modalRemoveText: {
     fontFamily: fonts.sans,

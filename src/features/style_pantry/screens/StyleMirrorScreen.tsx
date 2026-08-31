@@ -15,7 +15,6 @@ import useThemedStyles from '../../../hooks/useThemedStyles';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import Calendar from 'lucide-react-native/icons/calendar';
-import Sun from 'lucide-react-native/icons/sun';
 import RefreshCw from 'lucide-react-native/icons/refresh-cw';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import CheckCircle2 from 'lucide-react-native/icons/circle-check';
@@ -26,6 +25,7 @@ import {
   MOCK_EVENTS,
   generateAIOutfit,
 } from '../stylePantryStore';
+import { getClothingIconComponent, getWeatherIconComponent } from '../clothingIcons';
 import type { CalendarEvent, ClothingItem, OutfitRecommendation } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 
@@ -41,6 +41,7 @@ export default function StyleMirrorScreen({ navigation }: Props) {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent>(MOCK_EVENTS[0]);
   const [recommendation, setRecommendation] = useState<OutfitRecommendation | null>(null);
   const [generating, setGenerating] = useState(false);
+  const WeatherIcon = getWeatherIconComponent(MOCK_WEATHER.condition);
 
   const initData = async () => {
     setLoading(true);
@@ -100,7 +101,7 @@ export default function StyleMirrorScreen({ navigation }: Props) {
         <View style={styles.weatherHeroCard}>
           <View style={styles.weatherHeroRow}>
             <View style={styles.sunCircle}>
-              <Text style={{ fontSize: 24 }}>{MOCK_WEATHER.icon}</Text>
+              <WeatherIcon size={24} color="#B45309" />
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.weatherTitle}>{t('style_pantry.today_weather')}</Text>
@@ -186,15 +187,18 @@ export default function StyleMirrorScreen({ navigation }: Props) {
             <Text style={styles.stylistNote}>{recommendation.stylistNote}</Text>
 
             <View style={styles.itemsPreviewRow}>
-              {recommendation.items.map((item) => (
-                <View key={item.id} style={styles.itemMiniCard}>
-                  <Text style={styles.itemMiniEmoji}>{item.emoji || '👕'}</Text>
-                  <Text style={styles.itemMiniName} numberOfLines={1}>
-                    {item.name}
-                  </Text>
-                  <Text style={styles.itemMiniCat}>{item.category}</Text>
-                </View>
-              ))}
+              {recommendation.items.map((item) => {
+                const ItemIcon = getClothingIconComponent(item.emoji);
+                return (
+                  <View key={item.id} style={styles.itemMiniCard}>
+                    <ItemIcon size={24} color="#004F63" style={styles.itemMiniIcon} />
+                    <Text style={styles.itemMiniName} numberOfLines={1}>
+                      {item.name}
+                    </Text>
+                    <Text style={styles.itemMiniCat}>{item.category}</Text>
+                  </View>
+                );
+              })}
             </View>
 
             {/* Actions */}
@@ -438,8 +442,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    itemMiniEmoji: {
-      fontSize: 24,
+    itemMiniIcon: {
       marginBottom: 2,
     },
     itemMiniName: {

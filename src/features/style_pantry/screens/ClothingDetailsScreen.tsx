@@ -21,6 +21,7 @@ import Tag from 'lucide-react-native/icons/tag';
 import Clock from 'lucide-react-native/icons/clock';
 import Button from '../../../components/Button';
 import { loadClothingItems, deleteClothingItem } from '../stylePantryStore';
+import { getClothingIconComponent } from '../clothingIcons';
 import type { ClothingItem } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 
@@ -90,6 +91,8 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
     );
   }
 
+  const ItemIcon = getClothingIconComponent(item.emoji);
+
   return (
     <View style={styles.root}>
       {/* Header Bar */}
@@ -114,7 +117,7 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
         {/* Large Clothing Hero Card */}
         <View style={styles.heroCard}>
           <View style={styles.heroEmojiBadge}>
-            <Text style={styles.heroEmojiText}>{item.emoji || '👕'}</Text>
+            <ItemIcon size={42} color="#004F63" />
           </View>
           <Text style={styles.heroTitle}>{item.name}</Text>
           <Text style={styles.heroSub}>
@@ -261,9 +264,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.md,
-    },
-    heroEmojiText: {
-      fontSize: 42,
     },
     heroTitle: {
       fontFamily: fonts.sansBold,

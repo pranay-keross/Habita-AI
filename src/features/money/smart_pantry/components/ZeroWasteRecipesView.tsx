@@ -5,6 +5,9 @@ import { ALLERGEN_DEFINITIONS, MOCK_ZERO_WASTE_RECIPES } from '../data/mockPantr
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
+import ChefHat from 'lucide-react-native/icons/chef-hat';
+import Timer from 'lucide-react-native/icons/timer';
+import X from 'lucide-react-native/icons/x';
 
 interface Props {
   onCookRecipe: (recipe: ZeroWasteRecipe) => Promise<void>;
@@ -15,7 +18,7 @@ export const ZeroWasteRecipesView: React.FC<Props> = ({ onCookRecipe }) => {
   const [selectedRecipe, setSelectedRecipe] = useState<ZeroWasteRecipe | null>(null);
 
   const handleConfirmCook = (recipe: ZeroWasteRecipe) => {
-    Alert.alert('Bon Appétit! 🍽️', `Used ingredients for ${recipe.title}. Stock updated in Pantry.`, [
+    Alert.alert('Bon Appétit!', `Used ingredients for ${recipe.title}. Stock updated in Pantry.`, [
       {
         text: 'OK',
         onPress: async () => {
@@ -39,7 +42,10 @@ export const ZeroWasteRecipesView: React.FC<Props> = ({ onCookRecipe }) => {
             <View style={styles.matchBadge}>
               <Text style={styles.matchBadgeText}>{t('smart_pantry.match_rate', { rate: recipe.matchPercentage })}</Text>
             </View>
-            <Text style={styles.cookTimeText}>⏱️ {recipe.cookTime}</Text>
+            <View style={styles.cookTimeRow}>
+              <Timer size={12} color={styles.cookTimeText.color} strokeWidth={2} style={{ marginRight: 3 }} />
+              <Text style={styles.cookTimeText}>{recipe.cookTime}</Text>
+            </View>
           </View>
 
           <Text style={styles.recipeTitle}>{recipe.title}</Text>
@@ -61,15 +67,18 @@ export const ZeroWasteRecipesView: React.FC<Props> = ({ onCookRecipe }) => {
               {selectedRecipe && (
                 <>
                   <View style={styles.modalHeaderRow}>
-                    <Text style={{ fontSize: 28, marginRight: 8 }}>🍳</Text>
+                    <ChefHat size={28} color={styles.modalTitle.color} strokeWidth={1.8} style={{ marginRight: 8 }} />
                     <View style={{ flex: 1 }}>
                       <Text style={styles.modalTitle}>{selectedRecipe.title}</Text>
-                      <Text style={styles.modalSub}>
-                        ⏱️ {selectedRecipe.cookTime} · Difficulty: {selectedRecipe.difficulty}
-                      </Text>
+                      <View style={styles.modalSubRow}>
+                        <Timer size={12} color={styles.modalSub.color} strokeWidth={2} style={{ marginRight: 3 }} />
+                        <Text style={styles.modalSub}>
+                          {selectedRecipe.cookTime} · Difficulty: {selectedRecipe.difficulty}
+                        </Text>
+                      </View>
                     </View>
-                    <Pressable onPress={() => setSelectedRecipe(null)}>
-                      <Text style={styles.modalCloseBtn}>✕</Text>
+                    <Pressable style={styles.modalCloseBtn} onPress={() => setSelectedRecipe(null)}>
+                      <X size={20} color={styles.modalCloseBtnIcon.color} strokeWidth={2} />
                     </Pressable>
                   </View>
 
@@ -106,6 +115,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     recipeCardHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 6 },
     matchBadge: { backgroundColor: colors.surfaceElevated, paddingHorizontal: 8, paddingVertical: 3, borderRadius: radius.pill },
     matchBadgeText: { fontFamily: fonts.sansBold, fontSize: 10, color: colors.textSecondary },
+    cookTimeRow: { flexDirection: 'row', alignItems: 'center' },
     cookTimeText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textMuted },
     recipeTitle: { fontFamily: fonts.serif, fontSize: 16, color: colors.textPrimary },
     expiringUsedTag: { fontFamily: fonts.sansBold, fontSize: 11, color: colors.turmeric, marginTop: 4 },
@@ -115,8 +125,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg },
     modalHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
     modalTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textPrimary },
+    modalSubRow: { flexDirection: 'row', alignItems: 'center' },
     modalSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted },
-    modalCloseBtn: { fontSize: 20, color: colors.textMuted, padding: 4 },
+    modalCloseBtn: { padding: 4 },
+    modalCloseBtnIcon: { color: colors.textMuted },
     modalSectionLabel: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textSecondary, marginBottom: 6 },
     ingredientBullet: { fontFamily: fonts.sans, fontSize: 13, color: colors.textPrimary, marginBottom: 4 },
     instructionStep: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginBottom: 6 },

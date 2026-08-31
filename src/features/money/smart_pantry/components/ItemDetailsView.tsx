@@ -1,11 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
-import { CategoryType, PantryItem, StorageLocation } from '../types';
-import { ALLERGEN_DEFINITIONS } from '../data/mockPantryData';
+import { PantryItem, StorageLocation } from '../types';
+import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../data/mockPantryData';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
+import Check from 'lucide-react-native/icons/check';
 
 interface Props {
   items: PantryItem[];
@@ -14,15 +15,6 @@ interface Props {
   onUpdateQuantity: (id: string, delta: number) => void;
   onDeleteItem: (id: string) => void;
 }
-
-const CATEGORY_EMOJIS: Record<CategoryType, string> = {
-  produce: '🥦',
-  dairy: '🥛',
-  bakery: '🍞',
-  beverages: '🧃',
-  meat: '🥩',
-  pantry: '🥫',
-};
 
 export const ItemDetailsView: React.FC<Props> = ({
   items,
@@ -53,23 +45,31 @@ export const ItemDetailsView: React.FC<Props> = ({
       {/* Selector Row */}
       <Text style={styles.formLabel}>{t('smart_pantry.inspect_label')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 16 }}>
-        {items.map((item) => (
-          <Pressable
-            key={item.id}
-            style={[styles.catChip, selectedItem?.id === item.id && styles.catChipActive]}
-            onPress={() => onSelectItem(item)}>
-            <Text style={[styles.catChipText, selectedItem?.id === item.id && styles.catChipTextActive]}>
-              {CATEGORY_EMOJIS[item.category] || '📦'} {item.name}
-            </Text>
-          </Pressable>
-        ))}
+        {items.map((item) => {
+          const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+          const active = selectedItem?.id === item.id;
+          return (
+            <Pressable
+              key={item.id}
+              style={[styles.catChip, styles.catChipRow, active && styles.catChipActive]}
+              onPress={() => onSelectItem(item)}>
+              <CategoryIcon size={14} color={active ? styles.catChipTextActive.color : styles.catChipText.color} strokeWidth={2} style={{ marginRight: 4 }} />
+              <Text style={[styles.catChipText, active && styles.catChipTextActive]}>
+                {item.name}
+              </Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
 
       {selectedItem ? (
         <View style={styles.itemDetailsCard}>
           <View style={styles.detailsHeaderRow}>
             <View style={styles.detailsEmojiCircle}>
-              <Text style={{ fontSize: 32 }}>{CATEGORY_EMOJIS[selectedItem.category] || '📦'}</Text>
+              {(() => {
+                const CategoryIcon = PANTRY_CATEGORY_ICONS[selectedItem.category] || DEFAULT_CATEGORY_ICON;
+                return <CategoryIcon size={32} color={styles.detailsTitle.color} strokeWidth={1.5} />;
+              })()}
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.detailsTitle}>{selectedItem.name}</Text>
@@ -111,8 +111,9 @@ export const ItemDetailsView: React.FC<Props> = ({
               const def = ALLERGEN_DEFINITIONS.find((a) => a.tag === tag);
               const label = def ? (def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label) : tag;
               return (
-                <View key={tag} style={styles.microBadge}>
-                  <Text style={styles.microBadgeText}>✓ {label}</Text>
+                <View key={tag} style={[styles.microBadge, styles.microBadgeRow]}>
+                  <Check size={10} color={styles.microBadgeText.color} strokeWidth={2.5} style={{ marginRight: 3 }} />
+                  <Text style={styles.microBadgeText}>{label}</Text>
                 </View>
               );
             })}
@@ -141,6 +142,7 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     sectionHeading: { fontFamily: fonts.serif, fontSize: 17, color: colors.textPrimary, marginBottom: 8 },
     formLabel: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
     catChip: { backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+    catChipRow: { flexDirection: 'row', alignItems: 'center' },
     catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     catChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
     catChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
@@ -158,6 +160,7 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     qtyValueText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.textPrimary },
     badgeRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, marginTop: 6 },
     microBadge: { backgroundColor: colors.surfaceElevated, paddingHorizontal: 6, paddingVertical: 2, borderRadius: radius.pill },
+    microBadgeRow: { flexDirection: 'row', alignItems: 'center' },
     microBadgeText: { fontFamily: fonts.sansBold, fontSize: 9, color: colors.textSecondary },
     detailsActionRow: { flexDirection: 'row', gap: 10, marginTop: 16 },
     deleteBtn: { flex: 1, backgroundColor: colors.dangerSoft, paddingVertical: 10, borderRadius: radius.md, alignItems: 'center' },

@@ -12,6 +12,8 @@ import UsersRound from 'lucide-react-native/icons/users-round';
 import Check from 'lucide-react-native/icons/check';
 import X from 'lucide-react-native/icons/x';
 import CalendarClock from 'lucide-react-native/icons/calendar-clock';
+import ChevronUp from 'lucide-react-native/icons/chevron-up';
+import ChevronDown from 'lucide-react-native/icons/chevron-down';
 import type { RootStackParamList } from '../../app/_layout';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';

@@ -99,14 +99,23 @@ Added to `Saheli Backend — Auth, Profile & Family.postman_collection.json` 202
 
 **Added 2026-08-27 (`docs/DECISIONS.md` D-050):** The `Expense Groups & Multi-Currency Splitting` folder was added to `Saheli Backend — Auth, Profile & Family.postman_collection.json` (lines 7450–8177) defining 15 endpoints for SRS Module 11 (§11 'Multi-Currency Expense Groups'). All endpoints require Bearer auth. The React Native client is fully integrated via `src/features/money/expenses/api.ts`, `expenseStore.ts`, and screens, with automatic offline fallback to `AsyncStorage`.
 
+**Reconciled against the collection again 2026-08-29 (`docs/DECISIONS.md` D-056):** the
+`Expense Groups & Multi-Currency Splitting` folder (now lines 7451–8290) confirms the
+backend actually shipped everything this doc previously listed as "documented ahead of
+the backend" — groups-list pagination (`page`/`size`/`totalElements`/`totalPages`),
+`GET /members/lookup-by-phone`, and the verified-phone member-add flow all now have real
+Postman requests with passing test scripts, not just spec prose. It also introduced one
+field this doc hadn't captured: `relationshipBalances` on the sync endpoint (see below).
+
 | Method | Path | Notes |
 | --- | --- | --- |
-| `GET` | `/api/expense-groups` | Returns all groups for caller + summary (`totalSpentINR`, `youAreOwedINR`, `youOweINR`) + per-group `userNetBalanceINR` & status (`YOU_GET_BACK` \| `YOU_OWE` \| `SETTLED_UP`). Feeds `ExpenseGroupsScreen.tsx` |
-| `POST` | `/api/expense-groups` | `{name, emoji, category, defaultCurrency, members: [{name, avatar, phone}]}` → 201 Created. Caller is automatically `isOwner = true` |
+| `GET` | `/api/expense-groups` | Returns groups for caller + summary (`totalSpentINR`, `youAreOwedINR`, `youOweINR`) + per-group `userNetBalanceINR` & status (`YOU_GET_BACK` \| `YOU_OWE` \| `SETTLED_UP`). Feeds `ExpenseGroupsScreen.tsx`. **Confirmed paginated** (D-056, 2026-08-29): `?page=&size=` (0-indexed, default `0`/`8`), response adds `page`/`size`/`totalElements`/`totalPages` — `summary` stays the full cross-group aggregate regardless of page. See `docs/EXPENSES_API_SPEC.md` §4.1 |
+| `POST` | `/api/expense-groups` | `{name, emoji, category, defaultCurrency, members: [{name, phone, userId}]}` → 201 Created. Caller is automatically `isOwner = true`. As of `docs/DECISIONS.md` D-054 (2026-08-29), `emoji` is a lucide icon key (e.g. `"house"`), not an emoji character, and members carry no client-chosen avatar — see `docs/EXPENSES_API_SPEC.md` §3.5 |
 | `GET` | `/api/expense-groups/{id}` | Full group details with all member profiles |
 | `PUT` | `/api/expense-groups/{id}` | `{name, emoji, category, defaultCurrency}` → updates group metadata |
 | `DELETE` | `/api/expense-groups/{id}` | Soft-deletes group |
-| `POST` | `/api/expense-groups/{id}/members` | `{name, avatar, phone, userId}` → adds group member |
+| `GET` | `/api/expense-groups/members/lookup-by-phone?phone=` | Added `docs/EXPENSES_API_SPEC.md` §4.2 (D-054-adjacent, 2026-08-29): read-only check for whether a phone belongs to a registered user, so the client can show a verified badge + real name before adding a member. **Confirmed built** as of the 2026-08-29 collection reconciliation (D-056) — has a real Postman request + passing test script, no longer "documented ahead of the backend". **But likely broken for real accounts (D-057, 2026-08-30):** normalizes its query to E.164 (`+91...`) before `findByPhone`, while `/auth/*` stores numbers as bare 10-digit (no `+91`) — a live-account 404 was reproduced against a logged-in user's own number. Backend-owned; not fixable client-side |
+| `POST` | `/api/expense-groups/{id}/members` | `{name, phone, userId}` → adds group member |
 | `DELETE` | `/api/expense-groups/{id}/members/{memberId}` | Removes member. **Precondition:** net balance must be `0.00` |
 | `GET` | `/api/expense-groups/{id}/expenses` | Paginated list of expenses (`?page=0&size=50&category=...`) |
 | `POST` | `/api/expense-groups/{id}/expenses` | Supports 3 split modes (`EQUAL`, `PERCENTAGE` summing to 100%, `SHARES`) and multi-currency (`INR`, `USD`, `EUR`, `AED`, `GBP`) with automated conversion to base `INR` |
@@ -114,10 +123,44 @@ Added to `Saheli Backend — Auth, Profile & Family.postman_collection.json` 202
 | `DELETE` | `/api/expense-groups/{id}/expenses/{expenseId}` | Soft-deletes expense, triggering balance recomputation |
 | `POST` | `/api/expense-groups/{id}/settlements` | `{payerMemberId, payeeMemberId, amount, currency, method: 'UPI'\|'CASH'\|'BANK_TRANSFER', date, notes}` → records debt payment |
 | `GET` | `/api/expense-groups/{id}/settlements` | List all settlements in group |
-| `GET` | `/api/expense-groups/{id}/sync` | **Crucial mobile sync endpoint:** returns `{group, expenses, settlements, balances, pairwiseDebts, categoryBreakdown, totalSpendINR, userNetBalanceINR}` in a single call |
+| `GET` | `/api/expense-groups/{id}/sync` | **Crucial mobile sync endpoint:** returns `{group, expenses, settlements, balances, pairwiseDebts, relationshipBalances, categoryBreakdown, totalSpendINR, userNetBalanceINR}` in a single call. `relationshipBalances` added 2026-08-29 (D-056) — the *true* direct bilateral balance per pair who actually transacted (opposite directions netted, settled pairs omitted), distinct from `pairwiseDebts`' minimized settlement suggestion. Powers the Balances tab's "Owed to you"/"Owed by you"/"Settled" sections; see `docs/EXPENSES_API_SPEC.md` §5.2.1 |
 | `GET` | `/api/expenses/summary/30-day` | Rolling 30-day user spend in INR, feeding Dashboard spend tile |
 
 Full specification, PostgreSQL Flyway DDL (`V11__multi_currency_expenses.sql`), and algorithm details live in `docs/EXPENSES_API_SPEC.md`.
+
+**Reference material, not a literal spec:** `expenses_idea/*.md` at the repo root is a
+generic group-expense-sharing concept brief (its own `/api/v1/groups` namespace,
+integer-paise wire amounts, a `settlements/suggestions` sub-endpoint, an `EXACT` split
+type) — useful for cross-checking *concepts*, but it predates and doesn't match this
+project's actual `/api/expense-groups` contract (decimal rupee amounts, `EQUAL`/
+`PERCENTAGE`/`SHARES` only). Two of its concepts were real gaps and are now closed:
+`relationshipBalances` (above) and the equal-split 1-paisa remainder rule (D-055).
+**Two concepts described there are still unbuilt anywhere** (neither this backend nor
+the mobile client) — flagged here rather than built speculatively, since there's no
+confirmed product decision to build them yet:
+- **`EXACT` split mode** (explicit per-member rupee amounts summing to the total,
+  distinct from `PERCENTAGE`) — the idea doc's "Exact Split," not in `SplitType`.
+- **Per-expense participant subsets** — the idea doc's "Participants" concept: choosing
+  *which* group members are even part of a given expense (e.g. a dinner four people
+  attended in a six-person group), rather than always splitting among every group
+  member. Today's `EQUAL`/`PERCENTAGE`/`SHARES` all implicitly assume every group
+  member participates in every expense.
+
+### `avatarUrl` gap across Family, Medicine, and Expense-Group member responses (flagged alongside the emoji-removal sweep, `docs/DECISIONS.md` D-054, 2026-08-29)
+
+None of `FamilyMemberResponse` (§2 above), the Medchest `FamilyProfile` response (§2
+above), or — until this pass — the expense-groups `GroupMember` carry a photo field.
+The only place a real uploaded photo exists today is the caller's own
+`GET /profile/details` → `avatarUrl`, a freshly-signed, short-lived (~10 minute)
+presigned S3 URL. To let Family/Medicine/Expense-Group screens show a real photo for
+someone *other than* the caller, the backend needs to add a nullable `avatarUrl` field
+— same presigned-URL semantics, re-signed on every response, never a stable long-lived
+URL — to `FamilyMemberResponse`, `FamilyProfile`, and `GroupMember` (the last one
+already documented as the target shape in `docs/EXPENSES_API_SPEC.md` §3.5/§4.2/§5.3,
+ahead of the backend shipping it). The client's new `src/components/Avatar.tsx` already
+ships today using an initials/icon fallback and will start showing real photos
+automatically the moment any of these three responses starts returning a non-null
+`avatarUrl` — no further frontend change needed at that point.
 
 ---
 
