@@ -281,7 +281,7 @@
     "rate_type_hourly": "Hourly",
     "rate_label": "Agreed rate",
     "rate_placeholder": "e.g., 12000",
-    "phone_label": "Phone (optional)",
+    "phone_label": "Phone",
     "phone_placeholder": "Phone number",
     "notes_label": "Notes (optional)",
     "notes_placeholder": "Availability, duties, or other details",
@@ -291,9 +291,17 @@
     "remove_title": "Remove caregiver?",
     "remove_message": "Remove {{name}} from your household records?",
     "incomplete_title": "Complete the details",
-    "incomplete_message": "Enter a name, service, and valid rate.",
+    "incomplete_message": "Enter a name, service (with a custom role if selected), a valid rate, and phone.",
     "monthly_rate": "₹{{rate}} / month",
-    "hourly_rate": "₹{{rate}} / hour"
+    "hourly_rate": "₹{{rate}} / hour",
+    "service_options_loading": "Loading roles…",
+    "service_options_empty": "No data",
+    "joining_date_label": "Joining date",
+    "custom_role_label": "Custom role",
+    "custom_role_placeholder": "e.g., Cook, nanny, driver",
+    "save_failed_title": "Couldn't save",
+    "save_failed_no_family": "Couldn't find your family. Please try again in a moment.",
+    "save_failed_message": "Something went wrong while saving. Please try again."
   },
   "events": {
     "back": "Go back",

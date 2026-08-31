@@ -3,6 +3,7 @@
 // and preserving an older hook queue after a new state hook is added causes React's
 // "Should have a queue" development error.
 import React, { useEffect, useState } from 'react';
+import DateTimePicker, { type DateTimePickerEvent } from '@react-native-community/datetimepicker';
 import { ActivityIndicator, Alert, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -60,6 +61,13 @@ function todayKey(): string {
   return `${year}-${month}-${day}`;
 }
 
+function displayDate(value: string): string {
+  const date = new Date(`${value}T00:00:00`);
+  return Number.isNaN(date.getTime())
+    ? value
+    : date.toLocaleDateString(undefined, { day: 'numeric', month: 'short', year: 'numeric' });
+}
+
 const ATTENDANCE_STATUS_COLOR: Record<AttendanceStatus, { tint: string; soft: string }> = {
   present: { tint: '#2E7D5B', soft: '#E3F3EA' },
   absent: { tint: '#C0392B', soft: '#FBE7E4' },
@@ -77,6 +85,7 @@ export default function StaffScreen({ navigation }: Props) {
   const [loading, setLoading] = useState(true);
   const [localeVersion, setLocaleVersion] = useState(0);
   const [serviceOptions, setServiceOptions] = useState<ServiceOption[]>([]);
+  const [serviceOptionsError, setServiceOptionsError] = useState(false);
   const [addSheetVisible, setAddSheetVisible] = useState(false);
   const [saving, setSaving] = useState(false);
   const [addName, setAddName] = useState('');
@@ -87,6 +96,7 @@ export default function StaffScreen({ navigation }: Props) {
   const [addPhone, setAddPhone] = useState('');
   const [addSalary, setAddSalary] = useState('');
   const [addJoiningDate, setAddJoiningDate] = useState(todayKey());
+  const [addJoiningDatePickerVisible, setAddJoiningDatePickerVisible] = useState(false);
   const [addNotes, setAddNotes] = useState('');
   const [extraSheetVisible, setExtraSheetVisible] = useState(false);
   const [extraCaregiverId, setExtraCaregiverId] = useState<string | null>(null);
@@ -124,20 +134,24 @@ export default function StaffScreen({ navigation }: Props) {
     return () => { unsubscribe(); };
   }, [loadStaffList]);
 
-  useEffect(() => {
-    (async () => {
-      const token = await getAccessToken();
-      if (!token) return;
-      try {
-        const services = await listServiceOptions(token);
-        setServiceOptions(services);
-      } catch (err) {
-        // Surfaced instead of silently swallowed — an empty dropdown with no error
-        // previously looked identical whether the fetch failed or genuinely returned [].
-        console.warn('[staff] failed to load service options', err);
-      }
-    })();
+  const loadServiceOptions = React.useCallback(async () => {
+    const token = await getAccessToken();
+    if (!token) return;
+    try {
+      const services = await listServiceOptions(token);
+      setServiceOptions(services);
+      setServiceOptionsError(false);
+    } catch (err) {
+      // Surfaced instead of silently swallowed — an empty dropdown with no error
+      // previously looked identical whether the fetch failed or genuinely returned [].
+      console.warn('[staff] failed to load service options', err);
+      setServiceOptionsError(true);
+    }
   }, [getAccessToken]);
+
+  useEffect(() => {
+    loadServiceOptions();
+  }, [loadServiceOptions]);
 
   const persistAttendance = async (entries: AttendanceEntry[]) => {
     setAttendance(entries);
@@ -180,8 +194,18 @@ export default function StaffScreen({ navigation }: Props) {
   const openAddSheet = () => {
     setAddName(''); setAddServiceId(null); setAddServiceOptionsVisible(false);
     setAddCustomRole(''); setAddRateType('Monthly'); setAddPhone(''); setAddSalary('');
-    setAddJoiningDate(todayKey()); setAddNotes('');
+    setAddJoiningDate(todayKey()); setAddJoiningDatePickerVisible(false); setAddNotes('');
     setAddSheetVisible(true);
+  };
+
+  const handleJoiningDateChange = (event: DateTimePickerEvent, selected?: Date) => {
+    setAddJoiningDatePickerVisible(false);
+    if (event.type === 'set' && selected) {
+      const year = selected.getFullYear();
+      const month = String(selected.getMonth() + 1).padStart(2, '0');
+      const day = String(selected.getDate()).padStart(2, '0');
+      setAddJoiningDate(`${year}-${month}-${day}`);
+    }
   };
 
   const selectedService = serviceOptions.find((service) => service.id === addServiceId) ?? null;
@@ -205,7 +229,7 @@ export default function StaffScreen({ navigation }: Props) {
       const token = await getAccessToken();
       const family = token ? await getMyPrimaryFamily(token).catch(() => null) : null;
       if (!token || !family) {
-        Alert.alert(t('staff.incomplete_title'), t('staff.incomplete_message'));
+        Alert.alert(t('staff.save_failed_title'), t('staff.save_failed_no_family'));
         return;
       }
       await createStaff(family.id, {
@@ -220,6 +244,9 @@ export default function StaffScreen({ navigation }: Props) {
       }, token);
       setAddSheetVisible(false);
       await loadStaffList();
+    } catch (err) {
+      console.warn('[staff] failed to create caregiver', err);
+      Alert.alert(t('staff.save_failed_title'), t('staff.save_failed_message'));
     } finally {
       setSaving(false);
     }
@@ -371,22 +398,37 @@ export default function StaffScreen({ navigation }: Props) {
         </Pressable>
         {addServiceOptionsVisible ? (
           <View style={styles.serviceOptions}>
-            {serviceOptions.map((option) => (
-              <Pressable
-                key={option.id}
-                style={[styles.serviceOption, addServiceId === option.id && styles.serviceOptionSelected]}
-                onPress={() => {
-                  setAddServiceId(option.id);
-                  setAddServiceOptionsVisible(false);
-                }}
-              >
-                <Text style={[styles.serviceOptionText, addServiceId === option.id && styles.serviceOptionTextSelected]}>{option.serviceName}</Text>
-              </Pressable>
-            ))}
+            {serviceOptions.length === 0 ? (
+              serviceOptionsError ? (
+                <Pressable style={styles.serviceOption} onPress={loadServiceOptions}>
+                  <Text style={styles.serviceOptionText}>{t('staff.service_options_empty')}</Text>
+                </Pressable>
+              ) : (
+                <View style={styles.serviceOption}>
+                  <Text style={styles.serviceOptionText}>{t('staff.service_options_loading')}</Text>
+                </View>
+              )
+            ) : (
+              serviceOptions.map((option) => (
+                <Pressable
+                  key={option.id}
+                  style={[styles.serviceOption, addServiceId === option.id && styles.serviceOptionSelected]}
+                  onPress={() => {
+                    setAddServiceId(option.id);
+                    setAddServiceOptionsVisible(false);
+                  }}
+                >
+                  <Text style={[styles.serviceOptionText, addServiceId === option.id && styles.serviceOptionTextSelected]}>{option.serviceName}</Text>
+                </Pressable>
+              ))
+            )}
           </View>
         ) : null}
         {isCustomService ? (
-          <TextInput value={addCustomRole} onChangeText={setAddCustomRole} placeholder={t('staff.service_placeholder')} placeholderTextColor={styles.placeholder.color} style={[styles.input, styles.customServiceInput]} />
+          <>
+            <Text style={styles.label}>{t('staff.custom_role_label')}</Text>
+            <TextInput value={addCustomRole} onChangeText={setAddCustomRole} placeholder={t('staff.custom_role_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
+          </>
         ) : null}
         <Text style={styles.label}>{t('staff.rate_type_label')}</Text>
         <View style={styles.choiceRow}>
@@ -406,6 +448,18 @@ export default function StaffScreen({ navigation }: Props) {
         <TextInput value={addSalary} onChangeText={setAddSalary} keyboardType="decimal-pad" placeholder={t('staff.rate_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
         <Text style={styles.label}>{t('staff.phone_label')}</Text>
         <TextInput value={addPhone} onChangeText={setAddPhone} keyboardType="phone-pad" placeholder={t('staff.phone_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
+        <Text style={styles.label}>{t('staff.joining_date_label')}</Text>
+        <Pressable style={styles.input} onPress={() => setAddJoiningDatePickerVisible(true)}>
+          <Text style={styles.serviceValue}>{displayDate(addJoiningDate)}</Text>
+        </Pressable>
+        {addJoiningDatePickerVisible ? (
+          <DateTimePicker
+            value={new Date(`${addJoiningDate}T00:00:00`)}
+            mode="date"
+            display="default"
+            onChange={handleJoiningDateChange}
+          />
+        ) : null}
         <Text style={styles.label}>{t('staff.notes_label')}</Text>
         <TextInput value={addNotes} onChangeText={setAddNotes} placeholder={t('staff.notes_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
         <Button title={t('staff.save')} onPress={saveNewCaregiver} loading={saving} style={styles.saveButton} />
@@ -447,7 +501,7 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) => StyleShe
   content: { padding: spacing.lg, gap: spacing.md }, hero: { backgroundColor: colors.surfaceElevated, marginBottom: spacing.md }, heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blush, marginBottom: spacing.md }, heroIconColor: { color: colors.primary }, heroTitle: { fontFamily: fonts.serif, fontSize: 25, color: colors.textPrimary, marginBottom: 5 }, heroDescription: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, count: { marginTop: spacing.md, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary },
   empty: { alignItems: 'flex-start' }, emptyTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.textPrimary, marginBottom: 5 }, emptyText: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, emptyButton: { marginTop: spacing.lg, alignSelf: 'stretch' }, caregiverCard: { padding: spacing.lg }, cardTop: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }, avatarText: { fontFamily: fonts.serif, fontSize: 19, color: colors.primary }, cardTitleWrap: { flex: 1 }, name: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.textPrimary }, service: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary, marginTop: 2 }, rate: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.primary, marginTop: spacing.md }, paymentSummary: { marginTop: 4 }, extraTotal: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.forest }, extraReason: { marginTop: 2, fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary }, totalPayable: { marginTop: 3, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, phoneRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm }, phoneIcon: { color: colors.textMuted }, phone: { marginLeft: spacing.xs, fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary },
   label: { marginTop: spacing.md, marginBottom: spacing.xs, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface }, placeholder: { color: colors.textMuted },
-  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, choice: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }, choiceSelected: { backgroundColor: colors.blush, borderColor: colors.primary }, choiceText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary }, choiceTextSelected: { color: colors.primary }, serviceSelect: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surface }, serviceValue: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary }, customServiceInput: { marginTop: spacing.sm }, selectCaret: { marginLeft: spacing.sm, fontSize: 15, color: colors.textMuted }, serviceOptions: { marginTop: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, overflow: 'hidden' }, serviceOption: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }, serviceOptionSelected: { backgroundColor: colors.blush }, serviceOptionText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, serviceOptionTextSelected: { color: colors.primary }, saveButton: { marginTop: spacing.lg }, extraHelp: { marginTop: spacing.sm, fontFamily: fonts.sans, fontSize: 13, lineHeight: 19, color: colors.textSecondary }, reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm }, reasonChip: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.blush }, reasonText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.primary },
+  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, choice: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }, choiceSelected: { backgroundColor: colors.blush, borderColor: colors.primary }, choiceText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary }, choiceTextSelected: { color: colors.primary }, serviceSelect: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surface }, serviceValue: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary }, selectCaret: { marginLeft: spacing.sm, fontSize: 15, color: colors.textMuted }, serviceOptions: { marginTop: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, overflow: 'hidden' }, serviceOption: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }, serviceOptionSelected: { backgroundColor: colors.blush }, serviceOptionText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, serviceOptionTextSelected: { color: colors.primary }, saveButton: { marginTop: spacing.lg }, extraHelp: { marginTop: spacing.sm, fontFamily: fonts.sans, fontSize: 13, lineHeight: 19, color: colors.textSecondary }, reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm }, reasonChip: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.blush }, reasonText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.primary },
   attendanceCard: { padding: spacing.sm },
   attendanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm, paddingHorizontal: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
   attendanceRowLast: { borderBottomWidth: 0 },

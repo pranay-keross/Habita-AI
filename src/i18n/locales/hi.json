@@ -254,7 +254,7 @@
     "rate_type_hourly": "प्रति घंटा",
     "rate_label": "तय दर",
     "rate_placeholder": "जैसे, 12000",
-    "phone_label": "फ़ोन (वैकल्पिक)",
+    "phone_label": "फ़ोन",
     "phone_placeholder": "फ़ोन नंबर",
     "notes_label": "नोट्स (वैकल्पिक)",
     "notes_placeholder": "उपलब्धता, कर्तव्य या अन्य विवरण",
@@ -264,9 +264,17 @@
     "remove_title": "देखभालकर्ता हटाएँ?",
     "remove_message": "{{name}} को घरेलू रिकॉर्ड से हटाएँ?",
     "incomplete_title": "विवरण पूरे करें",
-    "incomplete_message": "नाम, सेवा और मान्य दर दर्ज करें।",
+    "incomplete_message": "नाम, सेवा (चयनित होने पर कस्टम भूमिका सहित), मान्य दर, और फ़ोन दर्ज करें।",
     "monthly_rate": "₹{{rate}} / माह",
-    "hourly_rate": "₹{{rate}} / घंटा"
+    "hourly_rate": "₹{{rate}} / घंटा",
+    "service_options_loading": "भूमिकाएँ लोड हो रही हैं…",
+    "service_options_empty": "कोई डेटा नहीं",
+    "joining_date_label": "जॉइनिंग की तारीख",
+    "custom_role_label": "कस्टम भूमिका",
+    "custom_role_placeholder": "जैसे, रसोइया, नैनी, ड्राइवर",
+    "save_failed_title": "सहेजा नहीं जा सका",
+    "save_failed_no_family": "आपका परिवार नहीं मिला। कृपया थोड़ी देर बाद फिर कोशिश करें।",
+    "save_failed_message": "सहेजते समय कुछ गलत हो गया। कृपया फिर कोशिश करें।"
   },
   "events": {
     "back": "वापस जाएं",

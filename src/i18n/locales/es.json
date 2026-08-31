@@ -254,7 +254,7 @@
     "rate_type_hourly": "Por hora",
     "rate_label": "Tarifa acordada",
     "rate_placeholder": "p. ej., 12000",
-    "phone_label": "Teléfono (opcional)",
+    "phone_label": "Teléfono",
     "phone_placeholder": "Número de teléfono",
     "notes_label": "Notas (opcional)",
     "notes_placeholder": "Disponibilidad, tareas u otros detalles",
@@ -264,9 +264,17 @@
     "remove_title": "¿Eliminar cuidador?",
     "remove_message": "¿Eliminar a {{name}} de los registros del hogar?",
     "incomplete_title": "Complete los datos",
-    "incomplete_message": "Introduzca un nombre, servicio y tarifa válidos.",
+    "incomplete_message": "Ingresa un nombre, servicio (con un rol personalizado si se seleccionó), una tarifa válida y teléfono.",
     "monthly_rate": "₹{{rate}} / mes",
-    "hourly_rate": "₹{{rate}} / hora"
+    "hourly_rate": "₹{{rate}} / hora",
+    "service_options_loading": "Cargando roles…",
+    "service_options_empty": "Sin datos",
+    "joining_date_label": "Fecha de incorporación",
+    "custom_role_label": "Rol personalizado",
+    "custom_role_placeholder": "p. ej., Cocinero, niñera, conductor",
+    "save_failed_title": "No se pudo guardar",
+    "save_failed_no_family": "No se pudo encontrar tu familia. Vuelve a intentarlo en un momento.",
+    "save_failed_message": "Algo salió mal al guardar. Vuelve a intentarlo."
   },
   "events": {
     "back": "Volver",

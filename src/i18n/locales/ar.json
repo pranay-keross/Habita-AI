@@ -254,7 +254,7 @@
     "rate_type_hourly": "بالساعة",
     "rate_label": "الأجر المتفق عليه",
     "rate_placeholder": "مثال: 12000",
-    "phone_label": "الهاتف (اختياري)",
+    "phone_label": "الهاتف",
     "phone_placeholder": "رقم الهاتف",
     "notes_label": "ملاحظات (اختياري)",
     "notes_placeholder": "التوفر أو المهام أو التفاصيل الأخرى",
@@ -264,9 +264,17 @@
     "remove_title": "حذف مقدم الرعاية؟",
     "remove_message": "هل تريد حذف {{name}} من سجلات المنزل؟",
     "incomplete_title": "أكمل التفاصيل",
-    "incomplete_message": "أدخل اسمًا وخدمة وأجرًا صالحًا.",
+    "incomplete_message": "أدخل اسمًا وخدمة (مع دور مخصص إذا تم اختياره) وأجرًا صالحًا ورقم هاتف.",
     "monthly_rate": "₹{{rate}} / شهر",
-    "hourly_rate": "₹{{rate}} / ساعة"
+    "hourly_rate": "₹{{rate}} / ساعة",
+    "service_options_loading": "جارٍ تحميل الأدوار…",
+    "service_options_empty": "لا توجد بيانات",
+    "joining_date_label": "تاريخ الانضمام",
+    "custom_role_label": "دور مخصص",
+    "custom_role_placeholder": "مثال: طاهٍ، مربية، سائق",
+    "save_failed_title": "تعذر الحفظ",
+    "save_failed_no_family": "تعذر العثور على عائلتك. يرجى المحاولة مرة أخرى بعد قليل.",
+    "save_failed_message": "حدث خطأ أثناء الحفظ. يرجى المحاولة مرة أخرى."
   },
   "events": {
     "back": "رجوع",
@@ -1480,4 +1488,3 @@
     "utility_due_today_body": "فاتورة %{utility} من %{provider} مستحقة اليوم."
   }
 }
-
