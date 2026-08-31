@@ -254,7 +254,7 @@
     "rate_type_hourly": "প্রতি ঘণ্টা",
     "rate_label": "নির্ধারিত পারিশ্রমিক",
     "rate_placeholder": "যেমন, 12000",
-    "phone_label": "ফোন (ঐচ্ছিক)",
+    "phone_label": "ফোন",
     "phone_placeholder": "ফোন নম্বর",
     "notes_label": "নোট (ঐচ্ছিক)",
     "notes_placeholder": "উপস্থিতি, দায়িত্ব বা অন্যান্য তথ্য",
@@ -264,9 +264,17 @@
     "remove_title": "পরিচর্যাকারী সরাবেন?",
     "remove_message": "{{name}}-কে গৃহস্থালির রেকর্ড থেকে সরাবেন?",
     "incomplete_title": "তথ্য পূরণ করুন",
-    "incomplete_message": "নাম, সেবা এবং বৈধ পারিশ্রমিক লিখুন।",
+    "incomplete_message": "একটি নাম, পরিষেবা (নির্বাচিত হলে কাস্টম ভূমিকা সহ), বৈধ হার এবং ফোন লিখুন।",
     "monthly_rate": "₹{{rate}} / মাস",
-    "hourly_rate": "₹{{rate}} / ঘণ্টা"
+    "hourly_rate": "₹{{rate}} / ঘণ্টা",
+    "service_options_loading": "ভূমিকা লোড হচ্ছে…",
+    "service_options_empty": "কোনো তথ্য নেই",
+    "joining_date_label": "যোগদানের তারিখ",
+    "custom_role_label": "কাস্টম ভূমিকা",
+    "custom_role_placeholder": "যেমন, রাঁধুনি, নানি, চালক",
+    "save_failed_title": "সংরক্ষণ করা যায়নি",
+    "save_failed_no_family": "আপনার পরিবার খুঁজে পাওয়া যায়নি। কিছুক্ষণ পরে আবার চেষ্টা করুন।",
+    "save_failed_message": "সংরক্ষণ করার সময় একটি সমস্যা হয়েছে। আবার চেষ্টা করুন।"
   },
   "events": {
     "back": "ফিরে যান",

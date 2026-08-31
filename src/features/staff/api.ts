@@ -14,7 +14,7 @@ export interface ServiceOption {
 // the shape the sibling `/staff` list endpoint uses) instead of a bare array — a mismatch
 // here previously made the dropdown fail silently empty via the caller's `.catch(() => [])`.
 export async function listServiceOptions(token: string): Promise<ServiceOption[]> {
-  const raw = await apiFetch<unknown>('/services/list', { method: 'GET', token });
+  const raw = await apiFetch<unknown>('/staff/services/list', { method: 'GET', token });
   const list = Array.isArray(raw)
     ? raw
     : Array.isArray((raw as { content?: unknown })?.content)
