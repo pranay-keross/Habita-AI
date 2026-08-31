@@ -1,12 +1,16 @@
 import { AllergenDefinition, PantryItem, ZeroWasteRecipe } from '../types';
 
+// Re-exported so consumers of this module can resolve an allergen/category icon-key
+// to its lucide component from a single shared source (see ../pantryData).
+export { ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../pantryData';
+
 export const ALLERGEN_DEFINITIONS: AllergenDefinition[] = [
-  { tag: 'gluten-free', labelKey: 'smart_pantry.allergen_gluten_free', label: 'Gluten-Free', icon: '🌾', color: '#10B981' },
-  { tag: 'vegan', labelKey: 'smart_pantry.allergen_vegan', label: 'Vegan', icon: '🌿', color: '#059669' },
-  { tag: 'halal', labelKey: 'smart_pantry.allergen_halal', label: 'Halal', icon: '🌙', color: '#6366F1' },
-  { tag: 'kosher', labelKey: 'smart_pantry.allergen_kosher', label: 'Kosher', icon: '✡️', color: '#8B5CF6' },
-  { tag: 'nut-free', labelKey: 'smart_pantry.allergen_nut_free', label: 'Nut-Free', icon: '🥜', color: '#F59E0B' },
-  { tag: 'dairy-free', labelKey: 'smart_pantry.allergen_dairy_free', label: 'Dairy-Free', icon: '🥛', color: '#3B82F6' },
+  { tag: 'gluten-free', labelKey: 'smart_pantry.allergen_gluten_free', label: 'Gluten-Free', icon: 'wheat', color: '#10B981' },
+  { tag: 'vegan', labelKey: 'smart_pantry.allergen_vegan', label: 'Vegan', icon: 'vegan', color: '#059669' },
+  { tag: 'halal', labelKey: 'smart_pantry.allergen_halal', label: 'Halal', icon: 'moon', color: '#6366F1' },
+  { tag: 'kosher', labelKey: 'smart_pantry.allergen_kosher', label: 'Kosher', icon: 'star', color: '#8B5CF6' },
+  { tag: 'nut-free', labelKey: 'smart_pantry.allergen_nut_free', label: 'Nut-Free', icon: 'nut', color: '#F59E0B' },
+  { tag: 'dairy-free', labelKey: 'smart_pantry.allergen_dairy_free', label: 'Dairy-Free', icon: 'milk-off', color: '#3B82F6' },
 ];
 
 export const BARCODE_CATALOG: Record<string, Partial<PantryItem>> = {

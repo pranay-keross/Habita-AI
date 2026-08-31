@@ -11,6 +11,7 @@ import Button from '../../components/Button';
 import BottomSheet from '../../components/BottomSheet';
 import ModernBottomNav, { type BottomNavTab } from '../../components/ModernBottomNav';
 import { SkeletonCard, SkeletonHeroCard } from '../../components/Skeleton';
+import Avatar from '../../components/Avatar';
 import useAuth from '../../hooks/useAuth';
 import {
   ChevronRight,
@@ -26,7 +27,6 @@ import {
   Sun,
   Sunset,
   Moon,
-  User,
   Edit2,
   UserPlus,
   HeartPulse,
@@ -789,9 +789,7 @@ export default function MedicineScreen({ navigation, route }: Props) {
             <View style={styles.heroCard}>
               <View style={styles.heroTopRow}>
                 <View style={styles.heroProfileBadge}>
-                  <View style={{ marginRight: 6 }}>
-                    <User size={13} color="#FFFFFF" strokeWidth={1.8} />
-                  </View>
+                  <Avatar name={currentProfile?.name ?? ''} size={20} />
                   <Text style={styles.heroProfileName} numberOfLines={1}>
                     {currentProfile ? `${currentProfile.name}'s Vault` : 'Personal Cabinet'}
                   </Text>
@@ -866,9 +864,7 @@ export default function MedicineScreen({ navigation, route }: Props) {
                           key={profile.id}
                           style={[styles.profileCard, active && styles.profileCardActive]}
                           onPress={() => handleSelectProfile(profile.id)}>
-                          <View style={[styles.profileAvatarWrap, active && styles.profileAvatarWrapActive]}>
-                            <User size={16} color={active ? '#FFFFFF' : '#888888'} strokeWidth={1.5} />
-                          </View>
+                          <Avatar name={profile.name} size={36} isOwner={active} style={styles.profileAvatarMargin} />
                           <Text
                             style={[styles.profileCardName, active && styles.profileCardNameActive]}
                             numberOfLines={1}>
@@ -1165,9 +1161,7 @@ export default function MedicineScreen({ navigation, route }: Props) {
                 key={member.id}
                 style={styles.memberRow}
                 onPress={() => chooseMemberForProfile(member)}>
-                <View style={styles.memberRowAvatar}>
-                  <User size={15} color="#000000" strokeWidth={1.5} />
-                </View>
+                <Avatar name={member.name} size={32} style={styles.memberRowAvatarMargin} />
                 <View style={styles.memberRowInfo}>
                   <Text style={styles.memberRowName}>{member.name}</Text>
                   {member.managed && <Text style={styles.memberRowSub}>{t('medicine.dependent_badge')}</Text>}
@@ -1358,9 +1352,6 @@ const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleShe
     gap: 6,
     flex: 1,
   },
-  heroProfileCategory: {
-    fontSize: 16,
-  },
   heroProfileName: {
     fontFamily: fonts.sans,
     fontSize: 14,
@@ -1502,20 +1493,8 @@ const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleShe
     borderColor: '#000000',
     backgroundColor: '#F5F5F7',
   },
-  profileAvatarWrap: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: '#F5F5F7',
-    alignItems: 'center',
-    justifyContent: 'center',
+  profileAvatarMargin: {
     marginBottom: 4,
-  },
-  profileAvatarWrapActive: {
-    backgroundColor: '#EAEAEA',
-  },
-  profileAvatarIcon: {
-    fontSize: 18,
   },
   profileCardName: {
     fontFamily: fonts.sans,
@@ -1575,10 +1554,6 @@ const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleShe
     borderWidth: 1,
     borderColor: '#ECECEE',
   },
-  memberRowIcon: {
-    fontSize: 22,
-    marginRight: 10,
-  },
   memberRowAvatar: {
     width: 32,
     height: 32,
@@ -1586,6 +1561,9 @@ const makeStyles = ({ fonts, radius, shadow, spacing }: ThemeTokens) => StyleShe
     backgroundColor: '#F5F5F7',
     alignItems: 'center',
     justifyContent: 'center',
+    marginRight: 10,
+  },
+  memberRowAvatarMargin: {
     marginRight: 10,
   },
   memberRowInfo: {

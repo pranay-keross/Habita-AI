@@ -20,18 +20,19 @@ import Sparkles from 'lucide-react-native/icons/sparkles';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import Shirt from 'lucide-react-native/icons/shirt';
 import { loadClothingItems } from '../stylePantryStore';
+import { CATEGORY_ICON_KEYS, getClothingIconComponent } from '../clothingIcons';
 import type { ClothingCategory, ClothingItem } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'StylePantryDashboard' | 'Wardrobe'>;
 
-const CATEGORIES: { key: ClothingCategory | 'all'; labelKey: string; icon: string }[] = [
-  { key: 'all', labelKey: 'style_pantry.cat_all', icon: '👔' },
-  { key: 'tops', labelKey: 'style_pantry.cat_tops', icon: '👕' },
-  { key: 'bottoms', labelKey: 'style_pantry.cat_bottoms', icon: '👖' },
-  { key: 'shoes', labelKey: 'style_pantry.cat_shoes', icon: '👞' },
-  { key: 'jackets', labelKey: 'style_pantry.cat_jackets', icon: '🧥' },
-  { key: 'accessories', labelKey: 'style_pantry.cat_accessories', icon: '⌚' },
+const CATEGORIES: { key: ClothingCategory | 'all'; labelKey: string; iconKey: string }[] = [
+  { key: 'all', labelKey: 'style_pantry.cat_all', iconKey: 'shirt' },
+  { key: 'tops', labelKey: 'style_pantry.cat_tops', iconKey: CATEGORY_ICON_KEYS.tops },
+  { key: 'bottoms', labelKey: 'style_pantry.cat_bottoms', iconKey: CATEGORY_ICON_KEYS.bottoms },
+  { key: 'shoes', labelKey: 'style_pantry.cat_shoes', iconKey: CATEGORY_ICON_KEYS.shoes },
+  { key: 'jackets', labelKey: 'style_pantry.cat_jackets', iconKey: CATEGORY_ICON_KEYS.jackets },
+  { key: 'accessories', labelKey: 'style_pantry.cat_accessories', iconKey: CATEGORY_ICON_KEYS.accessories },
 ];
 
 export default function WardrobeDashboardScreen({ navigation }: Props) {
@@ -120,7 +121,9 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
           horizontal
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.categoriesContainer}>
-          {CATEGORIES.map((cat) => (
+          {CATEGORIES.map((cat) => {
+            const CatIcon = getClothingIconComponent(cat.iconKey);
+            return (
             <Pressable
               key={cat.key}
               style={[
@@ -128,7 +131,11 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
                 selectedCat === cat.key && styles.categoryChipActive,
               ]}
               onPress={() => setSelectedCat(cat.key)}>
-              <Text style={styles.chipEmoji}>{cat.icon}</Text>
+              <CatIcon
+                size={14}
+                color={selectedCat === cat.key ? '#FFFFFF' : styles.chipText.color}
+                style={styles.chipIcon}
+              />
               <Text
                 style={[
                   styles.chipText,
@@ -137,7 +144,8 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
                 {t(cat.labelKey)}
               </Text>
             </Pressable>
-          ))}
+            );
+          })}
         </ScrollView>
 
         {/* Items List Header */}
@@ -164,13 +172,15 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
           </View>
         ) : (
           <View style={styles.gridWrap}>
-            {filteredItems.map((item) => (
+            {filteredItems.map((item) => {
+              const ItemIcon = getClothingIconComponent(item.emoji);
+              return (
               <Pressable
                 key={item.id}
                 style={styles.clothingCard}
                 onPress={() => navigation.navigate('ClothingDetails', { itemId: item.id })}>
                 <View style={styles.cardEmojiBadge}>
-                  <Text style={styles.cardEmojiText}>{item.emoji || '👕'}</Text>
+                  <ItemIcon size={28} color="#004F63" />
                 </View>
                 <Text style={styles.cardItemName} numberOfLines={1}>
                   {item.name}
@@ -184,7 +194,8 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
                   </Text>
                 </View>
               </Pressable>
-            ))}
+              );
+            })}
           </View>
         )}
       </ScrollView>
@@ -317,8 +328,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       backgroundColor: '#004F63',
       borderColor: '#004F63',
     },
-    chipEmoji: {
-      fontSize: 14,
+    chipIcon: {
       marginRight: 6,
     },
     chipText: {
@@ -396,9 +406,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       justifyContent: 'center',
       marginBottom: spacing.sm,
       alignSelf: 'center',
-    },
-    cardEmojiText: {
-      fontSize: 28,
     },
     cardItemName: {
       fontFamily: fonts.sansBold,

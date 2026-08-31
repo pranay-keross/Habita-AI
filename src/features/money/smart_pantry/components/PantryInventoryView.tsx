@@ -1,13 +1,19 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
-import { AllergenTag, CategoryType, PantryItem, StorageLocation } from '../types';
-import { ALLERGEN_DEFINITIONS } from '../data/mockPantryData';
+import { AllergenTag, PantryItem, StorageLocation } from '../types';
+import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../data/mockPantryData';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
 import { PANTRY_COLORS } from '../constants/colors';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
 import useTheme from '../../../../hooks/useTheme';
+import Globe from 'lucide-react-native/icons/globe';
+import Refrigerator from 'lucide-react-native/icons/refrigerator';
+import Snowflake from 'lucide-react-native/icons/snowflake';
+import Archive from 'lucide-react-native/icons/archive';
+import Search from 'lucide-react-native/icons/search';
+import X from 'lucide-react-native/icons/x';
 
 interface Props {
   filteredItems: PantryItem[];
@@ -23,16 +29,13 @@ interface Props {
   onNavigateAdd: () => void;
 }
 
-const CATEGORY_EMOJIS: Record<CategoryType, string> = {
-  produce: '🥦',
-  dairy: '🥛',
-  bakery: '🍞',
-  beverages: '🧃',
-  meat: '🥩',
-  pantry: '🥫',
-};
-
 const LOCATIONS: StorageLocation[] = ['Fridge', 'Freezer', 'Pantry Shelf'];
+
+const LOCATION_ICONS: Record<StorageLocation, typeof Refrigerator> = {
+  Fridge: Refrigerator,
+  Freezer: Snowflake,
+  'Pantry Shelf': Archive,
+};
 
 export const PantryInventoryView: React.FC<Props> = ({
   filteredItems,
@@ -53,17 +56,19 @@ export const PantryInventoryView: React.FC<Props> = ({
   const getLocLabel = (loc: StorageLocation | 'All') => {
     switch (loc) {
       case 'All':
-        return `🌐 ${t('smart_pantry.loc_all')}`;
+        return t('smart_pantry.loc_all');
       case 'Fridge':
-        return `❄️ ${t('smart_pantry.loc_fridge')}`;
+        return t('smart_pantry.loc_fridge');
       case 'Freezer':
-        return `🧊 ${t('smart_pantry.loc_freezer')}`;
+        return t('smart_pantry.loc_freezer');
       case 'Pantry Shelf':
-        return `🧺 ${t('smart_pantry.loc_pantry_shelf')}`;
+        return t('smart_pantry.loc_pantry_shelf');
       default:
         return loc;
     }
   };
+
+  const getLocIcon = (loc: StorageLocation | 'All') => (loc === 'All' ? Globe : LOCATION_ICONS[loc]);
 
   const getLocName = (loc: StorageLocation) => {
     switch (loc) {
@@ -84,7 +89,7 @@ export const PantryInventoryView: React.FC<Props> = ({
 
       {/* Search Bar */}
       <View style={styles.searchContainer}>
-        <Text style={{ fontSize: 16, marginRight: 8 }}>🔍</Text>
+        <Search size={16} color={theme.colors.textMuted} strokeWidth={1.8} style={{ marginRight: 8 }} />
         <TextInput
           style={styles.searchInput}
           placeholder={t('smart_pantry.search_placeholder')}
@@ -94,23 +99,28 @@ export const PantryInventoryView: React.FC<Props> = ({
         />
         {searchQuery !== '' && (
           <Pressable onPress={() => onSearchChange('')}>
-            <Text style={{ fontSize: 16, color: theme.colors.textMuted }}>✕</Text>
+            <X size={16} color={theme.colors.textMuted} strokeWidth={1.8} />
           </Pressable>
         )}
       </View>
 
       {/* Location Filter Pills */}
       <View style={styles.filterChipRow}>
-        {(['All', ...LOCATIONS] as (StorageLocation | 'All')[]).map((loc) => (
-          <Pressable
-            key={loc}
-            style={[styles.pillChip, selectedLocation === loc && styles.pillChipActive]}
-            onPress={() => onLocationSelect(loc)}>
-            <Text style={[styles.pillChipText, selectedLocation === loc && styles.pillChipTextActive]}>
-              {getLocLabel(loc)}
-            </Text>
-          </Pressable>
-        ))}
+        {(['All', ...LOCATIONS] as (StorageLocation | 'All')[]).map((loc) => {
+          const LocIcon = getLocIcon(loc);
+          const active = selectedLocation === loc;
+          return (
+            <Pressable
+              key={loc}
+              style={[styles.pillChip, styles.pillChipRow, active && styles.pillChipActive]}
+              onPress={() => onLocationSelect(loc)}>
+              <LocIcon size={12} color={active ? styles.pillChipTextActive.color : styles.pillChipText.color} strokeWidth={2} style={{ marginRight: 4 }} />
+              <Text style={[styles.pillChipText, active && styles.pillChipTextActive]}>
+                {getLocLabel(loc)}
+              </Text>
+            </Pressable>
+          );
+        })}
       </View>
 
       {/* Allergen Filters */}
@@ -122,16 +132,21 @@ export const PantryInventoryView: React.FC<Props> = ({
             {t('smart_pantry.all_safety_tags')}
           </Text>
         </Pressable>
-        {ALLERGEN_DEFINITIONS.map((def) => (
-          <Pressable
-            key={def.tag}
-            style={[styles.allergenFilterChip, selectedAllergenFilter === def.tag && styles.allergenFilterChipActive]}
-            onPress={() => onAllergenFilterSelect(def.tag)}>
-            <Text style={[styles.allergenFilterChipText, selectedAllergenFilter === def.tag && styles.allergenFilterChipTextActive]}>
-              {def.icon} {def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label}
-            </Text>
-          </Pressable>
-        ))}
+        {ALLERGEN_DEFINITIONS.map((def) => {
+          const AllergenIcon = ALLERGEN_ICONS[def.tag];
+          const active = selectedAllergenFilter === def.tag;
+          return (
+            <Pressable
+              key={def.tag}
+              style={[styles.allergenFilterChip, styles.pillChipRow, active && styles.allergenFilterChipActive]}
+              onPress={() => onAllergenFilterSelect(def.tag)}>
+              <AllergenIcon size={12} color={active ? styles.allergenFilterChipTextActive.color : styles.allergenFilterChipText.color} strokeWidth={2} style={{ marginRight: 4 }} />
+              <Text style={[styles.allergenFilterChipText, active && styles.allergenFilterChipTextActive]}>
+                {def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label}
+              </Text>
+            </Pressable>
+          );
+        })}
       </ScrollView>
 
       {/* Sort Options Bar */}
@@ -159,7 +174,7 @@ export const PantryInventoryView: React.FC<Props> = ({
       {/* Inventory Item Cards */}
       {filteredItems.length === 0 ? (
         <View style={styles.emptyStateContainer}>
-          <Text style={{ fontSize: 44, marginBottom: 8 }}>🧺</Text>
+          <Archive size={44} color={styles.emptyStateTitle.color} strokeWidth={1.5} style={{ marginBottom: 8 }} />
           <Text style={styles.emptyStateTitle}>{t('smart_pantry.no_items')}</Text>
           <Pressable style={styles.emptyStateBtn} onPress={onNavigateAdd}>
             <Text style={styles.emptyStateBtnText}>{t('smart_pantry.add_new_item')}</Text>
@@ -170,6 +185,7 @@ export const PantryInventoryView: React.FC<Props> = ({
           const daysLeft = getDaysUntilExpiry(item.expiryDate);
           const isUrgent = daysLeft <= 2;
           const isWarning = daysLeft > 2 && daysLeft <= 5;
+          const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
           return (
             <Pressable
               key={item.id}
@@ -177,7 +193,7 @@ export const PantryInventoryView: React.FC<Props> = ({
               onPress={() => onSelectItem(item)}>
               <View style={styles.inventoryMainRow}>
                 <View style={styles.categoryCircle}>
-                  <Text style={{ fontSize: 22 }}>{CATEGORY_EMOJIS[item.category] || '📦'}</Text>
+                  <CategoryIcon size={22} color={styles.inventoryName.color} strokeWidth={1.8} />
                 </View>
                 <View style={{ flex: 1 }}>
                   <Text style={styles.inventoryName}>{item.name}</Text>
@@ -224,6 +240,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     searchInput: { flex: 1, fontSize: 14, color: colors.textPrimary },
     filterChipRow: { flexDirection: 'row', gap: 6, marginBottom: 8 },
+    pillChipRow: { flexDirection: 'row', alignItems: 'center' },
     pillChip: { backgroundColor: colors.surface, paddingHorizontal: 10, paddingVertical: 5, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
     pillChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     pillChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },

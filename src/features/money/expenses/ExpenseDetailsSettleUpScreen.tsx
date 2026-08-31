@@ -22,6 +22,9 @@ import HandCoins from 'lucide-react-native/icons/hand-coins';
 import Calendar from 'lucide-react-native/icons/calendar';
 import User from 'lucide-react-native/icons/user';
 import Trash2 from 'lucide-react-native/icons/trash-2';
+import CreditCard from 'lucide-react-native/icons/credit-card';
+import Banknote from 'lucide-react-native/icons/banknote';
+import Landmark from 'lucide-react-native/icons/landmark';
 import useAuth from '../../../hooks/useAuth';
 import {
   calculateGroupBalances,
@@ -33,15 +36,16 @@ import {
 } from '../expenseStore';
 import type { Expense, ExpenseGroup } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { showNetworkUnavailableAlert } from '../../../utils/networkStatus';
 
 type Props = StackScreenProps<RootStackParamList, 'ExpenseDetailsSettleUp'>;
 
 type PaymentMethod = 'upi' | 'cash' | 'bank_transfer';
 
-const PAYMENT_METHODS: { key: PaymentMethod; labelKey: string; icon: string }[] = [
-  { key: 'upi', labelKey: 'expenses.method_upi', icon: '💳' },
-  { key: 'cash', labelKey: 'expenses.method_cash', icon: '💵' },
-  { key: 'bank_transfer', labelKey: 'expenses.method_bank_transfer', icon: '🏦' },
+const PAYMENT_METHODS: { key: PaymentMethod; labelKey: string; Icon: typeof CreditCard }[] = [
+  { key: 'upi', labelKey: 'expenses.method_upi', Icon: CreditCard },
+  { key: 'cash', labelKey: 'expenses.method_cash', Icon: Banknote },
+  { key: 'bank_transfer', labelKey: 'expenses.method_bank_transfer', Icon: Landmark },
 ];
 
 export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Props) {
@@ -110,8 +114,14 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
 
     setSettling(true);
     const token = await getAccessToken().catch(() => null);
-    await settlePairwiseDebt(group.id, settlePayerId, settlePayeeId, amt, paymentMethod, token);
+    const { offline } = await settlePairwiseDebt(group.id, settlePayerId, settlePayeeId, amt, paymentMethod, token);
     setSettling(false);
+
+    if (offline) {
+      showNetworkUnavailableAlert();
+      navigation.goBack();
+      return;
+    }
 
     const pmMeta = PAYMENT_METHODS.find((p) => p.key === paymentMethod);
     const methodStr = pmMeta ? t(pmMeta.labelKey) : paymentMethod.toUpperCase();
@@ -140,8 +150,9 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
           onPress: async () => {
             setDeleting(true);
             const token = await getAccessToken().catch(() => null);
-            await deleteExpenseFromGroup(groupId, expense.id, token);
+            const { offline } = await deleteExpenseFromGroup(groupId, expense.id, token);
             setDeleting(false);
+            if (offline) showNetworkUnavailableAlert();
             navigation.goBack();
           },
         },
@@ -200,7 +211,10 @@ export default function ExpenseDetailsSettleUpScreen({ navigation, route }: Prop
                     paymentMethod === pm.key && styles.methodRowActive,
                   ]}
                   onPress={() => setPaymentMethod(pm.key)}>
-                  <Text style={{ fontSize: 18 }}>{pm.icon}</Text>
+                  <pm.Icon
+                    size={18}
+                    color={paymentMethod === pm.key ? styles.methodTextActive.color : styles.methodText.color}
+                  />
                   <Text
                     style={[
                       styles.methodText,

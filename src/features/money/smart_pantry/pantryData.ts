@@ -1,4 +1,17 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import type { LucideIcon } from 'lucide-react-native';
+import Wheat from 'lucide-react-native/icons/wheat';
+import Vegan from 'lucide-react-native/icons/vegan';
+import Moon from 'lucide-react-native/icons/moon';
+import Star from 'lucide-react-native/icons/star';
+import Nut from 'lucide-react-native/icons/nut';
+import MilkOff from 'lucide-react-native/icons/milk-off';
+import Broccoli from 'lucide-react-native/icons/broccoli';
+import Milk from 'lucide-react-native/icons/milk';
+import Croissant from 'lucide-react-native/icons/croissant';
+import CupSoda from 'lucide-react-native/icons/cup-soda';
+import Beef from 'lucide-react-native/icons/beef';
+import Package from 'lucide-react-native/icons/package';
 
 export type AllergenTag = 'nut-free' | 'gluten-free' | 'dairy-free' | 'vegan' | 'halal' | 'kosher';
 export type CategoryType = 'produce' | 'dairy' | 'bakery' | 'beverages' | 'meat' | 'pantry';
@@ -34,13 +47,35 @@ export interface ZeroWasteRecipe {
 const STORAGE_KEY = '@sahel_smart_pantry_v2';
 
 export const ALLERGEN_DEFINITIONS: { tag: AllergenTag; labelKey: string; label: string; icon: string; color: string }[] = [
-  { tag: 'gluten-free', labelKey: 'smart_pantry.allergen_gluten_free', label: 'Gluten-Free', icon: '🌾', color: '#10B981' },
-  { tag: 'vegan', labelKey: 'smart_pantry.allergen_vegan', label: 'Vegan', icon: '🌿', color: '#059669' },
-  { tag: 'halal', labelKey: 'smart_pantry.allergen_halal', label: 'Halal', icon: '🌙', color: '#6366F1' },
-  { tag: 'kosher', labelKey: 'smart_pantry.allergen_kosher', label: 'Kosher', icon: '✡️', color: '#8B5CF6' },
-  { tag: 'nut-free', labelKey: 'smart_pantry.allergen_nut_free', label: 'Nut-Free', icon: '🥜', color: '#F59E0B' },
-  { tag: 'dairy-free', labelKey: 'smart_pantry.allergen_dairy_free', label: 'Dairy-Free', icon: '🥛', color: '#3B82F6' },
+  { tag: 'gluten-free', labelKey: 'smart_pantry.allergen_gluten_free', label: 'Gluten-Free', icon: 'wheat', color: '#10B981' },
+  { tag: 'vegan', labelKey: 'smart_pantry.allergen_vegan', label: 'Vegan', icon: 'vegan', color: '#059669' },
+  { tag: 'halal', labelKey: 'smart_pantry.allergen_halal', label: 'Halal', icon: 'moon', color: '#6366F1' },
+  { tag: 'kosher', labelKey: 'smart_pantry.allergen_kosher', label: 'Kosher', icon: 'star', color: '#8B5CF6' },
+  { tag: 'nut-free', labelKey: 'smart_pantry.allergen_nut_free', label: 'Nut-Free', icon: 'nut', color: '#F59E0B' },
+  { tag: 'dairy-free', labelKey: 'smart_pantry.allergen_dairy_free', label: 'Dairy-Free', icon: 'milk-off', color: '#3B82F6' },
 ];
+
+// Shared icon-key -> lucide component lookups so allergen/category icons are defined once
+// and consumed consistently across all smart_pantry render files.
+export const ALLERGEN_ICONS: Record<AllergenTag, LucideIcon> = {
+  'gluten-free': Wheat,
+  vegan: Vegan,
+  halal: Moon,
+  kosher: Star,
+  'nut-free': Nut,
+  'dairy-free': MilkOff,
+};
+
+export const PANTRY_CATEGORY_ICONS: Record<CategoryType, LucideIcon> = {
+  produce: Broccoli,
+  dairy: Milk,
+  bakery: Croissant,
+  beverages: CupSoda,
+  meat: Beef,
+  pantry: Package,
+};
+
+export const DEFAULT_CATEGORY_ICON: LucideIcon = Package;
 
 export const BARCODE_CATALOG: Record<string, Partial<PantryItem>> = {
   '8901234567890': {

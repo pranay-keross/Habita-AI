@@ -1068,6 +1068,277 @@ at `org.jetbrains.kotlin.com.intellij.util.lang.JavaVersion.parse` because curre
 
 ---
 
+## D-054 — Project-Wide Emoji Sweep, Icon-Key Data Contracts, and a Real Avatar Component (Superseding D-050/D-051's Incomplete Claim)
+
+**Status:** Accepted · **Date:** 2026-08-29
+
+**Context.**
+D-050 ("Complete UI/UX Standardization: Emoji Removal...") and D-051 ("Total Emoji
+Eradication...") both claimed, on 2026-08-23, that emoji had been eliminated
+project-wide. A fresh audit on 2026-08-29 found emoji still present in roughly 40
+files — money/expenses (including code added in this same session), the smart-pantry
+and style-pantry features, several shared components, `StaffScreen.tsx`/
+`VehiclesScreen.tsx`, all 6 i18n locale files, and several markdown docs. D-051's claim
+that Family/Medicine avatars got "initials" was also false — both still rendered a bare
+`User`/`Users` lucide icon with no initials logic anywhere. Separately, the product
+owner asked that anywhere a member's/user's profile is shown (Family, Medicine, Expense
+Groups — excluding the caller's own profile screen, which was already correct) should
+show that person's real uploaded photo when one exists, instead of an emoji or generic
+placeholder.
+
+**Decision.**
+1. Treat this pass as the real project-wide sweep, correcting D-050/D-051's scope claim
+   rather than assuming it was ever complete. `src/features/money/style_pantry/` and
+   `src/features/money/style_wardrobe/` were excluded entirely — both are confirmed
+   dead code, unreferenced duplicates of the live `src/features/style_pantry/` tree.
+2. Added a new reusable `src/components/Avatar.tsx`: renders a real photo
+   (`<Image>`) when `avatarUrl` is provided, otherwise falls back to initials in a
+   deterministically-colored circle, and finally to a monochrome `User` icon if no
+   usable name exists either. Wired into `FamilyScreen.tsx` (avatar-stack, Circle
+   Members, Managed Dependents), `MedicineScreen.tsx` (hero badge, profile switcher,
+   Add Profile member rows), and `ExpenseGroupsScreen.tsx` (member chips, family-member
+   picker chips). Deliberately **not** wired into the onboarding profile screen or
+   `dashboard.tsx`'s own-avatar chip, both of which already render the caller's real
+   `avatarUrl` correctly and were out of scope.
+3. `GroupMember`, `CreateGroupMemberInput`, `AddGroupMemberRequest`, and
+   `MemberLookupResult` (`src/features/money/types.ts`) dropped the free-text `avatar`
+   emoji field entirely — a member's identity is name + optional phone/userId; only the
+   server resolves `avatarUrl` for a linked account, never the client. `MemberBalance`/
+   `PairwiseDebt` renamed `avatar`/`payerAvatar`/`payeeAvatar` to `avatarUrl`/
+   `payerAvatarUrl`/`payeeAvatarUrl` for consistency (both were confirmed unused by any
+   render, so a pure rename). See `docs/EXPENSES_API_SPEC.md` §3.5/§4.2/§5.3 for the
+   full new `avatarUrl` contract, including why it's a transient/computed response
+   field rather than a persisted column (presigned URLs expire in ~10 minutes).
+4. Converted every emoji-as-data "icon choice picker" to a lucide icon-key string
+   (the key is always the literal lucide file name, e.g. `"house"`, mapped through a
+   small `Record<string, ComponentType>` lookup): the expense-group icon picker
+   (`ExpenseGroup.emoji`, new `src/features/money/expenses/groupIcons.ts`), the
+   settle-up payment-method icons, and the smart-pantry allergen/category icons. This
+   is a data-shape and API-contract change — see `docs/EXPENSES_API_SPEC.md` §3.5 for
+   the expense-group side.
+5. **Explicit exception, out of scope:** language-flag emoji in `src/i18n/index.ts`,
+   `src/app/onboarding/profile.tsx`'s `SUPPORTED_LANGS`, and
+   `src/features/money/voice_assistant/VoiceSettingsScreen.tsx`'s `LANGUAGES` are kept
+   as-is — flags are the one place emoji were judged a legitimate, widely-understood
+   convention rather than decoration.
+6. This surfaces a genuine backend gap, documented in `docs/BACKEND_CONTEXT.md`:
+   neither `FamilyMemberResponse` nor the Medchest `FamilyProfile` response carries a
+   photo field today — only the caller's own `GET /profile/details` does. The `Avatar`
+   component ships today via its initials/icon fallback and will start showing real
+   photos automatically the moment either response adds a non-null `avatarUrl`, with no
+   further frontend change needed.
+7. Two deliberate non-changes: D-049/D-050/D-051's own historical prose still quotes
+   the specific emoji characters they removed (e.g. "replaced 🧑/🧓/👤 with User
+   icon") — left untouched, since that's the historical record of past UI state, not
+   live decoration. Separately, this log has two pre-existing heading collisions (two
+   entries titled `D-030`, two titled `D-049`) — a known numbering defect, out of scope
+   for this pass.
+
+**Consequences.**
+Real-photo rendering can't be verified end-to-end until the backend ships `avatarUrl`
+on the Family/Medicine responses — what's testable today is the `Avatar` component's
+initials/icon fallback path (Family's Circle Members list, Medicine's profile
+switcher, and the expense-group create-sheet chips should all now show colored
+initials instead of a bare icon or an emoji character).
+
+---
+
+## D-055 — Real (Backend-Driven) Pagination for Groups & Expenses Lists, Date-Grouped Expenses, and a Verified Equal-Split Rounding Fix
+
+**Status:** Accepted · **Date:** 2026-08-29
+
+**Context.**
+A prior pass added pagination controls and date-grouped headers to the Groups list
+(`ExpenseGroupsScreen.tsx`) and a group's Expenses tab (`GroupDetailsScreen.tsx`), but
+implemented it as a client-side slice over an already-fully-loaded array — the
+underlying API calls (`GET /api/expense-groups`, and the Expenses tab's use of
+`GET /api/expense-groups/{groupId}/sync`) still returned everything in one response.
+The user correctly flagged this as not real pagination ("neither groups api are having
+paginated data nor expenses screen does have paginated data") and asked for a
+backend-driven redesign, with `docs/EXPENSES_API_SPEC.md` updated so the backend can be
+built to match. Separately, the user described a specific expected calculation — a
+₹100 expense in a 2-member group, paid by one member and split equally, should leave
+the payer "due" (owed) ₹50 — and asked for the exact algorithm to be researched
+(matching Splitwise/Google Pay's convention), documented, and verified against the
+frontend before the backend is updated to match.
+
+**Decision.**
+1. **Groups list is now fetched page-by-page from the server.** `listExpenseGroups()`
+   (`src/features/money/expenses/api.ts`) accepts `{page, size}` and appends them as
+   query params. `ExpenseGroupListResponse` gained optional `page`/`size`/
+   `totalElements`/`totalPages` fields (`src/features/money/types.ts`) — optional so a
+   backend that hasn't shipped this yet doesn't break type validation. A new
+   `loadGroupsPage()` (`expenseStore.ts`) calls it, merges the fetched page into the
+   local offline cache (upsert by id, not a wholesale replace, so previously-seen
+   groups stay reachable offline via `getGroupById`), and falls back to slicing the
+   full local cache when offline/unreachable. `summary` is documented as always the
+   full cross-group aggregate, never scoped to the current page.
+2. **The Expenses tab now fetches its list from the already-documented
+   `GET /api/expense-groups/{groupId}/expenses?page=&size=` endpoint** instead of
+   pulling from `/sync`'s bundled `expenses` array — a new `loadExpensesPage()`
+   (`expenseStore.ts`) wraps it, degrades gracefully if the backend still returns a
+   plain unpaginated array (slices it client-side), and falls back to the local cache
+   offline. `/sync`'s `expenses` array keeps its existing job — total-spend fallback
+   and the Balances/Summary tabs, which need the complete dataset, not one page — see
+   `docs/EXPENSES_API_SPEC.md` §4.5's new note.
+3. Both screens avoid the stale-closure bug this refactor could easily introduce (a
+   focus-listener effect registered once on mount, closing over page 1 forever) by
+   tracking the current page in a `useRef` kept in sync via its own effect, and by
+   clamping + auto-refetching when a deletion shrinks the list below the page being
+   viewed.
+4. **Verified the net-balance/equal-split calculation end-to-end and found it already
+   correct** for the user's exact scenario — traced `AddSplitExpenseScreen.tsx`'s split
+   construction through `expenseStore.ts`'s local-fallback share computation and
+   `calculateGroupBalances()`'s `NetBalance = paid − share` formula, plus every
+   "you owe"/"you get back" render site (`ExpenseGroupsScreen.tsx`,
+   `GroupDetailsScreen.tsx`). ₹100 split equally between 2 members, one pays: payer
+   nets `+50` (gets back), the other nets `-50` (owes) — matching Splitwise/Google Pay.
+   If the user is seeing something different, it's almost certainly a live backend
+   whose implementation diverges from this — `docs/EXPENSES_API_SPEC.md` §5.1.1 now
+   spells out this exact worked example numerically so the backend can be checked
+   against it directly.
+5. **Found and fixed a real, if narrower, bug while verifying:** equal-split amounts
+   were computed by naively dividing and rounding each share independently
+   (`Math.round(amount / n * 100) / 100` for every member), which doesn't sum back to
+   the original total for amounts not evenly divisible (₹100 ÷ 3 = ₹33.33 × 3 = ₹99.99,
+   one paisa short) — a gap against what §5's original text already claimed ("1-paise
+   rounding distribution") but never actually implemented. Added
+   `computeEqualSplitAmounts()` (`expenseStore.ts`): works in integer paise, hands the
+   leftover paise one each to the first N members in group order, guaranteeing an exact
+   sum every time. Wired into `AddSplitExpenseScreen.tsx`'s equal-split path and the
+   local-fallback expense creation path. Documented as a concrete algorithm — with
+   matching Java pseudocode — in `docs/EXPENSES_API_SPEC.md` §5.1.2, so the backend
+   implements the identical tie-break rule (first-N-by-member-order), not an
+   arbitrary one that could itemize the same expense differently between an
+   offline-created copy and the server's.
+
+**Consequences.**
+The groups/expenses list network calls now genuinely fetch one page at a time — this
+is directly observable in request logs (`?page=0&size=8`, etc.), not just a UI-layer
+slice. The equal-split rounding fix only changes output for amounts that don't divide
+evenly by the member count; it does not change the user's originally-described ₹100/2
+scenario, which already summed exactly. If the user's live backend still disagrees with
+§5.1.1's worked example after this pass, the divergence is server-side — the spec now
+gives an unambiguous numeric reference to fix it against.
+
+---
+
+## D-056 — Adopt Backend's `relationshipBalances` (True Bilateral Debt, Distinct from Pairwise-Minimized Settlement Suggestions)
+
+**Status:** Accepted · **Date:** 2026-08-29
+
+**Context.**
+The user pointed at the actual `Saheli Backend — Auth, Profile & Family.postman_collection.json`
+and the `expenses_idea/*.md` reference folder and asked for a reconciliation pass. The
+collection's "Expense Groups & Multi-Currency Splitting" folder (re-read in full,
+lines 7451–8290) confirms the backend already implemented everything D-054/D-055 had
+documented ahead of it shipping — groups-list pagination, `lookup-by-phone`, and the
+verified-phone member-add flow all now have real Postman requests with passing test
+scripts. It also revealed one field this project's spec/client hadn't captured at all:
+`GET /{groupId}/sync`'s response now includes `relationshipBalances`, and
+`docs/EXPENSES_API_SPEC.md` had already grown a §5.2.1 section for it (written against
+this same collection, ahead of this client catching up) describing it as the *true*
+direct bilateral balance between every pair who actually transacted — distinct from
+`pairwiseDebts`, which is a minimized settlement suggestion that can route a payment
+between two people with no direct relationship. This concept traces back to
+`expenses_idea/# AI Implementation Instructions.md`'s "Relationship Balances" section
+and the "Owed by you"/"Owed to you"/"Settled" UI sections described across several of
+that folder's files — a real, previously-uncaptured product requirement, not a
+speculative one.
+
+**Decision.**
+1. Added `RelationshipBalance` to `src/features/money/types.ts` — a type alias of
+   `PairwiseDebt` (identical shape; the backend's own `ExpenseCalculationService`
+   reuses the same DTO for both), documented with the semantic distinction at the
+   usage site. Added the optional `relationshipBalances` field to `GroupSyncResponse`.
+2. Added `calculateRelationshipBalances()` to `expenseStore.ts`, mirroring
+   `docs/EXPENSES_API_SPEC.md` §5.2.1's algorithm exactly: accumulate a directional
+   "owed" amount per pair from every expense share and settlement, then net each
+   unordered pair's two directions down to one signed relationship, emitting an entry
+   only when `|net| > 0.01` — a settled or never-transacted pair gets no entry at all.
+   Added 3 tests in `__tests__/expenseApi.test.ts` mirroring the spec's own worked
+   examples (star-shaped debt graph, opposite-direction netting, full settlement).
+3. `getGroupSyncDetails()` now populates `relationshipBalances` on all three of its
+   return paths (sync success, individual-endpoint fallback, full local fallback) —
+   trusting the backend's value when present, computing it locally otherwise, so the
+   client works unchanged against a backend at any stage of shipping this field.
+4. `GroupDetailsScreen.tsx`'s Balances tab is restructured into the sections the idea
+   docs actually specify: **Owed to You** and **Owed by You** (from
+   `relationshipBalances`, each row settleable directly), **Settled** (every other
+   group member with no outstanding `relationshipBalances` entry against the viewer),
+   and **Recommended Settlements** (the pre-existing `pairwiseDebts` cards, kept as a
+   separate, clearly-labeled section per the idea docs' distinct "Smart Settlement"
+   concept) — instead of a single flat "Pairwise Debt Matrix" list.
+5. **Two `expenses_idea/` concepts confirmed still unbuilt anywhere** (neither this
+   backend nor the client) and deliberately not implemented speculatively: an `EXACT`
+   split mode, and per-expense participant subsets (excluding specific group members
+   from a specific expense). Documented as known gaps in `docs/BACKEND_CONTEXT.md`
+   rather than built without a confirmed product decision to do so.
+
+**Consequences.**
+The Balances tab now answers "who specifically owes me, and who do I specifically owe"
+directly and accurately in groups with 3+ members, where the old flat list only showed
+`pairwiseDebts`' minimized-transaction view (which can name someone you never actually
+shared an expense with). In a 2-member group the two views are numerically identical,
+so no visible change there. `docs/BACKEND_CONTEXT.md`'s Expense Groups section is
+updated to mark pagination and phone-lookup as **confirmed** built (no longer
+"documented ahead of the backend"), reflecting what the re-read collection actually
+shows.
+
+---
+
+## D-057 — `lookup-by-phone` 404s for real, logged-in accounts: backend phone-format mismatch between `/auth/*` and expense-group member lookup
+
+**Status:** Accepted (documented as a backend-owned bug, no client code changed) · **Date:** 2026-08-30
+
+**Context.** User report: `GET /api/expense-groups/members/lookup-by-phone?phone=+919062545232`
+returns `404 USER_NOT_FOUND` for `9062545232`, even though that number is a real,
+currently-logged-in account on the same backend/IP (`10.0.2.2:8080`). Traced client-side
+first — `ExpenseGroupsScreen.tsx`'s `handleVerifyPhone` normalizes the same way
+`EXPENSES_API_SPEC.md` §4.2/§5.3.1 documents (strip spaces/hyphens, prepend `+91` for a
+bare 10-digit number), so the request itself (`phone=+919062545232`) is correct and
+matches spec.
+
+The actual cause is a **storage/lookup format mismatch on the backend**:
+- `src/features/auth/auth.ts:10-16` (`toBackendPhone`) has an explicit comment, backed by
+  real login testing (D-012/D-015): `/auth/register`, `/auth/login`, `/auth/verify-otp`
+  all require a **bare 10-digit number, no country code**, and reject anything else with
+  a 400. A logged-in account's `users.phone` row is therefore almost certainly stored as
+  `"9062545232"`, not `"+919062545232"`.
+- `lookup-by-phone`, per the documented §5.3.1 algorithm, normalizes its query param to
+  **E.164 with a `+91` prefix** before calling `userRepository.findByPhone(normalizedPhone)`
+  — i.e. it searches for `"+919062545232"`.
+
+If `findByPhone` is an exact match against the `phone` column (the only sane
+implementation), a column storing bare-digit numbers can never match an E.164-prefixed
+query. That guarantees `USER_NOT_FOUND` for every real account, regardless of how
+correctly the client formats its request — there is no client-side normalization that
+can fix a server-side format disagreement between two endpoints.
+
+**Decision.** Not a `docs/BACKLOG.md` row — this repo has no code to change for it (same
+pattern as the backend-data issue noted at D-011/line 231). Documented here so a future
+session doesn't mistake this for a client bug and go looking for one in
+`ExpenseGroupsScreen.tsx`/`api.ts` again. To be raised with whoever owns
+`Saheli-Backend`, with one of two fixes:
+1. Make `lookup-by-phone`'s normalization match how `users.phone` is actually stored
+   (bare 10-digit, no `+91`) — the minimal fix, consistent with `/auth/*`'s existing
+   contract, or
+2. Standardize storage to E.164 everywhere and fix `/auth/register`/`/auth/login` to
+   normalize into that form on write (a larger, cross-cutting change affecting existing
+   rows).
+
+**Consequences.** `docs/BACKEND_CONTEXT.md`'s Expense Groups table entry for
+`lookup-by-phone`, which currently reads "Confirmed built" (per D-056, based on the
+Postman collection having a passing test script), gets a caveat: the endpoint exists and
+matches its documented contract, but is very likely non-functional for real accounts due
+to this format mismatch, since the Postman test's fixture data may use a phone stored in
+whatever format that specific test seeded rather than exercising the `/auth/*` write
+path. Until the backend fixes the mismatch, every "add member by phone" attempt against
+a real registered user will 404, and the UI will incorrectly show "no registered account"
+for accounts that do exist.
+
+---
+
 ## Open decisions
 
 Tracked in `docs/BACKLOG.md` → Open questions. Move each here once answered.

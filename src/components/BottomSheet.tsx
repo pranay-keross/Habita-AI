@@ -17,6 +17,7 @@ import {
 } from 'react-native';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
+import X from 'lucide-react-native/icons/x';
 
 interface BottomSheetProps {
   visible: boolean;
@@ -171,7 +172,7 @@ export default function BottomSheet({
           <View style={[styles.header, dark && styles.headerDark]}>
             <Text style={[styles.title, dark && styles.titleDark]}>{title}</Text>
             <Pressable onPress={dismissSheet} style={[styles.closeBtn, dark && styles.closeBtnDark]}>
-              <Text style={[styles.closeText, dark && styles.closeTextDark]}>✕</Text>
+              <X size={14} color={dark ? styles.closeTextDark.color : styles.closeText.color} />
             </Pressable>
           </View>
         ) : null}

@@ -12,6 +12,8 @@ import UsersRound from 'lucide-react-native/icons/users-round';
 import Check from 'lucide-react-native/icons/check';
 import X from 'lucide-react-native/icons/x';
 import CalendarClock from 'lucide-react-native/icons/calendar-clock';
+import ChevronUp from 'lucide-react-native/icons/chevron-up';
+import ChevronDown from 'lucide-react-native/icons/chevron-down';
 import type { RootStackParamList } from '../../app/_layout';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
@@ -317,7 +319,11 @@ export default function StaffScreen({ navigation }: Props) {
           <Text style={serviceOption ? styles.serviceValue : styles.placeholder}>
             {serviceOption || t('staff.service_placeholder')}
           </Text>
-          <Text style={styles.selectCaret}>{serviceOptionsVisible ? '▴' : '▾'}</Text>
+          {serviceOptionsVisible ? (
+            <ChevronUp size={15} color={styles.selectCaret.color} style={{ marginLeft: styles.selectCaret.marginLeft }} />
+          ) : (
+            <ChevronDown size={15} color={styles.selectCaret.color} style={{ marginLeft: styles.selectCaret.marginLeft }} />
+          )}
         </Pressable>
         {serviceOptionsVisible ? (
           <View style={styles.serviceOptions}>

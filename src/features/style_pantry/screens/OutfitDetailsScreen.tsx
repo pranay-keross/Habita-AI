@@ -15,9 +15,9 @@ import useThemedStyles from '../../../hooks/useThemedStyles';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import CheckCircle2 from 'lucide-react-native/icons/circle-check';
 import Bookmark from 'lucide-react-native/icons/bookmark';
-import Shirt from 'lucide-react-native/icons/shirt';
 import Button from '../../../components/Button';
 import { recordWearOutfit, saveOutfit } from '../stylePantryStore';
+import { getClothingIconComponent } from '../clothingIcons';
 import type { OutfitRecommendation } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 
@@ -104,19 +104,22 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
           {t('style_pantry.items_in_outfit', { count: outfit.items.length })}
         </Text>
         <View style={styles.itemsWrap}>
-          {outfit.items.map((item) => (
-            <View key={item.id} style={styles.itemCard}>
-              <View style={styles.itemEmojiBadge}>
-                <Text style={{ fontSize: 24 }}>{item.emoji || '👕'}</Text>
+          {outfit.items.map((item) => {
+            const ItemIcon = getClothingIconComponent(item.emoji);
+            return (
+              <View key={item.id} style={styles.itemCard}>
+                <View style={styles.itemEmojiBadge}>
+                  <ItemIcon size={24} color="#004F63" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.itemName}>{item.name}</Text>
+                  <Text style={styles.itemSub}>
+                    {item.category.toUpperCase()} · {item.color} {item.brand ? `(${item.brand})` : ''}
+                  </Text>
+                </View>
               </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.itemName}>{item.name}</Text>
-                <Text style={styles.itemSub}>
-                  {item.category.toUpperCase()} · {item.color} {item.brand ? `(${item.brand})` : ''}
-                </Text>
-              </View>
-            </View>
-          ))}
+            );
+          })}
         </View>
 
         {/* Bottom Actions */}

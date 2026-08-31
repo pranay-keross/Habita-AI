@@ -17,17 +17,18 @@ import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Camera from 'lucide-react-native/icons/camera';
 import Button from '../../../components/Button';
 import { addClothingItem, updateClothingItem, loadClothingItems } from '../stylePantryStore';
+import { CATEGORY_ICON_KEYS, getClothingIconComponent } from '../clothingIcons';
 import type { ClothingCategory, ClothingSeason } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'AddEditClothing'>;
 
-const CATEGORY_OPTIONS: { key: ClothingCategory; labelKey: string; emoji: string }[] = [
-  { key: 'tops', labelKey: 'style_pantry.cat_tops', emoji: '👕' },
-  { key: 'bottoms', labelKey: 'style_pantry.cat_bottoms', emoji: '👖' },
-  { key: 'shoes', labelKey: 'style_pantry.cat_shoes', emoji: '👞' },
-  { key: 'jackets', labelKey: 'style_pantry.cat_jackets', emoji: '🧥' },
-  { key: 'accessories', labelKey: 'style_pantry.cat_accessories', emoji: '⌚' },
+const CATEGORY_OPTIONS: { key: ClothingCategory; labelKey: string; iconKey: string }[] = [
+  { key: 'tops', labelKey: 'style_pantry.cat_tops', iconKey: CATEGORY_ICON_KEYS.tops },
+  { key: 'bottoms', labelKey: 'style_pantry.cat_bottoms', iconKey: CATEGORY_ICON_KEYS.bottoms },
+  { key: 'shoes', labelKey: 'style_pantry.cat_shoes', iconKey: CATEGORY_ICON_KEYS.shoes },
+  { key: 'jackets', labelKey: 'style_pantry.cat_jackets', iconKey: CATEGORY_ICON_KEYS.jackets },
+  { key: 'accessories', labelKey: 'style_pantry.cat_accessories', iconKey: CATEGORY_ICON_KEYS.accessories },
 ];
 
 const SEASON_OPTIONS: { key: ClothingSeason; label: string }[] = [
@@ -107,7 +108,7 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
           season,
           material: material.trim(),
           tags,
-          emoji: chosenCat.emoji,
+          emoji: chosenCat.iconKey,
         });
       }
     } else {
@@ -119,7 +120,7 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
         season,
         material: material.trim(),
         tags,
-        emoji: chosenCat.emoji,
+        emoji: chosenCat.iconKey,
       });
     }
 
@@ -165,24 +166,31 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
 
           <Text style={styles.inputLabel}>{t('style_pantry.category_label')}</Text>
           <View style={styles.categoryWrap}>
-            {CATEGORY_OPTIONS.map((c) => (
-              <Pressable
-                key={c.key}
-                style={[
-                  styles.catOptionChip,
-                  category === c.key && styles.catOptionChipActive,
-                ]}
-                onPress={() => setCategory(c.key)}>
-                <Text style={styles.catOptionEmoji}>{c.emoji}</Text>
-                <Text
+            {CATEGORY_OPTIONS.map((c) => {
+              const CatIcon = getClothingIconComponent(c.iconKey);
+              return (
+                <Pressable
+                  key={c.key}
                   style={[
-                    styles.catOptionText,
-                    category === c.key && styles.catOptionTextActive,
-                  ]}>
-                  {t(c.labelKey)}
-                </Text>
-              </Pressable>
-            ))}
+                    styles.catOptionChip,
+                    category === c.key && styles.catOptionChipActive,
+                  ]}
+                  onPress={() => setCategory(c.key)}>
+                  <CatIcon
+                    size={14}
+                    color={category === c.key ? '#FFFFFF' : styles.catOptionText.color}
+                    style={styles.catOptionIcon}
+                  />
+                  <Text
+                    style={[
+                      styles.catOptionText,
+                      category === c.key && styles.catOptionTextActive,
+                    ]}>
+                    {t(c.labelKey)}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </View>
 
           <Text style={styles.inputLabel}>{t('style_pantry.color_label')}</Text>
@@ -374,8 +382,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       backgroundColor: '#004F63',
       borderColor: '#004F63',
     },
-    catOptionEmoji: {
-      fontSize: 14,
+    catOptionIcon: {
       marginRight: 4,
     },
     catOptionText: {

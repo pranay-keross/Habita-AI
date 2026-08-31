@@ -7468,6 +7468,12 @@
                   "        pm.expect(json.summary).to.be.an('object');",
                   "        pm.expect(json.groups).to.be.an('array');",
                   "    });",
+                  "    pm.test('Has pagination fields', function () {",
+                  "        pm.expect(json.page).to.be.a('number');",
+                  "        pm.expect(json.size).to.be.a('number');",
+                  "        pm.expect(json.totalElements).to.be.a('number');",
+                  "        pm.expect(json.totalPages).to.be.a('number');",
+                  "    });",
                   "    if (json.groups && json.groups.length > 0) {",
                   "        pm.collectionVariables.set('groupId', json.groups[0].id);",
                   "    }",
@@ -7480,16 +7486,26 @@
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/expense-groups",
+              "raw": "{{baseUrl}}/api/expense-groups?page=0&size=8",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
                 "expense-groups"
+              ],
+              "query": [
+                {
+                  "key": "page",
+                  "value": "0"
+                },
+                {
+                  "key": "size",
+                  "value": "8"
+                }
               ]
             },
-            "description": "Retrieves all expense groups for the authenticated user, along with the user's net balance in each group and an overall summary (totalSpentINR, youAreOwedINR, youOweINR)."
+            "description": "Retrieves a page of expense groups for the authenticated user, along with the user's net balance in each group. `summary` (totalSpentINR, youAreOwedINR, youOweINR) is always the caller's full aggregate across every group they belong to, not just this page — only `groups` is paginated. `page`/`size` are optional (default 0/8)."
           }
         },
         {
@@ -7529,7 +7545,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Weekend Goa Trip\",\n  \"emoji\": \"🏖️\",\n  \"category\": \"Travel & Fun\",\n  \"defaultCurrency\": \"INR\",\n  \"members\": [\n    {\n      \"name\": \"Rahul Sharma\",\n      \"avatar\": \"👨‍🦱\",\n      \"phone\": \"+919876543210\"\n    },\n    {\n      \"name\": \"Priya Patel\",\n      \"avatar\": \"👩‍🦰\"\n    }\n  ]\n}"
+              "raw": "{\n  \"name\": \"Weekend Goa Trip\",\n  \"emoji\": \"umbrella\",\n  \"category\": \"Travel & Fun\",\n  \"defaultCurrency\": \"INR\",\n  \"members\": [\n    {\n      \"name\": \"Priya Patel\",\n      \"avatar\": \"👩‍🦰\"\n    }\n  ]\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/expense-groups",
@@ -7608,7 +7624,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Goa Trip 2026\",\n  \"emoji\": \"🌴\",\n  \"category\": \"Vacation\",\n  \"defaultCurrency\": \"INR\"\n}"
+              "raw": "{\n  \"name\": \"Goa Trip 2026\",\n  \"emoji\": \"umbrella\",\n  \"category\": \"Vacation\",\n  \"defaultCurrency\": \"INR\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}",
@@ -7621,11 +7637,62 @@
                 "{{groupId}}"
               ]
             },
-            "description": "Updates group metadata (name, emoji, category, default currency)."
+            "description": "Updates group metadata (name, emoji, category, default currency). `emoji` must be one of the GroupIconKey values: house, umbrella, popcorn, car, graduation-cap, plane, hamburger, gift, users."
           }
         },
         {
-          "name": "Add Group Member",
+          "name": "Lookup Member By Phone",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "if (pm.response.code === 200) {",
+                  "    pm.test('Status code is 200', function () {",
+                  "        pm.response.to.have.status(200);",
+                  "    });",
+                  "    const json = pm.response.json();",
+                  "    pm.test('Has userId and name', function () {",
+                  "        pm.expect(json.userId).to.be.a('string');",
+                  "        pm.expect(json.name).to.be.a('string');",
+                  "    });",
+                  "    pm.collectionVariables.set('lookedUpMemberUserId', json.userId);",
+                  "} else {",
+                  "    pm.test('Status code is 404 (no registered user for this phone)', function () {",
+                  "        pm.response.to.have.status(404);",
+                  "    });",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/members/lookup-by-phone?phone={{invitedPhone}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "members",
+                "lookup-by-phone"
+              ],
+              "query": [
+                {
+                  "key": "phone",
+                  "value": "{{invitedPhone}}"
+                }
+              ]
+            },
+            "description": "Looks up whether a phone number belongs to a registered user, without creating or modifying anything. Used by the \"add member by phone\" UI to show a verified badge and prefill the real name before the member is actually added. Requires `{{invitedPhone}}` to already belong to a registered user — run the Auth flow a second time for that phone first (see Family folder notes). Returns 200 with `userId`/`name`/`avatarUrl`/`phone` on a match, or 404 `USER_NOT_FOUND` otherwise."
+          }
+        },
+        {
+          "name": "Add Group Member (Verified Phone)",
           "event": [
             {
               "listen": "test",
@@ -7653,7 +7720,7 @@
             ],
             "body": {
               "mode": "raw",
-              "raw": "{\n  \"name\": \"Rohan Gupta\",\n  \"avatar\": \"🧔\",\n  \"phone\": \"+919123456789\",\n  \"userId\": null\n}"
+              "raw": "{\n  \"name\": \"Rohan Gupta\",\n  \"avatar\": \"🧔\",\n  \"phone\": \"{{invitedPhone}}\",\n  \"userId\": \"{{lookedUpMemberUserId}}\"\n}"
             },
             "url": {
               "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/members",
@@ -7667,7 +7734,53 @@
                 "members"
               ]
             },
-            "description": "Adds a member to an existing group (either an existing registered user or an ad-hoc member name)."
+            "description": "Adds a member using a phone already confirmed via 'Lookup Member By Phone' (run that request first to populate {{lookedUpMemberUserId}}). The backend re-resolves the phone server-side and trusts its own lookup over the client-supplied `userId` — if the phone no longer resolves to a registered user, this returns 400 `PHONE_NO_LONGER_REGISTERED` instead of silently adding an ad-hoc member."
+          }
+        },
+        {
+          "name": "Add Group Member (Ad-hoc, No Phone)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('Status code is 201', function () {",
+                  "    pm.response.to.have.status(201);",
+                  "});",
+                  "if (pm.response.code === 201) {",
+                  "    const json = pm.response.json();",
+                  "    pm.collectionVariables.set('newMemberId', json.id);",
+                  "}"
+                ]
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Priya Patel\",\n  \"avatar\": \"👩‍🦰\"\n}"
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/members",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "expense-groups",
+                "{{groupId}}",
+                "members"
+              ]
+            },
+            "description": "Adds an ad-hoc member by name only, no phone/userId — the path used when 'Lookup Member By Phone' returns 404 and the UI offers 'Add without phone number'."
           }
         },
         {
@@ -8038,10 +8151,11 @@
                   "});",
                   "if (pm.response.code === 200) {",
                   "    const json = pm.response.json();",
-                  "    pm.test('Has group, balances, pairwiseDebts and categoryBreakdown', function () {",
+                  "    pm.test('Has group, balances, pairwiseDebts, relationshipBalances and categoryBreakdown', function () {",
                   "        pm.expect(json.group).to.be.an('object');",
                   "        pm.expect(json.balances).to.be.an('array');",
                   "        pm.expect(json.pairwiseDebts).to.be.an('array');",
+                  "        pm.expect(json.relationshipBalances).to.be.an('array');",
                   "        pm.expect(json.categoryBreakdown).to.be.an('object');",
                   "    });",
                   "}"
@@ -8064,7 +8178,7 @@
                 "sync"
               ]
             },
-            "description": "Crucial for GroupDetailsScreen.tsx: Returns group metadata, active expenses, settlements, computed balances, pairwise debts, and category spending analytics in a single performant payload."
+            "description": "Crucial for GroupDetailsScreen.tsx: Returns group metadata, active expenses, settlements, computed balances, pairwise debts, relationship balances, and category spending analytics in a single performant payload. `pairwiseDebts` is a minimized settlement suggestion; `relationshipBalances` is the true, direct per-pair debt (use this for 'Owed by you'/'Owed to you' sections)."
           }
         },
         {
@@ -8326,6 +8440,11 @@
     },
     {
       "key": "newMemberId",
+      "value": "",
+      "type": "string"
+    },
+    {
+      "key": "lookedUpMemberUserId",
       "value": "",
       "type": "string"
     },

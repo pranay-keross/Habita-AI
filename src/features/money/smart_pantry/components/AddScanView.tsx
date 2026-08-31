@@ -1,24 +1,26 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView, ActivityIndicator, Alert } from 'react-native';
 import { AddMode, AllergenTag, CategoryType, PantryItem, StorageLocation } from '../types';
-import { ALLERGEN_DEFINITIONS, BARCODE_CATALOG } from '../data/mockPantryData';
+import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, BARCODE_CATALOG } from '../data/mockPantryData';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
 import useTheme from '../../../../hooks/useTheme';
+import Receipt from 'lucide-react-native/icons/receipt';
+import Zap from 'lucide-react-native/icons/zap';
 
 interface Props {
   onAddItem: (item: PantryItem) => Promise<void>;
   onNavigateDetails: () => void;
 }
 
-const CATEGORIES: { key: CategoryType; labelKey: string; label: string; emoji: string }[] = [
-  { key: 'produce', labelKey: 'smart_pantry.cat_produce', label: 'Produce', emoji: '🥦' },
-  { key: 'dairy', labelKey: 'smart_pantry.cat_dairy', label: 'Dairy', emoji: '🥛' },
-  { key: 'bakery', labelKey: 'smart_pantry.cat_bakery', label: 'Bakery', emoji: '🍞' },
-  { key: 'beverages', labelKey: 'smart_pantry.cat_beverages', label: 'Beverages', emoji: '🧃' },
-  { key: 'meat', labelKey: 'smart_pantry.cat_meat', label: 'Meat & Seafood', emoji: '🥩' },
-  { key: 'pantry', labelKey: 'smart_pantry.cat_pantry', label: 'Dry Pantry', emoji: '🥫' },
+const CATEGORIES: { key: CategoryType; labelKey: string; label: string }[] = [
+  { key: 'produce', labelKey: 'smart_pantry.cat_produce', label: 'Produce' },
+  { key: 'dairy', labelKey: 'smart_pantry.cat_dairy', label: 'Dairy' },
+  { key: 'bakery', labelKey: 'smart_pantry.cat_bakery', label: 'Bakery' },
+  { key: 'beverages', labelKey: 'smart_pantry.cat_beverages', label: 'Beverages' },
+  { key: 'meat', labelKey: 'smart_pantry.cat_meat', label: 'Meat & Seafood' },
+  { key: 'pantry', labelKey: 'smart_pantry.cat_pantry', label: 'Dry Pantry' },
 ];
 
 const LOCATIONS: StorageLocation[] = ['Fridge', 'Freezer', 'Pantry Shelf'];
@@ -74,7 +76,7 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
     setSaving(false);
     setName('');
     setScannedBarcode('');
-    Alert.alert('Item Saved! 🥗', `${newItem.name} added to ${getLocName(newItem.storageLocation)}.`);
+    Alert.alert('Item Saved!', `${newItem.name} added to ${getLocName(newItem.storageLocation)}.`);
     onNavigateDetails();
   };
 
@@ -90,7 +92,7 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
         if (catalogItem.unit) setUnit(catalogItem.unit);
         if (catalogItem.storageLocation) setStorageLocation(catalogItem.storageLocation);
         if (catalogItem.allergens) setSelectedAllergens(catalogItem.allergens);
-        Alert.alert('Barcode Scanned 🎯', `Found: ${catalogItem.name}`);
+        Alert.alert('Barcode Scanned', `Found: ${catalogItem.name}`);
       } else {
         setName('Scanned Item #' + code.slice(-4));
         Alert.alert('Barcode Detected', `Code ${code} scanned. Confirm item details.`);
@@ -114,7 +116,7 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
         allergens: ['gluten-free', 'vegan', 'nut-free', 'dairy-free', 'halal', 'kosher'],
       };
       await onAddItem(extracted);
-      Alert.alert('Receipt Processed ✨', 'Extracted 1 item from receipt into Pantry!');
+      Alert.alert('Receipt Processed', 'Extracted 1 item from receipt into Pantry!');
       onNavigateDetails();
     }, 1200);
   };
@@ -169,7 +171,10 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
                 key={code}
                 style={styles.barcodeTile}
                 onPress={() => handleSimulateBarcodeScan(code)}>
-                <Text style={styles.barcodeTileTitle}>⚡ {details.name}</Text>
+                <View style={styles.barcodeTileTitleRow}>
+                  <Zap size={12} color={styles.barcodeTileTitle.color} strokeWidth={2} style={{ marginRight: 4 }} />
+                  <Text style={styles.barcodeTileTitle}>{details.name}</Text>
+                </View>
                 <Text style={styles.barcodeTileCode}>Code: {code}</Text>
               </Pressable>
             ))}
@@ -185,7 +190,7 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
               <ActivityIndicator size="large" color={theme.colors.primary} />
             ) : (
               <>
-                <Text style={{ fontSize: 48, marginBottom: 8 }}>🧾</Text>
+                <Receipt size={48} color={styles.receiptUploadTitle.color} strokeWidth={1.5} style={{ marginBottom: 8 }} />
                 <Text style={styles.receiptUploadTitle}>{t('smart_pantry.receipt_upload_title')}</Text>
                 <Text style={styles.receiptUploadSub}>{t('smart_pantry.receipt_upload_sub')}</Text>
               </>
@@ -207,16 +212,21 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
 
           <Text style={styles.formLabel}>{t('smart_pantry.category')}</Text>
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 12 }}>
-            {CATEGORIES.map((cat) => (
-              <Pressable
-                key={cat.key}
-                style={[styles.catChip, category === cat.key && styles.catChipActive]}
-                onPress={() => setCategory(cat.key)}>
-                <Text style={[styles.catChipText, category === cat.key && styles.catChipTextActive]}>
-                  {cat.emoji} {t(cat.labelKey, { defaultValue: cat.label })}
-                </Text>
-              </Pressable>
-            ))}
+            {CATEGORIES.map((cat) => {
+              const CategoryIcon = PANTRY_CATEGORY_ICONS[cat.key];
+              const active = category === cat.key;
+              return (
+                <Pressable
+                  key={cat.key}
+                  style={[styles.catChip, styles.catChipRow, active && styles.catChipActive]}
+                  onPress={() => setCategory(cat.key)}>
+                  <CategoryIcon size={14} color={active ? styles.catChipTextActive.color : styles.catChipText.color} strokeWidth={2} style={{ marginRight: 4 }} />
+                  <Text style={[styles.catChipText, active && styles.catChipTextActive]}>
+                    {t(cat.labelKey, { defaultValue: cat.label })}
+                  </Text>
+                </Pressable>
+              );
+            })}
           </ScrollView>
 
           <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -251,10 +261,11 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
           <View style={styles.allergenGrid}>
             {ALLERGEN_DEFINITIONS.map((def) => {
               const selected = selectedAllergens.includes(def.tag);
+              const AllergenIcon = ALLERGEN_ICONS[def.tag];
               return (
                 <Pressable
                   key={def.tag}
-                  style={[styles.allergenChip, selected && styles.allergenChipActive]}
+                  style={[styles.allergenChip, styles.catChipRow, selected && styles.allergenChipActive]}
                   onPress={() => {
                     if (selected) {
                       setSelectedAllergens(selectedAllergens.filter((a) => a !== def.tag));
@@ -262,8 +273,9 @@ export const AddScanView: React.FC<Props> = ({ onAddItem, onNavigateDetails }) =
                       setSelectedAllergens([...selectedAllergens, def.tag]);
                     }
                   }}>
+                  <AllergenIcon size={14} color={selected ? styles.allergenChipTextActive.color : styles.allergenChipText.color} strokeWidth={2} style={{ marginRight: 4 }} />
                   <Text style={[styles.allergenChipText, selected && styles.allergenChipTextActive]}>
-                    {def.icon} {def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label}
+                    {def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label}
                   </Text>
                 </Pressable>
               );
@@ -313,6 +325,7 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     quickScanLabel: { alignSelf: 'flex-start', fontFamily: fonts.sansBold, fontSize: 12, color: colors.textSecondary, marginBottom: 6 },
     barcodeCatalogRow: { width: '100%', gap: 6 },
     barcodeTile: { backgroundColor: colors.surfaceElevated, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, padding: 8 },
+    barcodeTileTitleRow: { flexDirection: 'row', alignItems: 'center' },
     barcodeTileTitle: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textPrimary },
     barcodeTileCode: { fontFamily: fonts.sans, fontSize: 10, color: colors.textMuted, marginTop: 2 },
     receiptUploadCard: { width: '100%', paddingVertical: 30, backgroundColor: colors.surfaceElevated, borderRadius: radius.lg, borderWidth: 2, borderColor: colors.border, borderStyle: 'dashed', alignItems: 'center' },
@@ -322,6 +335,7 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     formLabel: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary, marginBottom: 4, marginTop: 8 },
     formInput: { backgroundColor: colors.background, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: 10, paddingVertical: 7, fontSize: 13, color: colors.textPrimary, marginBottom: 4 },
     catChip: { backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
+    catChipRow: { flexDirection: 'row', alignItems: 'center' },
     catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     catChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
     catChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },

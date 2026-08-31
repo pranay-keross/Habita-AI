@@ -1,7 +1,7 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
-import { CategoryType, PantryItem, StorageLocation } from '../types';
-import { ALLERGEN_DEFINITIONS } from '../data/mockPantryData';
+import { PantryItem, StorageLocation } from '../types';
+import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../data/mockPantryData';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
@@ -11,15 +11,6 @@ interface Props {
   items: PantryItem[];
   onNavigateRecipes: () => void;
 }
-
-const CATEGORY_EMOJIS: Record<CategoryType, string> = {
-  produce: '🥦',
-  dairy: '🥛',
-  bakery: '🍞',
-  beverages: '🧃',
-  meat: '🥩',
-  pantry: '🥫',
-};
 
 export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) => {
   const styles = useThemedStyles(makeStyles);
@@ -52,9 +43,11 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) =
       {urgentItems.length === 0 ? (
         <Text style={styles.noUrgentText}>{t('smart_pantry.no_urgent')}</Text>
       ) : (
-        urgentItems.map((item) => (
+        urgentItems.map((item) => {
+          const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+          return (
           <View key={item.id} style={[styles.radarItemCard, styles.radarItemCardUrgent]}>
-            <Text style={{ fontSize: 22, marginRight: 10 }}>{CATEGORY_EMOJIS[item.category] || '📦'}</Text>
+            <CategoryIcon size={22} color={styles.radarItemName.color} strokeWidth={1.8} style={{ marginRight: 10 }} />
             <View style={{ flex: 1 }}>
               <Text style={styles.radarItemName}>{item.name}</Text>
               <Text style={styles.radarItemSub}>
@@ -69,13 +62,16 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) =
               <Text style={styles.cookActionBtnText}>{t('smart_pantry.cook_now')}</Text>
             </Pressable>
           </View>
-        ))
+          );
+        })
       )}
 
       <Text style={[styles.sectionHeading, { marginTop: 16 }]}>{t('smart_pantry.upcoming_exp')}</Text>
-      {upcomingItems.map((item) => (
+      {upcomingItems.map((item) => {
+        const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+        return (
         <View key={item.id} style={[styles.radarItemCard, styles.radarItemCardWarning]}>
-          <Text style={{ fontSize: 22, marginRight: 10 }}>{CATEGORY_EMOJIS[item.category] || '📦'}</Text>
+          <CategoryIcon size={22} color={styles.radarItemName.color} strokeWidth={1.8} style={{ marginRight: 10 }} />
           <View style={{ flex: 1 }}>
             <Text style={styles.radarItemName}>{item.name}</Text>
             <Text style={styles.radarItemSub}>
@@ -86,16 +82,20 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) =
             </Text>
           </View>
         </View>
-      ))}
+        );
+      })}
 
       {/* Dietary Allergen Safety Matrix */}
       <Text style={[styles.sectionHeading, { marginTop: 20 }]}>{t('smart_pantry.allergen_matrix')}</Text>
       <View style={styles.radarMatrixCard}>
         {ALLERGEN_DEFINITIONS.map((def) => {
           const safeCount = items.filter((i) => i.allergens.includes(def.tag)).length;
+          const AllergenIcon = ALLERGEN_ICONS[def.tag];
           return (
             <View key={def.tag} style={styles.matrixRow}>
-              <Text style={{ fontSize: 18, width: 30 }}>{def.icon}</Text>
+              <View style={{ width: 30 }}>
+                <AllergenIcon size={18} color={styles.matrixLabel.color} strokeWidth={1.8} />
+              </View>
               <Text style={styles.matrixLabel}>{def.labelKey ? t(def.labelKey, { defaultValue: def.label }) : def.label}</Text>
               <Text style={styles.matrixValue}>{t('smart_pantry.items_safe', { safe: safeCount, total: items.length })}</Text>
             </View>
