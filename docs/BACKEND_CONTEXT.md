@@ -146,6 +146,18 @@ confirmed product decision to build them yet:
   member. Today's `EQUAL`/`PERCENTAGE`/`SHARES` all implicitly assume every group
   member participates in every expense.
 
+### Caregiver & Home Services Hub (Household Operations) — documented contract & full spec
+
+**Added 2026-08-31:** The comprehensive backend API specification for SRS Module 7 (§7 'Caregiver & Home Services Hub') and Flyway migration `V7__caregiver_and_home_services.sql` is authored in `docs/CAREGIVER_HOME_SERVICES_API_SPEC.md`. The Postman collection contains the initial scaffolding under the `Household Operations` folder (`GET {{staff}}/services/list`, `POST {{family}}/{{familyId}}/staff`, `GET {{family}}/{{familyId}}/staff?page=0&size=10`). The full specification defines 16 production endpoints covering:
+- **Service Catalog & Lookups:** `/api/staff/services` (11 pre-seeded categories)
+- **Caregiver / Staff CRUD & Lifecycle:** `/api/families/{familyId}/staff/**` (Monthly vs. Hourly rate support, phone, emergency contacts, shift timings)
+- **Daily Attendance & Roll-Call:** Single-tap toggle, bulk daily roll-call (`/attendance/bulk-daily`), monthly calendar records, 30-day present count
+- **Financial Transactions & Ledger:** Cash advances, overtime, festival bonuses, tips, manual deductions
+- **Automated Monthly Payroll Engine:** Dynamic calculation (`/payroll/summary?month=YYYY-MM`), unpaid absence deductions, advance recovery, and salary settlement (`/payroll/settle`)
+- **Dashboard & Tax Reports:** Household Operations bento summary (`/dashboard-summary`) and annual contractor tax breakdown (`/tax-summary?year=YYYY`)
+
+Full specification, PostgreSQL DDL (`V7__caregiver_and_home_services.sql`), calculation formulas, TypeScript contracts, and Postman examples live in `docs/CAREGIVER_HOME_SERVICES_API_SPEC.md`.
+
 ### `avatarUrl` gap across Family, Medicine, and Expense-Group member responses (flagged alongside the emoji-removal sweep, `docs/DECISIONS.md` D-054, 2026-08-29)
 
 None of `FamilyMemberResponse` (§2 above), the Medchest `FamilyProfile` response (§2
