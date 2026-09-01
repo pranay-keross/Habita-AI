@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
@@ -19,9 +19,11 @@ import Ellipsis from 'lucide-react-native/icons/ellipsis';
 import type { RootStackParamList } from '../../app/_layout';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
+import AlertsCard from '../../components/AlertsCard';
 import Card from '../../components/Card';
 import SectionHeader from '../../components/SectionHeader';
 import useThemedStyles from '../../hooks/useThemedStyles';
+import usePushNotifications from '../../hooks/usePushNotifications';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
 import {
@@ -55,7 +57,27 @@ function startOfToday(): number {
   return date.getTime();
 }
 
-export default function ResourcesScreen({ navigation }: Props) {
+export default function ResourcesScreen({ navigation, route }: Props) {
+  // Utility-bill alerts that arrived while the user was elsewhere. Opening this
+  // screen is what "seeing" them means, so they are marked read on mount.
+  const { utilities: utilityAlerts, markAsRead, markSectionAsRead } = usePushNotifications();
+
+  // Set by a bill-alert tap: open on the utility bills list rather than at the
+  // top of the screen, which is several sections above it.
+  const scrollRef = useRef<ScrollView>(null);
+  const billsY = useRef(0);
+
+  useEffect(() => {
+    if (!route.params?.focus) {
+      return;
+    }
+    // After layout, or the offset is still 0 and it scrolls nowhere.
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: billsY.current, animated: true });
+    }, 350);
+    navigation.setParams({ focus: undefined });
+    return () => clearTimeout(timer);
+  }, [route.params?.focus, navigation]);
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const [items, setItems] = useState<QuickTapItem[]>([]);
@@ -315,12 +337,19 @@ export default function ResourcesScreen({ navigation }: Props) {
         </Pressable>
       </View>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: insets.bottom + 28 },
         ]}
         showsVerticalScrollIndicator={false}
       >
+        <AlertsCard
+          section="utilities"
+          items={utilityAlerts}
+          onDismiss={markAsRead}
+          onMarkAllRead={() => markSectionAsRead('utilities')}
+        />
         <Card style={styles.hero}>
           <View style={styles.heroIcon}>
             <Droplets size={24} color={styles.heroIconColor.color} />
@@ -409,11 +438,16 @@ export default function ResourcesScreen({ navigation }: Props) {
             </Pressable>
           ))
         )}
-        <SectionHeader
-          title={t('resources.utility_bills')}
-          subtitle={t('resources.utility_bills_subtitle')}
-          style={styles.historyHeader}
-        />
+        <View
+          onLayout={(e) => {
+            billsY.current = e.nativeEvent.layout.y;
+          }}>
+          <SectionHeader
+            title={t('resources.utility_bills')}
+            subtitle={t('resources.utility_bills_subtitle')}
+            style={styles.historyHeader}
+          />
+        </View>
         <Button title={t('resources.add_utility_bill')} onPress={() => openUtility()} />
         {utilityBills.length === 0 ? (
           <Text style={styles.noHistory}>{t('resources.no_utility_bills')}</Text>

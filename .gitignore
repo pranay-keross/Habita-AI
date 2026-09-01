@@ -82,3 +82,25 @@ __tests__/
 *.test.ts
 *.test.tsx
 
+# Firebase service-account keys (docs/DECISIONS.md D-059)
+#
+# These are ADMIN credentials: one grants the ability to send push to every
+# device registered to the project, and they do not expire on their own. The
+# file Google hands you is named like
+# `habita-ai-97928-firebase-adminsdk-xxxxx-0123456789.json`, which matches
+# nothing above, so it would otherwise be committed by a plain `git add -A`.
+#
+# `scripts/send-test-push.js` takes the path to one as an argument precisely so
+# the key never has to live in the repo — keep it outside the project directory.
+#
+# NOT ignored, deliberately: `android/app/google-services.json` (client config,
+# already tracked, safe to commit — it ships inside the APK anyway) and
+# `firebase.json` (build config, must be committed or the notification channel
+# id is empty and Android 8+ drops every backgrounded message).
+*serviceAccount*.json
+*service-account*.json
+*-adminsdk-*.json
+*firebase-adminsdk*.json
+serviceAccountKey.json
+# Apple push keys, for when iOS lands (M4-T10)
+*.p8

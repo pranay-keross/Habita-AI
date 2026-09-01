@@ -15,12 +15,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import {
+  Annoyed,
   CalendarHeart,
   CarFront,
   ChevronRight,
   Droplets,
+  Frown,
   Fuel,
   Info,
+  Laugh,
+  Meh,
   PartyPopper,
   Pill,
   Receipt,
@@ -53,10 +57,28 @@ import type { QuickTapItem, ResourceLog } from '../features/resources/types';
 import useAuth from '../hooks/useAuth';
 import { apiFetch } from '../features/auth/api';
 import { getRolling30DaySpend, loadExpenses } from '../features/money';
+import { createCheckIn, getMoodUplift, getWellnessSummary } from '../features/wellness/api';
+import {
+  MOOD_BY_LEVEL,
+  MOOD_LEVELS,
+  type AiMoodUpliftResponse,
+  type MoodLevel,
+  type WellnessSummaryResponse,
+} from '../features/wellness/types';
 
 type Props = StackScreenProps<RootStackParamList, 'Dashboard'>;
 
 const PROFILE_STORAGE_KEY = 'habita.user_profile';
+
+// Same five faces the Wellness screen uses, so the one-tap strip on the dashboard
+// and the full check-in sheet behind it read as the same control.
+const MOOD_ICONS: Record<MoodLevel, LucideIcon> = {
+  1: Frown,
+  2: Annoyed,
+  3: Meh,
+  4: Smile,
+  5: Laugh,
+};
 
 interface ProfileDetailsResponse {
   phone: string;
@@ -119,6 +141,9 @@ export default function DashboardScreen({ navigation, route }: Props) {
   const [selectedInsightsTab, setSelectedInsightsTab] = useState<InsightsTab>('adherence');
   const [selectedDayIndex, setSelectedDayIndex] = useState(5);
   const [infoModule, setInfoModule] = useState<BentoModule | null>(null);
+  const [moodSummary, setMoodSummary] = useState<WellnessSummaryResponse | null>(null);
+  const [moodUplift, setMoodUplift] = useState<AiMoodUpliftResponse | null>(null);
+  const [loggingMood, setLoggingMood] = useState<MoodLevel | null>(null);
 
   useFocusEffect(
     useCallback(() => {
@@ -293,6 +318,56 @@ export default function DashboardScreen({ navigation, route }: Props) {
     }
   }, [getAccessToken]);
 
+  /**
+   * The dashboard's Log Mood strip reads the same `/wellness/summary` and
+   * `/wellness/cbt/uplift` the Wellness screen does, so the two never disagree
+   * about today's count or streak. Both are settled independently — an uplift
+   * that fails must not blank the stats.
+   */
+  const fetchWellness = useCallback(async () => {
+    try {
+      const token = await getAccessToken();
+      if (!token) return;
+      const [summaryRes, upliftRes] = await Promise.allSettled([
+        getWellnessSummary(token),
+        getMoodUplift(token),
+      ]);
+      if (summaryRes.status === 'fulfilled') setMoodSummary(summaryRes.value);
+      if (upliftRes.status === 'fulfilled') setMoodUplift(upliftRes.value);
+    } catch {
+      // Offline — the strip still renders, just without today's numbers.
+    }
+  }, [getAccessToken]);
+
+  // One tap logs a check-in at that mood with no tags or note; the Wellness
+  // screen is where a reason and tags get added. Anything richer than a single
+  // tap belongs there, not on the home screen.
+  const handleQuickMoodLog = useCallback(
+    async (level: MoodLevel) => {
+      if (loggingMood !== null) return;
+      setLoggingMood(level);
+      try {
+        const token = await getAccessToken();
+        if (!token) {
+          navigation.navigate('Wellness');
+          return;
+        }
+        await createCheckIn({ mood: MOOD_BY_LEVEL[level] }, token);
+        await fetchWellness();
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(t('wellness.ex_done_title'), ToastAndroid.SHORT);
+        }
+      } catch {
+        if (Platform.OS === 'android') {
+          ToastAndroid.show(t('wellness.sync_failed_title'), ToastAndroid.SHORT);
+        }
+      } finally {
+        setLoggingMood(null);
+      }
+    },
+    [fetchWellness, getAccessToken, loggingMood, navigation],
+  );
+
   useEffect(() => {
     let mounted = true;
     (async () => {
@@ -300,6 +375,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
         await Promise.all([
           fetchLiveProfile(),
           fetchSpendRollup(),
+          fetchWellness(),
           getItem(PROFILE_STORAGE_KEY, { name: 'Pranay', photoUri: null }).then((data) => {
             if (data && data.name && mounted) setUserName(data.name);
             if (mounted) setPhotoUri((current) => current ?? data?.photoUri ?? null);
@@ -321,7 +397,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
     return () => {
       mounted = false;
     };
-  }, [fetchLiveProfile, fetchSpendRollup]);
+  }, [fetchLiveProfile, fetchSpendRollup, fetchWellness]);
 
   useEffect(() => {
     if (route.params?.profileUpdated) {
@@ -333,6 +409,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
   useEffect(() => {
     const unsubFocus = navigation.addListener('focus', () => {
       fetchSpendRollup();
+      fetchWellness();
       getItem(PROFILE_STORAGE_KEY, { name: 'Pranay', photoUri: null }).then((data) => {
         if (data && data.name) setUserName(data.name);
         setPhotoUri((current) => current ?? data?.photoUri ?? null);
@@ -354,7 +431,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
       unsubFocus();
       unsubLang();
     };
-  }, [navigation, fetchSpendRollup]);
+  }, [navigation, fetchSpendRollup, fetchWellness]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -362,6 +439,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
       await Promise.all([
         fetchLiveProfile(),
         fetchSpendRollup(),
+        fetchWellness(),
         getItem(PROFILE_STORAGE_KEY, { name: 'Pranay', photoUri: null }).then((data) => {
           if (data && data.name) setUserName(data.name);
           setPhotoUri((current) => current ?? data?.photoUri ?? null);
@@ -376,7 +454,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
     } finally {
       setRefreshing(false);
     }
-  }, [fetchLiveProfile, fetchSpendRollup]);
+  }, [fetchLiveProfile, fetchSpendRollup, fetchWellness]);
 
 
   const handleLifeOsPress = (id: LifeOsId) => {
@@ -661,6 +739,84 @@ export default function DashboardScreen({ navigation, route }: Props) {
                       />
                     </View>
                   ))}
+                </View>
+              </View>
+
+              {/* Log Mood — live from /api/wellness/summary + /cbt/uplift */}
+              <View style={styles.sectionContainer}>
+                <View style={styles.sectionHeaderRow}>
+                  <Text style={styles.sectionHeading}>{t('wellness.checkin_title')}</Text>
+                  <Pressable onPress={() => navigation.navigate('Wellness')}>
+                    <Text style={styles.sectionLink}>{t('resources.open')} →</Text>
+                  </Pressable>
+                </View>
+
+                <View style={styles.moodCard}>
+                  <Text style={styles.moodPrompt}>{t('wellness.checkin_sub')}</Text>
+
+                  <View style={styles.moodStrip}>
+                    {MOOD_LEVELS.map((value) => {
+                      const Icon = MOOD_ICONS[value];
+                      const active = moodSummary?.latestCheckIn?.moodScore === value;
+                      const pending = loggingMood === value;
+                      return (
+                        <Pressable
+                          key={value}
+                          onPress={() => handleQuickMoodLog(value)}
+                          disabled={loggingMood !== null}
+                          style={styles.moodItem}
+                          accessibilityRole="button"
+                          accessibilityLabel={t(`wellness.mood_${value}`)}>
+                          <View style={[styles.moodCircle, active && styles.moodCircleActive]}>
+                            <Icon
+                              size={20}
+                              color={active ? '#FFFFFF' : '#000000'}
+                              strokeWidth={1.8}
+                              opacity={pending ? 0.4 : 1}
+                            />
+                          </View>
+                          <Text
+                            style={[styles.moodItemLabel, active && styles.moodItemLabelActive]}
+                            numberOfLines={1}>
+                            {t(`wellness.mood_${value}`)}
+                          </Text>
+                        </Pressable>
+                      );
+                    })}
+                  </View>
+
+                  <View style={styles.moodStatsRow}>
+                    <View style={styles.moodStat}>
+                      <Text style={styles.moodStatNum}>{moodSummary?.checkInsToday ?? 0}</Text>
+                      <Text style={styles.moodStatLabel}>{t('wellness.stat_today')}</Text>
+                    </View>
+                    <View style={styles.moodStatDivider} />
+                    <View style={styles.moodStat}>
+                      <Text style={styles.moodStatNum}>
+                        {moodSummary?.sevenDayAverage ? moodSummary.sevenDayAverage.toFixed(1) : '—'}
+                      </Text>
+                      <Text style={styles.moodStatLabel}>{t('wellness.stat_average')}</Text>
+                    </View>
+                    <View style={styles.moodStatDivider} />
+                    <View style={styles.moodStat}>
+                      <Text style={styles.moodStatNum}>{moodSummary?.dayStreak ?? 0}</Text>
+                      <Text style={styles.moodStatLabel}>{t('wellness.stat_streak')}</Text>
+                    </View>
+                  </View>
+
+                  {moodUplift ? (
+                    <View style={styles.moodUpliftBox}>
+                      <Sparkles size={13} color="#000000" strokeWidth={1.9} />
+                      <View style={styles.moodUpliftText}>
+                        <Text style={styles.moodUpliftMessage} numberOfLines={2}>
+                          {moodUplift.upliftMessage}
+                        </Text>
+                        <Text style={styles.moodUpliftActivity} numberOfLines={2}>
+                          {moodUplift.suggestedActivity}
+                        </Text>
+                      </View>
+                    </View>
+                  ) : null}
                 </View>
               </View>
 
@@ -1112,6 +1268,108 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 1,
       height: 26,
       backgroundColor: '#EAEAEA',
+    },
+    moodCard: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.xl,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.lg,
+      ...shadow.soft,
+    },
+    moodPrompt: {
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      lineHeight: 18,
+      color: colors.textSecondary,
+      marginBottom: spacing.md,
+    },
+    moodStrip: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      gap: 6,
+    },
+    moodItem: {
+      flex: 1,
+      alignItems: 'center',
+      gap: 6,
+    },
+    moodCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.surfaceElevated,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    moodCircleActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    moodItemLabel: {
+      fontFamily: fonts.sans,
+      fontSize: 10,
+      color: colors.textMuted,
+      textAlign: 'center',
+    },
+    moodItemLabelActive: {
+      fontFamily: fonts.sansBold,
+      color: colors.textPrimary,
+    },
+    moodStatsRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.lg,
+      paddingTop: spacing.md,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    moodStat: {
+      flex: 1,
+      alignItems: 'center',
+    },
+    moodStatDivider: {
+      width: 1,
+      height: 22,
+      backgroundColor: colors.border,
+    },
+    moodStatNum: {
+      fontFamily: fonts.sansBold,
+      fontSize: 16,
+      color: colors.textPrimary,
+    },
+    moodStatLabel: {
+      fontFamily: fonts.sans,
+      fontSize: 10,
+      color: colors.textMuted,
+      marginTop: 2,
+    },
+    moodUpliftBox: {
+      flexDirection: 'row',
+      gap: 8,
+      alignItems: 'flex-start',
+      marginTop: spacing.md,
+      padding: spacing.md,
+      borderRadius: radius.lg,
+      backgroundColor: colors.surfaceElevated,
+    },
+    moodUpliftText: {
+      flex: 1,
+    },
+    moodUpliftMessage: {
+      fontFamily: fonts.sansBold,
+      fontSize: 12,
+      lineHeight: 18,
+      color: colors.textPrimary,
+    },
+    moodUpliftActivity: {
+      fontFamily: fonts.sans,
+      fontSize: 11,
+      lineHeight: 17,
+      color: colors.textSecondary,
+      marginTop: 3,
     },
     sectionContainer: {
       marginBottom: spacing.lg,

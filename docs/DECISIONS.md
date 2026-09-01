@@ -1339,6 +1339,286 @@ for accounts that do exist.
 
 ---
 
+## D-058 — Wellness goes to the real backend: `/api/wellness/**` wired end-to-end, three Postman-vs-reality corrections, and one live backend defect
+
+**Status:** Accepted (implemented) · **Date:** 2026-08-31
+
+**Context.** The wellness module shipped at D-030 as device-local only, behind rule 8's
+"no backend or network calls, except auth/profile/family". A backend now exists for it —
+a `wellness` Postman folder with Mood Check-Ins, CBT Chat Assistant & AI Uplift,
+Exercises & Session Completion, and Wellness Dashboard & Analytics — and the user asked
+for all of it integrated and checked.
+
+The Postman folder alone was not a sufficient contract. The backend publishes an OpenAPI
+document at `https://ikon-vpm.keross.com/saheli/v3/api-docs` (unauthenticated); reading
+that and then calling all fourteen routes with a real bearer token turned up three places
+where the Postman paths/params are wrong or missing, each of which would have shipped as
+a silent client bug:
+
+1. **Chat history is `/wellness/cbt/history`, not `/wellness/cbt/chat`.** The Postman
+   folder shows "2.2 [GET] Get CBT Chat History" and "2.4 [DELETE] Clear CBT Chat History"
+   under the same `cbt/chat` path as the POST. `/wellness/cbt/chat` is POST-only —
+   `GET` and `DELETE` on it return 500, while `GET`/`DELETE /wellness/cbt/history`
+   return 200 and 204.
+2. **The check-ins page size parameter is `limit`, not `size`.** `?page=0&size=2` is
+   accepted and silently ignored (the response always echoes `size: 10`), which reads as
+   "pagination is broken". `?page=0&limit=2` paginates correctly.
+3. **`reason` is not part of `MoodCheckInRequest`.** It appears in the demo bodies and in
+   `MoodCheckInResponse`, but the server's own request schema has only `mood`, `tags`,
+   `note` — so `reason` is accepted, discarded, and always reads back `null`.
+
+Also confirmed by call, not assumption: `moodScore` is exactly the ascending index of the
+`VERY_LOW…GREAT` enum, so it is 1:1 with this module's existing `MoodLevel` and the
+mapping is lossless in both directions.
+
+**Decision.**
+
+- **Rule 8 is widened to include `wellness`.** `src/features/wellness/api.ts` owns the
+  domain's calls, in the same shape as `family/api.ts` and `money/expenses/api.ts`: one
+  documented function per endpoint, over `apiFetch`.
+- **The backend becomes the source of truth; the device copy becomes a cache, not a
+  peer.** `MoodEntry.id` is now the server's UUID, and each load mirrors the fetched page
+  into `MOOD_STORAGE_KEY` so a cold start with no network still paints something honest
+  and `wellnessStore.ts`'s analytics keep working unchanged. Writes go to the server
+  first; the local-only write path survives solely for the signed-out case.
+- **Server-computed stats win where they exist.** The hero counts, the 7-day trend and the
+  top-tags summary read `GET /wellness/summary` when it answers and fall back to the local
+  derivations otherwise. The two agree by construction, given `moodScore == MoodLevel`.
+- **`LocalCbtCoach` is kept, and is now also the chat's failure path** — see below.
+- **The static `MEDITATION_GUIDES` registry is no longer rendered.** The exercise library
+  is `GET /wellness/exercises`, filterable by the five backend categories, and finishing
+  one POSTs to `.../complete`. The registry and its i18n keys stay in the tree because
+  `med_minutes` / `med_note` are still used and removing content is not this change's job.
+- **`reason` is still sent** on create and update. It is ignored today; sending it means
+  the client is already correct the day the backend persists it, and the field is
+  surfaced in the log sheet so the data exists client-side either way.
+
+**`POST /api/wellness/cbt/chat` — was broken, fixed same day.** On the first pass every
+valid message returned `500 "An unexpected error occurred"` in ~0.13s, far too fast to be
+an AI-provider timeout; validation was intact (an empty `message` correctly 400s with
+`"message: Message content cannot be blank"`), so the request shape was right and the
+fault was server-side. It was fixed on the backend later the same day and now answers in
+~2s with a real assistant reply and a `suggestedTechnique` (a human-readable name such as
+`"Ground yourself"`, not the enum). Two observations from the working endpoint:
+
+- The POST's own reply object has `createdAt: null`; only the rows returned by
+  `GET /cbt/history` are timestamped. `handleSendChat` therefore re-reads the history
+  after a successful send rather than rendering the POST's object directly, and
+  `CbtChatMessage.createdAt` is typed `string | null`.
+- Replies are genuinely generated per message, not templated. Probing with three
+  unrelated messages returned three distinct replies with appropriately different
+  techniques ("I cannot sleep..." -> `Slow the breath`, "My mother is unwell..." ->
+  `Ground yourself`, a purely good-news message -> a `null` technique and no exercise
+  push). An earlier read of this as "templated" came from two consecutive sends that
+  happened to return identical text; it did not hold up on a wider probe.
+- `suggestedTechnique` is legitimately null when no exercise fits, so the UI must not
+  assume one is always present.
+
+The `LocalCbtCoach` fallback is kept regardless: an offline device needs it whether or not
+the route is healthy. On failure the client appends the coach's reply to the transcript as
+an assistant message and says plainly in the UI that it came from the offline coach,
+rather than leaving the user's message unanswered.
+
+**Verification.** All fourteen endpoints were exercised against
+`https://ikon-vpm.keross.com/saheli/api` through the compiled client itself (not a
+parallel script), on a real token. First pass: 15 of 16 assertions, the one failure being
+the CBT chat POST above. Re-run after the backend fix: **16 of 16**. Create → get → update → delete round-trips, `limit`-based
+pagination, per-category exercise filtering, session completion and the summary payload
+were each checked against their responses, and the probe check-ins were deleted from the
+test account afterwards. `npx tsc --noEmit` clean; `npm run lint` unchanged from baseline
+(230 problems / 52 errors, all pre-existing and in untouched files); `npm test` 167/167.
+
+**Consequences.**
+
+- Mood data is no longer device-private. D-030 deliberately kept Mind & Mood off the
+  family-shared path; that reasoning was about *family sharing*, and still holds — nothing
+  here exposes a check-in to another family member — but the data now leaves the device
+  for the user's own account. The privacy note on the screen should be revisited if it
+  ever implied otherwise.
+- `docs/BACKEND_CONTEXT.md`'s `wellness` row ("Not built client-side yet") is now stale
+  and updated.
+- `reason` remains the one live gap: still absent from `MoodCheckInRequest`, still
+  discarded, still reads back `null`.
+- Chat history and check-ins are account-scoped server-side, so `useAuth`'s
+  `ACCOUNT_SCOPED_KEYS` clearing of `MOOD_STORAGE_KEY` on account switch is still correct
+  but is now only clearing a cache.
+
+---
+
+## D-059 — Push notifications for Medicine Chest and Utilities: everything but the transport
+
+**Date:** 2026-09-01
+
+**Context.** The backend sends four FCM data payloads — `DOSAGE_REMINDER`, `LOW_STOCK`,
+`UTILITY_DUE_SOON`, `UTILITY_DUE_TODAY` — each carrying a `click_action` naming the screen
+a tap should open. The task was to receive them in the Medicine Chest and Utilities
+sections and route taps.
+
+**What "Firebase is already integrated" turned out to mean.** Native Android is set up for
+**analytics only**: `android/app/google-services.json`, the `com.google.gms:google-services`
+plugin, `firebase-bom:34.17.0`, and `firebase-analytics`. Missing for push, all of it:
+
+- `firebase-messaging` — not in `android/app/build.gradle`; analytics cannot receive a push.
+- `POST_NOTIFICATIONS` — absent from `AndroidManifest.xml`; required at runtime on Android 13+.
+- No FCM service registered in the manifest.
+- No JS bridge: `@react-native-firebase/app` and `/messaging` are in neither `package.json`
+  nor `node_modules`, so JavaScript cannot obtain a token or receive a message at all.
+- iOS has no Firebase whatsoever — no `GoogleService-Info.plist`, nothing in the `Podfile`.
+
+Adding the bridge is a new dependency plus a native change, which agent.md rules 7 and 11
+both require asking about first. **Asked, and approved:** `@react-native-firebase/app` +
+`/messaging` (26.3.3) for transport and `@notifee/react-native` (9.1.8) for display and
+scheduling, Android now with iOS deferred.
+
+**Decision.** Build every layer that does not depend on which library wins, and put the
+transport behind an interface. Same "define the interface, stub it" shape as `CbtCoach`
+(D-030, agent.md rule 8): `PushMessaging` in `features/notifications/messaging.ts` with
+`NoopPushMessaging` as the shipping implementation. The app mounts it, does nothing, and
+costs nothing; swapping in the real transport is one new file and one line.
+
+Built and tested behind that line:
+
+- `types.ts` / `parse.ts` — the four payloads as a discriminated union, and a parser that
+  never throws. Notable: FCM data values are **always strings on the wire**, so
+  `remainingQuantity` arrives as `"5"` and is coerced once at the edge; `dueDate` stays the
+  raw `YYYY-MM-DD` string, because `new Date('2026-09-05')` is UTC midnight and renders as
+  the *previous day* anywhere west of Greenwich.
+- `notificationStore.ts` / `inbox.ts` — a device-local inbox, capped at 100, deduped on
+  content (FCM does not promise at-most-once delivery, and the cold-start tap handler
+  legitimately replays a message the foreground handler already saw).
+- `api.ts` — `POST /api/devices/register`.
+- `AlertsCard.tsx`, mounted in `MedicineScreen` and `ResourcesScreen`; `usePushRegistration`
+  mounted once in `_layout.tsx`, where a tap becomes a route via `navigationRef`.
+- 43 tests, and all 15 new strings in all six locales (rule 2).
+
+**Postman is wrong about `/api/devices/register`, again.** It documents the body as
+`{phone, code}` — a stale copy of the verify-otp body. Sending it returns **500**. The real
+shape is `{fcmToken, platform}` (OpenAPI `DeviceTokenRequestDto`). The route is also
+authenticated and returns **403**, not 401, without a bearer token. Verified live on
+2026-09-01 through the compiled client: both platforms 200, repeat registration of the same
+token is idempotent (which matters — the app re-registers on every launch and every token
+refresh), and a bad access token is refused.
+
+**One bug caught in review, worth recording.** The first cut gave every
+`usePushNotifications()` mount its own `useState`. Two screens mount it, both write the same
+AsyncStorage key, and marking an alert read on one screen would be silently clobbered by the
+next write from the other. Replaced with a single module-level store read through
+`useSyncExternalStore` — the same shape as the theme singleton (D-004). Pinned by four tests.
+
+**The transport, once approved.** `FirebasePushMessaging` in `firebaseMessaging.ts`, behind
+the same interface, plus the native changes the analytics-only setup was missing:
+`firebase-messaging` in `android/app/build.gradle`, `POST_NOTIFICATIONS` in the manifest, and
+a `default_notification_channel_id` meta-data entry. Four things worth recording:
+
+- **v26 is the modular API.** `messaging().getToken()` no longer exists; it is
+  `getToken(getMessaging())`, and there is no default export. The namespaced form
+  type-checks against nothing and fails at import.
+- **Foreground messages are not displayed by FCM.** Without the explicit Notifee
+  `displayNotification` call, an alert arriving while the user is on another screen produces
+  no banner at all. This is what Notifee earns its place for.
+- **The background handler must be registered in `index.js`**, at module scope outside
+  React. A backgrounded data message spins up a headless JS context that never mounts the
+  component tree, so a handler installed in a hook is never reached. It writes straight to
+  AsyncStorage rather than through `inbox.ts`, because there are no subscribers to notify,
+  and it never rejects — FCM reads a rejection as a failed delivery.
+- **The channel id must NOT be declared in `AndroidManifest.xml`.** This one was found by
+  an actual build failure, not by reading docs. `@react-native-firebase/messaging` already
+  declares `default_notification_channel_id` in its own manifest as the placeholder
+  `${firebaseJsonNotificationChannelId}`, so declaring it again in the app manifest fails
+  the merger outright:
+
+      Attribute meta-data#...default_notification_channel_id@value
+      value=(habita_alerts) ... is also present at
+      [:react-native-firebase_messaging] ... value=().
+
+  Gradle suggests `tools:replace="android:value"`. That works but fights the merger and
+  leaves two competing declarations. The supported mechanism is a `firebase.json` at the
+  project root with `react-native.messaging_android_notification_channel_id`, which fills
+  the placeholder the library already declared — one source of truth instead of an
+  override. That is what is used.
+
+  The id must still match `ANDROID_CHANNEL_ID` in `firebaseMessaging.ts` or Android 8+
+  silently drops every backgrounded message. A test asserts both halves: that the ids
+  agree, and that the app manifest does *not* re-declare the key.
+
+**A second unwired-param gap, caught the same way as D-058's.** `routeFor` produced a
+`focus` param ('dosage' / 'stock' / 'bills'), `_layout.tsx` passed it, and
+`RootStackParamList` declared it — but neither screen ever read it. Every tap landed at the
+top of the screen, so the two medicine click_actions the backend deliberately distinguishes
+(`OPEN_DOSAGE_SCREEN` vs `OPEN_MEDICINE_SCREEN`) looked identical in the app. Both screens
+now capture their section offsets via `onLayout` and scroll to the right one, then clear the
+param with `navigation.setParams` so a later re-render does not scroll again. Found by
+grepping for consumers rather than trusting that "the route is wired" meant it did anything.
+
+**A silent-failure risk, closed.** `resolveTransport()` requires the Firebase module in a
+`try`/`catch`. Falling back to the no-op is right on iOS, but the same catch would have
+swallowed a genuine Android misconfiguration and left push permanently dead with no
+explanation anywhere. It now warns in `__DEV__` on the unexpected path and stays silent on
+the expected one.
+
+**Consequences.**
+
+- Android push works end-to-end once a build is run. **Not build-verified from this
+  environment** — no Android toolchain here — so the native changes are unverified; the JS
+  is covered by 53 tests against mocked native modules.
+- iOS stays on the no-op transport by design: no `GoogleService-Info.plist`, and APNs needs
+  an Apple Developer push key only the user can generate. It degrades to "no push" rather
+  than crashing. Tracked as a new backlog row.
+- The alerts UI renders only when the inbox is non-empty, so both screens look exactly as
+  they did before until an alert arrives. Deliberate, not an oversight.
+- `OD-4` is now answered for remote push. `M4-T4`'s *local* dosage reminders are still
+  unbuilt, but Notifee is now present and is the tool for them — so that task no longer
+  needs a library decision, only the work.
+
+---
+
+## D-060 — Medchest "unexpected error" on add: a backend 500 on the *list*, misreported as a failed *save*
+
+**Date:** 2026-09-01
+
+**Symptom.** Adding a medicine showed "An unexpected error occurred". Retrying with the same
+name then showed "Medicine already exists" — proving the first save had in fact succeeded.
+
+**Cause, isolated against the live backend.** `POST /api/profiles/{id}/medicines` works.
+`GET /api/profiles/{id}/medicines` returns **500** for the affected account:
+
+    {"status":500,"error":"Internal Server Error",
+     "message":"An unexpected error occurred",
+     "path":"/api/profiles/3db59d35-.../medicines"}
+
+Both profiles on that family 500. On a **freshly created, empty profile** the same endpoint
+behaves perfectly — `GET` → `200 []`, `POST` → `200` with a full body, `GET` → `200` with the
+new row. So the endpoint is not broken in general: something in that account's existing
+medicine rows breaks the list query server-side. **Backend-owned**; no client change fixes it.
+
+The "unexpected error" string the user saw is the backend's own 500 message, surfaced
+verbatim by `extractMedchestErrorMessage`.
+
+**Client bug this exposed, and fixed.** `handleSave` wrapped the write *and* the follow-up
+`refreshRemoteMedicines` in one try/catch, so a failed refresh was reported as a failed save.
+That is what turned a display problem into "your save failed" followed by "already exists" —
+the app telling the user something untrue about data it had just written successfully.
+Split into `refreshAfterWrite`, which swallows and logs a refresh failure: the write is
+already committed by then, the previously loaded list stays on screen, and the next
+pull-to-refresh retries.
+
+**Diagnosability.** `showRemoteError` previously collapsed a network failure, a backend 4xx/5xx
+and a TypeError in our own post-save code into one friendly string, leaving nothing to debug
+from — a report of "it says unexpected error" was unactionable. It now logs status, body and
+stack in `__DEV__`.
+
+**Consequences.**
+
+- The user-facing lie is gone: a successful save now reads as successful.
+- The underlying 500 remains, so the list will not refresh for affected accounts until the
+  backend is fixed. Report: `GET /api/profiles/{profileId}/medicines` 500s for family
+  `18cf0a8b-4e13-43a0-86c8-ae2dee6c872e`, both profiles; a new empty profile is unaffected.
+- Unrelated finding while probing: `GET /api/families/relationship/type` — the route
+  `medicine/api.ts` `listRelationshipTypes` documents — returns **404 "No endpoint found"**.
+  Worth a separate look; not touched here.
+
+---
+
 ## Open decisions
 
 Tracked in `docs/BACKLOG.md` → Open questions. Move each here once answered.
@@ -1348,7 +1628,7 @@ Tracked in `docs/BACKLOG.md` → Open questions. Move each here once answered.
 | OD-1 | AI provider and where inference runs | Answered at target-architecture level by D-020 (OpenAI + Gemini, server-side). Still blocks `M8-T4` in practice — no backend exists yet to call |
 | OD-2 | Backend: BaaS vs custom API; data residency | Answered at target-architecture level by D-020 (custom Spring Boot API, not BaaS). India-specific data residency still unspecified by the SRS; still blocks all of M8 |
 | OD-3 | UPI/payment rails: deep-link vs payment SDK, per gateway | M6-T6 |
-| OD-4 | Notification library and background scheduling | M4-T4 |
+| ~~OD-4~~ | ~~Notification library and background scheduling~~ — **answered by D-059**: `@react-native-firebase/messaging` + `@notifee/react-native`. Remote push is built; `M4-T4`'s local scheduling now needs only the work, not a decision | — |
 | OD-5 | Which domain module ships first after M1–M3 | SRS §1.2 leans India-first without dictating order; `NEXT_STEPS.md` recommends Medical Chest (M4) regardless |
 | OD-6 | Dark mode: follow OS appearance or manual only | M1-T4 |
 | OD-7 | Safety SOS has no module in the SRS's 16 — intentionally dropped in the rebrand, or still wanted alongside it? | Old `M7-T1`; parked by D-020, not deleted |
