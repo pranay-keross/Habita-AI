@@ -110,10 +110,22 @@ function resolveTransport(): PushMessaging {
     // no explanation" is the worst possible failure for this feature, so say so
     // in dev. Production still degrades rather than crashing.
     if (__DEV__) {
+      const cause = (err as { message?: string })?.message ?? String(err);
+      // "native module not found" means the JS package is installed but the app
+      // binary predates it. A Metro reload cannot fix that — the native side
+      // only exists after a real rebuild. Said explicitly because the generic
+      // message sent one teammate looking in the wrong place entirely.
+      const missingNative = /native module|has not been (registered|linked)|NativeModule/i.test(cause);
       console.warn(
         '[notifications] Firebase transport failed to load; push is disabled. ' +
-          'Alerts will not arrive. Cause:',
-        err,
+          'Alerts will not arrive.\nCause: ' +
+          cause +
+          (missingNative
+            ? '\n\nThe JS package is installed but this app binary does not contain its' +
+              '\nnative code, so the app must be REBUILT - reloading Metro will not fix it:' +
+              '\n    npx react-native run-android' +
+              '\nIf it still fails after a rebuild:  node scripts/check-push-setup.js'
+            : '\n\nRun:  node scripts/check-push-setup.js'),
       );
     }
     return new NoopPushMessaging();
