@@ -1550,6 +1550,24 @@ now capture their section offsets via `onLayout` and scroll to the right one, th
 param with `navigation.setParams` so a later re-render does not scroll again. Found by
 grepping for consumers rather than trusting that "the route is wired" meant it did anything.
 
+**The silent fallback has a cost on other machines.** A teammate pulled the branch and
+reported "Firebase not working, it does not even ask for notification permission". Nothing
+was wrong with the repo — a fresh clone was verified to contain `google-services.json`,
+`firebase.json`, the gradle and manifest changes, and the dependency declarations. The cause
+is that `resolveTransport()` no-ops when the Firebase modules cannot load, so a machine that
+pulled without running `npm install` gets no crash, no dialog, and — the tell — *no
+permission prompt at all*, because `NoopPushMessaging.requestPermission()` returns
+`'unavailable'` without asking. That reads as "the feature is broken" rather than "your
+machine is not set up".
+
+`scripts/check-push-setup.js` exists for this: ten static checks covering dependencies,
+`google-services.json` vs `applicationId`, the `firebase.json` channel id vs
+`ANDROID_CHANNEL_ID`, the gradle and manifest entries, and the `index.js` background handler.
+Verified to pass here and to correctly report the missing dependencies against a fresh clone
+with no `npm install`. Adding a native module also requires a real rebuild
+(`npx react-native run-android`), not a Metro reload — the script says so when the static
+checks pass but push still does not work.
+
 **A silent-failure risk, closed.** `resolveTransport()` requires the Firebase module in a
 `try`/`catch`. Falling back to the no-op is right on iOS, but the same catch would have
 swallowed a genuine Android misconfiguration and left push permanently dead with no
