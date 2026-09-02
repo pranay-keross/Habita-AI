@@ -22,8 +22,15 @@ export type UtilityType =
   | 'water'
   | 'waste';
 
+export interface UtilityTypeOption {
+  id: number;
+  utilityName: string;
+  active: boolean;
+}
+
 export interface UtilityBill {
   id: string;
+  utilityTypeId: number | null;
   type: UtilityType;
   provider: string;
   amount: number;

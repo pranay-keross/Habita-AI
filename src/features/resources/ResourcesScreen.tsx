@@ -21,22 +21,32 @@ import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
 import Card from '../../components/Card';
 import SectionHeader from '../../components/SectionHeader';
+import useAuth from '../../hooks/useAuth';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
+import { getMyPrimaryFamily } from '../family/api';
+import { showNetworkUnavailableAlert } from '../../utils/networkStatus';
 import {
+  createLog,
+  createOrUpdateQuickTapItem,
+  createUtilityBill,
   loadQuickTapItems,
   loadResourceLogs,
   loadUtilityBills,
+  loadUtilityTypeOptions,
+  removeQuickTapItem,
   saveQuickTapItems,
   saveResourceLogs,
   saveUtilityBills,
+  toggleUtilityBillPaid,
 } from './resourceStore';
 import type {
   QuickTapItem,
   ResourceLog,
   UtilityBill,
   UtilityType,
+  UtilityTypeOption,
 } from './types';
 
 type Props = StackScreenProps<RootStackParamList, 'Resources'>;
@@ -58,6 +68,9 @@ function startOfToday(): number {
 export default function ResourcesScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { getAccessToken } = useAuth();
+  const [familyId, setFamilyId] = useState<string | null>(null);
+  const [utilityTypeOptions, setUtilityTypeOptions] = useState<UtilityTypeOption[]>([]);
   const [items, setItems] = useState<QuickTapItem[]>([]);
   const [logs, setLogs] = useState<ResourceLog[]>([]);
   const [utilityBills, setUtilityBills] = useState<UtilityBill[]>([]);
@@ -80,22 +93,29 @@ export default function ResourcesScreen({ navigation }: Props) {
   const [localeVersion, setLocaleVersion] = useState(0);
 
   useEffect(() => {
-    Promise.all([
-      loadQuickTapItems(),
-      loadResourceLogs(),
-      loadUtilityBills(),
-    ]).then(([savedItems, savedLogs, savedBills]) => {
+    (async () => {
+      const token = await getAccessToken().catch(() => null);
+      const family = token ? await getMyPrimaryFamily(token).catch(() => null) : null;
+      const fid = family?.id ?? null;
+      setFamilyId(fid);
+      const [savedItems, savedLogs, savedBills, typeOptions] = await Promise.all([
+        loadQuickTapItems(fid, token),
+        loadResourceLogs(fid, token),
+        loadUtilityBills(fid, token),
+        loadUtilityTypeOptions(token),
+      ]);
       setItems(savedItems);
       setLogs(savedLogs);
       setUtilityBills(savedBills);
-    });
+      setUtilityTypeOptions(typeOptions);
+    })();
     const unsub = subscribeToLanguageChanges(() =>
       setLocaleVersion(v => v + 1),
     );
     return () => {
       unsub();
     };
-  }, []);
+  }, [getAccessToken]);
   const activeItems = items.filter(item => item.active);
   const todayLogs = useMemo(
     () => logs.filter(log => log.loggedAt >= startOfToday()),
@@ -143,23 +163,18 @@ export default function ResourcesScreen({ navigation }: Props) {
       );
       return;
     }
-    const next = { name: name.trim(), unitLabel: unitLabel.trim() };
+    const token = await getAccessToken().catch(() => null);
+    const { item: savedItem, offline } = await createOrUpdateQuickTapItem(
+      { id: editingItemId, name: name.trim(), unitLabel: unitLabel.trim() },
+      familyId,
+      token,
+    );
+    if (offline && token) showNetworkUnavailableAlert();
     if (editingItemId)
       await persistItems(
-        items.map(item =>
-          item.id === editingItemId ? { ...item, ...next } : item,
-        ),
+        items.map(item => (item.id === editingItemId ? savedItem : item)),
       );
-    else
-      await persistItems([
-        ...items,
-        {
-          id: String(Date.now()),
-          active: true,
-          createdAt: Date.now(),
-          ...next,
-        },
-      ]);
+    else await persistItems([...items, savedItem]);
     setItemSheet(false);
   };
   const saveLog = async () => {
@@ -178,15 +193,23 @@ export default function ResourcesScreen({ navigation }: Props) {
       quantity: amount,
       note: note.trim(),
     };
-    if (editingLogId)
+    if (editingLogId) {
       await persistLogs(
         logs.map(log => (log.id === editingLogId ? { ...log, ...next } : log)),
       );
-    else
+    } else {
+      const token = await getAccessToken().catch(() => null);
+      const { offline } = await createLog(
+        { itemName: item.name, quantity: amount, note: note.trim() },
+        familyId,
+        token,
+      );
+      if (offline && token) showNetworkUnavailableAlert();
       await persistLogs([
         { id: String(Date.now()), loggedAt: Date.now(), ...next },
         ...logs,
       ]);
+    }
     setLogSheet(false);
   };
   const saveUtility = async () => {
@@ -203,7 +226,12 @@ export default function ResourcesScreen({ navigation }: Props) {
       );
       return;
     }
+    const matchedOption = utilityTypeOptions.find(option =>
+      option.utilityName.toLowerCase().includes(utilityType),
+    );
+    const utilityTypeId = matchedOption?.id ?? null;
     const next = {
+      utilityTypeId,
       type: utilityType,
       provider: provider.trim(),
       amount,
@@ -216,6 +244,13 @@ export default function ResourcesScreen({ navigation }: Props) {
         ),
       );
     } else {
+      const token = await getAccessToken().catch(() => null);
+      const { offline } = await createUtilityBill(
+        { utilityTypeId, provider: provider.trim(), amount, dueDate: dueDate.trim() },
+        familyId,
+        token,
+      );
+      if (offline && token) showNetworkUnavailableAlert();
       await persistUtilityBills([
         { id: String(Date.now()), createdAt: Date.now(), paid: false, ...next },
         ...utilityBills,
@@ -224,6 +259,7 @@ export default function ResourcesScreen({ navigation }: Props) {
     setUtilitySheet(false);
   };
   const toggleUtilityPaid = async (bill: UtilityBill) => {
+    await toggleUtilityBillPaid(bill.id, !bill.paid);
     await persistUtilityBills(
       utilityBills.map(entry =>
         entry.id === bill.id ? { ...entry, paid: !entry.paid } : entry,
@@ -267,6 +303,9 @@ export default function ResourcesScreen({ navigation }: Props) {
           text: t('resources.remove'),
           style: 'destructive',
           onPress: async () => {
+            const token = await getAccessToken().catch(() => null);
+            const { offline } = await removeQuickTapItem(target.id, token);
+            if (offline && token) showNetworkUnavailableAlert();
             await persistItems(items.filter(item => item.id !== target.id));
             setItemSheet(false);
           },

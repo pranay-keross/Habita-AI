@@ -7444,6 +7444,1004 @@
               ]
             }
           ]
+        },
+        {
+          "name": "Resource And Utilities",
+          "item": [
+            {
+              "name": "Create Quick Tap items",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"label\": \"Electricity Bill\",\r\n  \"icon\": \"bolt\",\r\n  \"supplyName\": \"Electricity\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "quick-tap-items"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-qucik tap items",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"label\": \"Electricity Bill\",\r\n  \"icon\": \"bolt\",\r\n  \"supplyName\": \"Electricity\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:12:07 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"id\": \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\n    \"label\": \"Electricity Bill\",\n    \"icon\": \"bolt\",\n    \"supplyName\": \"Electricity\"\n}"
+                },
+                {
+                  "name": "401 Unauthorized - Wrong family id given",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"label\": \"Electricity Bill\",\r\n  \"icon\": \"bolt\",\r\n  \"supplyName\": \"Electricity\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:14:02 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:14:01.847278Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have write access to this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/quick-tap-items\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Update quick tap items",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"id\" : \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\r\n  \"label\": \"20 l\",\r\n  \"icon\": \"water \",\r\n  \"supplyName\": \"Water Cans\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "quick-tap-items"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-updated Sucessfullly",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"id\" : \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\r\n  \"label\": \"20 l\",\r\n  \"icon\": \"water \",\r\n  \"supplyName\": \"Water Cans\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "text/plain;charset=UTF-8" },
+                    { "key": "Content-Length", "value": "20" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:19:54 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "Updated Successfully"
+                },
+                {
+                  "name": "500 Internal Server Error-Wrong quick tap id given",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"id\" : \"999d91b3-35a4-4066-adfa-c933f2ce1fc\",\r\n  \"label\": \"20 l\",\r\n  \"icon\": \"water \",\r\n  \"supplyName\": \"Water Cans\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "Internal Server Error",
+                  "code": 500,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:20:51 GMT" },
+                    { "key": "Connection", "value": "close" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:20:51.188061200Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc275/quick-tap-items\",\n    \"details\": []\n}"
+                },
+                {
+                  "name": "401 Unauthorized-Wrong family id given",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"id\" : \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\r\n  \"label\": \"20 l\",\r\n  \"icon\": \"water \",\r\n  \"supplyName\": \"Water Cans\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:21:36 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:21:36.756061200Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have write access to this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/quick-tap-items\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Delete quick tap item",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/quick-tap-items/999d91b3-35a4-4066-adfa-c933f2ce1fc0",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "quick-tap-items",
+                    "999d91b3-35a4-4066-adfa-c933f2ce1fc0"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "204 - set active to false",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/quick-tap-items/999d91b3-35a4-4066-adfa-c933f2ce1fc0",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "quick-tap-items",
+                        "999d91b3-35a4-4066-adfa-c933f2ce1fc0"
+                      ]
+                    }
+                  },
+                  "status": "No Content",
+                  "code": 204,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:24:18 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": ""
+                },
+                {
+                  "name": "404 Not Found-Wrong item it given",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/quick-tap-items/999d91b3-35a4-4066-adfa-c933f2ce1fc",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "quick-tap-items",
+                        "999d91b3-35a4-4066-adfa-c933f2ce1fc"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:25:48 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:25:48.383721Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Quick tap item not found\",\n    \"path\": \"/api/quick-tap-items/999d91b3-35a4-4066-adfa-c933f2ce1fc\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "List quick tap items",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "quick-tap-items"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK -List quick tap items",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:29:41 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "[\n    {\n        \"id\": \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\n        \"label\": \"20 l\",\n        \"icon\": \"water \",\n        \"supplyName\": \"Water Cans\"\n    },\n    {\n        \"id\": \"248bbc43-f48c-4aa7-ba45-956a162ede93\",\n        \"label\": \"Electricity Bill\",\n        \"icon\": \"bolt\",\n        \"supplyName\": \"Electricity\"\n    }\n]"
+                },
+                {
+                  "name": "401 Unauthorized-Wrong family id given",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:30:39 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:30:39.462700Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/quick-tap-items\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Create log action",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"supplyName\": \"Water Cans\",\r\n  \"quantity\": 5,\r\n  \"note\": \"Purchased for weekly stock\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/resource-logs",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "resource-logs"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-Create log action",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"supplyName\": \"Water Cans\",\r\n  \"quantity\": 5,\r\n  \"note\": \"Purchased for weekly stock\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/resource-logs",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "resource-logs"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:34:17 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"id\": \"e856e85d-033c-4991-b2a0-49140b3ee75c\",\n    \"supplyName\": \"Water Cans\",\n    \"note\": \"Purchased for weekly stock\",\n    \"loggedAt\": \"25-34-2026 09:34:16 am\"\n}"
+                },
+                {
+                  "name": "401 Unauthorized-Wrong family id given",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"supplyName\": \"Water Cans\",\r\n  \"quantity\": 5,\r\n  \"note\": \"Purchased for weekly stock\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/resource-logs",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "resource-logs"
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 09:35:16 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:35:16.814868300Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have write access to this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/resource-logs\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "List Recent Logs",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/resource-logs?page=0",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "resource-logs"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    }
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-List Recent Logs",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/resource-logs?page=0",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "resource-logs"
+                      ],
+                      "query": [
+                        {
+                          "key": "page",
+                          "value": "0"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 10:38:54 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"content\": [\n        {\n            \"id\": \"a16c9217-1676-4000-83da-d316913c6edf\",\n            \"supplyName\": \"Water Cans\",\n            \"note\": \"Purchased for weekly stock\",\n            \"loggedAt\": \"25-36-2026 10:36:44 am\"\n        },\n        {\n            \"id\": \"e856e85d-033c-4991-b2a0-49140b3ee75c\",\n            \"supplyName\": \"Water Cans\",\n            \"note\": \"Purchased for weekly stock\",\n            \"loggedAt\": \"25-34-2026 09:34:16 am\"\n        }\n    ],\n    \"totalElements\": 2,\n    \"totalPages\": 1,\n    \"page\": 0,\n    \"size\": 10\n}"
+                },
+                {
+                  "name": "401 Unauthorized-Wrong family id given",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/resource-logs?page=0",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "resource-logs"
+                      ],
+                      "query": [
+                        {
+                          "key": "page",
+                          "value": "0"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 10:39:59 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T10:39:58.971938600Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/resource-logs\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Available utility types",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/utilities/utility-types",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "utilities",
+                    "utility-types"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-Available utility types",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/utilities/utility-types",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "utilities",
+                        "utility-types"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 11:18:47 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "[\n    {\n        \"id\": 1,\n        \"utilityName\": \"Electricity\",\n        \"active\": true\n    },\n    {\n        \"id\": 2,\n        \"utilityName\": \"Gas\",\n        \"active\": true\n    },\n    {\n        \"id\": 3,\n        \"utilityName\": \"Internet\",\n        \"active\": true\n    },\n    {\n        \"id\": 4,\n        \"utilityName\": \"Water\",\n        \"active\": true\n    },\n    {\n        \"id\": 5,\n        \"utilityName\": \"Waste Collection\",\n        \"active\": true\n    }\n]"
+                }
+              ]
+            },
+            {
+              "name": "Get bills list",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/utility-bill",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "utility-bill"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Save utility bill",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"utilityTypeId\": 1,\r\n  \"provider\": \"West Bengal State Electricity Distribution Company\",\r\n  \"billAmount\": 1250.75,\r\n  \"dueDate\": \"2026-09-15\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/utility-bill/save",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "utility-bill",
+                    "save"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-Save utility bill",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"utilityTypeId\": 1,\r\n  \"provider\": \"West Bengal State Electricity Distribution Company\",\r\n  \"billAmount\": 1250.75,\r\n  \"dueDate\": \"2026-09-15\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/utility-bill/save",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "utility-bill",
+                        "save"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "text/plain;charset=UTF-8" },
+                    { "key": "Content-Length", "value": "23" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 12:08:49 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "Bill saved successfully"
+                },
+                {
+                  "name": "404 Not found-Wrong family id given",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"utilityTypeId\": 1,\r\n  \"provider\": \"West Bengal State Electricity Distribution Company\",\r\n  \"billAmount\": 1250.75,\r\n  \"dueDate\": \"2026-09-15\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/utility-bill/save",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "utility-bill",
+                        "save"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": "Text",
+                  "header": [
+                    { "key": "Vary", "value": "Origin" },
+                    { "key": "Vary", "value": "Access-Control-Request-Method" },
+                    { "key": "Vary", "value": "Access-Control-Request-Headers" },
+                    { "key": "X-Content-Type-Options", "value": "nosniff" },
+                    { "key": "X-XSS-Protection", "value": "0" },
+                    { "key": "Cache-Control", "value": "no-cache, no-store, max-age=0, must-revalidate" },
+                    { "key": "Pragma", "value": "no-cache" },
+                    { "key": "Expires", "value": "0" },
+                    { "key": "X-Frame-Options", "value": "DENY" },
+                    { "key": "Content-Type", "value": "application/json" },
+                    { "key": "Transfer-Encoding", "value": "chunked" },
+                    { "key": "Date", "value": "Tue, 25 Aug 2026 12:09:37 GMT" },
+                    { "key": "Keep-Alive", "value": "timeout=60" },
+                    { "key": "Connection", "value": "keep-alive" }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T12:09:37.765802100Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family not found\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/utility-bill/save\",\n    \"details\": []\n}"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
