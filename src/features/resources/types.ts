@@ -2,6 +2,7 @@ export interface QuickTapItem {
   id: string;
   name: string;
   unitLabel: string;
+  icon: string;
   active: boolean;
   createdAt: number;
 }

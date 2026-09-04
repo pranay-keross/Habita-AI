@@ -24,7 +24,7 @@ import useAuth from '../../hooks/useAuth';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
-import { getMyPrimaryFamily } from '../family/api';
+import { createFamily, getMyPrimaryFamily, getMyProfileName } from '../family/api';
 import { createStaff, listServiceOptions, listStaff, type RemoteStaffMember, type ServiceOption } from './api';
 import {
   loadAttendanceEntries,
@@ -227,10 +227,17 @@ export default function StaffScreen({ navigation }: Props) {
     setSaving(true);
     try {
       const token = await getAccessToken();
-      const family = token ? await getMyPrimaryFamily(token).catch(() => null) : null;
-      if (!token || !family) {
+      if (!token) {
         Alert.alert(t('staff.save_failed_title'), t('staff.save_failed_no_family'));
         return;
+      }
+      let family = await getMyPrimaryFamily(token).catch(() => null);
+      if (!family) {
+        // No family yet: caregivers only exist under a family on the backend, so create
+        // one behind the scenes (named after the user) rather than blocking the caregiver
+        // add flow — same pattern as MedicineScreen's profile creation.
+        const profileName = (await getMyProfileName()) ?? t('staff.default_family_name');
+        family = await createFamily(profileName, token);
       }
       await createStaff(family.id, {
         serviceId: addServiceId,

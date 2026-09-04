@@ -99,17 +99,21 @@ export interface UtilityTypeOption {
   active: boolean;
 }
 
-// Static lookup, no family/auth context needed — same shape as staff's listServiceOptions.
-export async function listUtilityTypes(): Promise<UtilityTypeOption[]> {
-  return apiFetch<UtilityTypeOption[]>('/utilities/utility-types', { method: 'GET' });
+export async function listUtilityTypes(token?: string | null): Promise<UtilityTypeOption[]> {
+  return apiFetch<UtilityTypeOption[]>('/families/utilities/utility-types', {
+    method: 'GET',
+    token: token ?? undefined,
+  });
 }
 
 export interface RemoteUtilityBill {
   id: string;
-  utilityTypeId: number;
+  utilityType: string;
+  utilityTypeName: string;
   provider: string;
   billAmount: number;
   dueDate: string;
+  isPaid: boolean;
 }
 
 export interface SaveUtilityBillInput {
@@ -117,6 +121,14 @@ export interface SaveUtilityBillInput {
   provider: string;
   billAmount: number;
   dueDate: string; // "YYYY-MM-DD"
+}
+
+interface UtilityBillPage {
+  content: RemoteUtilityBill[];
+  totalElements: number;
+  totalPages: number;
+  page: number;
+  size: number;
 }
 
 export async function saveUtilityBill(
@@ -131,8 +143,25 @@ export async function saveUtilityBill(
   });
 }
 
-export async function listUtilityBills(familyId: string, token: string): Promise<RemoteUtilityBill[]> {
-  return apiFetch<RemoteUtilityBill[]>(`/families/${familyId}/utility-bill`, {
+export async function setUtilityBillPaid(
+  familyId: string,
+  billId: string,
+  isPaid: boolean,
+  token: string,
+): Promise<void> {
+  await apiFetch<void>(`/families/${familyId}/utility-bill/${billId}`, {
+    method: 'PUT',
+    body: { isPaid },
+    token,
+  });
+}
+
+export async function listUtilityBills(
+  familyId: string,
+  token: string,
+  page = 0,
+): Promise<UtilityBillPage> {
+  return apiFetch<UtilityBillPage>(`/families/${familyId}/utility-bill?page=${page}`, {
     method: 'GET',
     token,
   });
