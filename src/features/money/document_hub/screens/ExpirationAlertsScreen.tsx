@@ -24,12 +24,16 @@ import Button from '../../../../components/Button';
 import { loadDocuments, getDocStatus, updateDocument } from '../docStore';
 import type { DocHubEntry } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../../i18n';
+import useAuth from '../../../../hooks/useAuth';
+import { showNetworkUnavailableAlert } from '../../../../utils/networkStatus';
+import { extractVaultErrorMessage } from '../api';
 
 type Props = StackScreenProps<RootStackParamList, 'ExpirationAlerts'>;
 
 export default function ExpirationAlertsScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { getAccessToken } = useAuth();
   const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -40,7 +44,8 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
 
   const fetchAlerts = async () => {
     setLoading(true);
-    const list = await loadDocuments();
+    const token = await getAccessToken().catch(() => null);
+    const list = await loadDocuments(token);
     setDocs(list);
     setLoading(false);
   };
@@ -63,17 +68,34 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
 
   const handleSaveRenewal = async () => {
     if (!selectedDoc || !newExpiry.trim()) return;
+    if (selectedDoc.issueDate && selectedDoc.issueDate > newExpiry.trim()) {
+      Alert.alert(t('doc_hub.invalid_dates_title'), t('doc_hub.invalid_dates_msg'));
+      return;
+    }
 
     setUpdating(true);
-    await updateDocument({
-      ...selectedDoc,
-      expiryDate: newExpiry.trim(),
-    });
-    setUpdating(false);
+    try {
+      const token = await getAccessToken().catch(() => null);
+      const { offline } = await updateDocument(
+        {
+          ...selectedDoc,
+          expiryDate: newExpiry.trim(),
+        },
+        token,
+      );
 
-    Alert.alert(t('doc_hub.updated_alert_title'), t('doc_hub.updated_alert_msg', { title: selectedDoc.title }));
-    setSelectedDoc(null);
-    fetchAlerts();
+      if (offline) {
+        showNetworkUnavailableAlert();
+      } else {
+        Alert.alert(t('doc_hub.updated_alert_title'), t('doc_hub.updated_alert_msg', { title: selectedDoc.title }));
+      }
+      setSelectedDoc(null);
+      fetchAlerts();
+    } catch (err) {
+      Alert.alert(t('doc_hub.renew_failed_title'), extractVaultErrorMessage(err) || t('doc_hub.renew_failed_msg'));
+    } finally {
+      setUpdating(false);
+    }
   };
 
   return (

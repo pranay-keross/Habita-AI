@@ -1,8 +1,21 @@
 import { getItem, setItem } from '../../../utils/storage';
-import type { DocHubEntry } from './types';
+import { isNetworkError } from '../../../utils/networkStatus';
+import {
+  createVaultDocument,
+  deleteVaultDocument,
+  getVaultDocument,
+  listVaultDocuments,
+  parseVaultError,
+  updateVaultDocument,
+} from './api';
+import type { DocHubEntry, PickedFile, VaultDocumentInput } from './types';
 
 const STORAGE_KEY = 'habita.dochub_entries';
 
+// Seed data shown until the household adds its own first document, or until a real
+// family + backend sync replaces it — see docs/VAULT_API_SPEC.md §8. Once a remote load
+// succeeds even once, the returned list (empty or not) fully replaces this seed in local
+// cache, so it never leaks into synced data.
 const INITIAL_DOCS: DocHubEntry[] = [
   {
     id: 'doc_1',
@@ -53,7 +66,26 @@ const INITIAL_DOCS: DocHubEntry[] = [
   },
 ];
 
-export async function loadDocuments(): Promise<DocHubEntry[]> {
+/**
+ * Loads every document in the household vault. Tries the real backend first whenever a
+ * token is available (docs/VAULT_API_SPEC.md §4.1); on any failure — including the
+ * expected case today, where the backend doesn't exist yet — falls back to the local
+ * on-device cache, seeding it with sample documents on a genuine first run. This is the
+ * same dual-mode shape `loadGroups()` (expenseStore.ts) and Medicine's remote-first
+ * loaders already use.
+ */
+export async function loadDocuments(token?: string | null): Promise<DocHubEntry[]> {
+  if (token) {
+    try {
+      const remote = await listVaultDocuments(token);
+      if (Array.isArray(remote)) {
+        await saveDocuments(remote);
+        return remote;
+      }
+    } catch {
+      // Remote call failed (most likely: backend not deployed yet) — fall back below.
+    }
+  }
   const data = await getItem<DocHubEntry[]>(STORAGE_KEY, INITIAL_DOCS);
   if (!data || data.length === 0) {
     await saveDocuments(INITIAL_DOCS);
@@ -66,32 +98,134 @@ export async function saveDocuments(docs: DocHubEntry[]): Promise<void> {
   await setItem(STORAGE_KEY, docs);
 }
 
-export async function addDocument(doc: Omit<DocHubEntry, 'id'>): Promise<DocHubEntry> {
-  const docs = await loadDocuments();
+// True for a failure that means "couldn't reach a real backend decision at all" — no
+// connectivity, or no family to own the vault yet (the documented graceful-degradation
+// case, docs/VAULT_API_SPEC.md §2) — where silently continuing in local-only mode is the
+// right call. False for a failure the server actually reached and rejected (bad
+// category, expiry before issue date, oversized/wrong-type file, not found, no
+// permission) — those must never be swallowed into a fake "saved offline" success, since
+// the input was actually invalid and retrying unchanged will just fail again forever.
+function isRecoverableOffline(err: unknown): boolean {
+  const kind = parseVaultError(err);
+  return kind === 'network' || kind === 'no_family';
+}
+
+/**
+ * Creates a document. Attempts the remote multipart upload first when a token is
+ * available. On real connectivity loss (or no token at all) saves it locally with a
+ * temporary id instead, so the user's input is never lost — `offline: true` tells the
+ * caller to surface the standard "saved on your device only" notice. A rejection the
+ * server actually sent back (invalid data, oversized file, ...) is rethrown instead —
+ * saving that locally would just produce a document that can never sync and silently
+ * tell the user it worked.
+ */
+export async function addDocument(
+  input: VaultDocumentInput,
+  token?: string | null,
+  file?: PickedFile | null,
+): Promise<{ doc: DocHubEntry; offline: boolean }> {
+  if (token) {
+    try {
+      const created = await createVaultDocument(input, file ?? null, token);
+      const docs = await loadLocalOnly();
+      await saveDocuments([created, ...docs]);
+      return { doc: created, offline: false };
+    } catch (err) {
+      if (!isRecoverableOffline(err)) throw err;
+      // Fall through to local-only save below — never lose the user's input.
+    }
+  }
+
+  const docs = await loadLocalOnly();
   const newDoc: DocHubEntry = {
-    ...doc,
-    id: `doc_${Date.now()}`,
+    ...input,
+    id: `doc_local_${Date.now()}`,
+    fileUri: file?.uri,
+    fileName: file?.name ?? input.fileName,
   };
-  const updated = [newDoc, ...docs];
-  await saveDocuments(updated);
-  return newDoc;
+  await saveDocuments([newDoc, ...docs]);
+  return { doc: newDoc, offline: true };
 }
 
-export async function updateDocument(updatedDoc: DocHubEntry): Promise<void> {
-  const docs = await loadDocuments();
-  const updated = docs.map((d) => (d.id === updatedDoc.id ? updatedDoc : d));
-  await saveDocuments(updated);
+/**
+ * Updates a document's metadata (and optionally replaces its file). Attempts the remote
+ * call first when a token is present. Only a connectivity failure (or no family yet)
+ * falls back to a local-only write; a rejection the server actually sent back (e.g. a
+ * renewed expiry date that's still before the issue date) is rethrown rather than
+ * quietly written to the local cache and reported as a success — the previous behavior
+ * here told the user "Updated!" even though the server had refused the change.
+ */
+export async function updateDocument(
+  updatedDoc: DocHubEntry,
+  token?: string | null,
+  file?: PickedFile | null,
+): Promise<{ offline: boolean }> {
+  let offline = !token;
+  let resolved = updatedDoc;
+
+  if (token) {
+    try {
+      const { id, fileUri, fileUrl, createdAt, updatedAt, ...input } = updatedDoc;
+      const remote = await updateVaultDocument(id, input, file ?? null, token);
+      resolved = remote;
+      offline = false;
+    } catch (err) {
+      if (!isRecoverableOffline(err)) throw err;
+      offline = true;
+    }
+  }
+
+  const docs = await loadLocalOnly();
+  const merged = docs.map((d) =>
+    d.id === updatedDoc.id
+      ? { ...resolved, fileUri: file?.uri ?? d.fileUri, fileName: file?.name ?? resolved.fileName }
+      : d,
+  );
+  await saveDocuments(merged);
+  return { offline };
 }
 
-export async function deleteDocument(id: string): Promise<void> {
-  const docs = await loadDocuments();
-  const updated = docs.filter((d) => d.id !== id);
-  await saveDocuments(updated);
+export async function deleteDocument(id: string, token?: string | null): Promise<{ offline: boolean }> {
+  let offline = !token;
+  if (token) {
+    try {
+      await deleteVaultDocument(id, token);
+      offline = false;
+    } catch (err) {
+      offline = isNetworkError(err);
+      // Not a network error means the server was reached (e.g. already-deleted 404) —
+      // still remove the local copy either way, since the user already confirmed this
+      // delete via the UI.
+    }
+  }
+  const docs = await loadLocalOnly();
+  await saveDocuments(docs.filter((d) => d.id !== id));
+  return { offline };
 }
 
-export async function getDocById(id: string): Promise<DocHubEntry | undefined> {
-  const docs = await loadDocuments();
+export async function getDocById(id: string, token?: string | null): Promise<DocHubEntry | undefined> {
+  if (token && !id.startsWith('doc_local_')) {
+    try {
+      const remote = await getVaultDocument(id, token);
+      if (remote) {
+        const docs = await loadLocalOnly();
+        await saveDocuments([remote, ...docs.filter((d) => d.id !== remote.id)]);
+        return remote;
+      }
+    } catch {
+      // Fall through to local lookup below.
+    }
+  }
+  const docs = await loadLocalOnly();
   return docs.find((d) => d.id === id);
+}
+
+// Reads the local cache as-is, without ever attempting a remote call or reseeding — used
+// by the write paths above so a create/update/delete never re-triggers a network round
+// trip or resurrects the sample seed data mid-write.
+async function loadLocalOnly(): Promise<DocHubEntry[]> {
+  const data = await getItem<DocHubEntry[]>(STORAGE_KEY, INITIAL_DOCS);
+  return data ?? [];
 }
 
 export function getDocStatus(expiryDate: string): {
