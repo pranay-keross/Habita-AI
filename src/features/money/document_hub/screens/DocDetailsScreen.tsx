@@ -7,6 +7,7 @@ import {
   Pressable,
   Alert,
   ActivityIndicator,
+  Linking,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -23,9 +24,12 @@ import ShieldCheck from 'lucide-react-native/icons/shield-check';
 import Trash2 from 'lucide-react-native/icons/trash-2';
 import Clock from 'lucide-react-native/icons/clock';
 import File from 'lucide-react-native/icons/file';
+import ExternalLink from 'lucide-react-native/icons/external-link';
 import { getDocById, getDocStatus, deleteDocument } from '../docStore';
-import type { DocHubEntry } from '../types';
+import { getFileKind, type DocHubEntry } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../../i18n';
+import useAuth from '../../../../hooks/useAuth';
+import { showNetworkUnavailableAlert } from '../../../../utils/networkStatus';
 
 type Props = StackScreenProps<RootStackParamList, 'DocDetails'>;
 
@@ -33,6 +37,7 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { docId } = route.params;
+  const { getAccessToken } = useAuth();
   const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -41,7 +46,8 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
 
   const fetchDetail = async () => {
     setLoading(true);
-    const item = await getDocById(docId);
+    const token = await getAccessToken().catch(() => null);
+    const item = await getDocById(docId, token);
     setDoc(item);
     setLoading(false);
   };
@@ -64,8 +70,13 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
           text: t('doc_hub.delete'),
           style: 'destructive',
           onPress: async () => {
-            await deleteDocument(docId);
-            Alert.alert(t('doc_hub.delete_doc_title'), t('doc_hub.deleted_alert'));
+            const token = await getAccessToken().catch(() => null);
+            const { offline } = await deleteDocument(docId, token);
+            if (offline) {
+              showNetworkUnavailableAlert();
+            } else {
+              Alert.alert(t('doc_hub.delete_doc_title'), t('doc_hub.deleted_alert'));
+            }
             navigation.goBack();
           },
         },
@@ -244,17 +255,48 @@ export default function DocDetailsScreen({ navigation, route }: Props) {
 
         {/* Attachment View Card */}
         <Text style={styles.sectionTitle}>{t('doc_hub.doc_attachment')}</Text>
-        <View style={styles.card}>
-          <View style={styles.attachmentRow}>
-            <File size={20} color={styles.primaryIcon.color} />
-            <View style={{ flex: 1 }}>
-              <Text style={styles.attachmentTitle}>
-                {doc.fileName || `${doc.title}.pdf`}
-              </Text>
-              <Text style={styles.attachmentSub}>{t('doc_hub.local_vault_sub')}</Text>
+        {doc.fileUrl || doc.fileUri ? (
+          <Pressable
+            style={styles.card}
+            onPress={async () => {
+              const url = doc.fileUrl || doc.fileUri;
+              if (!url) return;
+              const kind = getFileKind(doc.fileName, url);
+              if (kind === 'pdf' || kind === 'image') {
+                navigation.navigate('DocViewer', {
+                  url,
+                  fileName: doc.fileName || doc.title,
+                  kind,
+                });
+                return;
+              }
+              try {
+                await Linking.openURL(url);
+              } catch {
+                Alert.alert(t('doc_hub.cannot_open_title'), t('doc_hub.cannot_open_msg'));
+              }
+            }}>
+            <View style={styles.attachmentRow}>
+              <File size={20} color={styles.primaryIcon.color} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachmentTitle}>{doc.fileName || `${doc.title}.pdf`}</Text>
+                <Text style={styles.attachmentSub}>
+                  {doc.fileUrl ? t('doc_hub.tap_to_view') : t('doc_hub.local_vault_sub')}
+                </Text>
+              </View>
+              <ExternalLink size={16} color={styles.placeholder.color} />
+            </View>
+          </Pressable>
+        ) : (
+          <View style={styles.card}>
+            <View style={styles.attachmentRow}>
+              <File size={20} color={styles.placeholder.color} />
+              <View style={{ flex: 1 }}>
+                <Text style={styles.attachmentSub}>{t('doc_hub.no_attachment')}</Text>
+              </View>
             </View>
           </View>
-        </View>
+        )}
       </ScrollView>
     </View>
   );

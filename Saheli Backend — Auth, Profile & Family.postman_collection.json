@@ -4201,7 +4201,7 @@
             "header": [],
             "body": {
               "mode": "raw",
-              "raw": "{\r\n  \"name\": \"Paracetamol\",\r\n  \"dosage\": \"500mg\",\r\n  \"scheduleTimes\": [\r\n    \"09:00\",\r\n    \"21:00\"\r\n  ],\r\n  \"stockQuantity\": 10,\r\n  \"lowStockThreshold\": 3\r\n}",
+              "raw": "{\r\n  \"name\": \"Aicilli\",\r\n  \"dosage\": \"250 mg\",\r\n  \"scheduleTimes\": {\r\n    \"morning\": \"16:02\",\r\n    \"afternoon\": \"14:06\",\r\n    \"night\": \"14:07\"\r\n  },\r\n  \"stockQuantity\": 15,\r\n  \"lowStockThreshold\": 5\r\n}",
               "options": {
                 "raw": {
                   "language": "json"
@@ -4209,13 +4209,11 @@
               }
             },
             "url": {
-              "raw": "localhost:8080/api/profiles/{{familyProfileId}}/medicines",
+              "raw": "{{baseUrl}}/profiles/{{familyProfileId}}/medicines",
               "host": [
-                "localhost"
+                "{{baseUrl}}"
               ],
-              "port": "8080",
               "path": [
-                "api",
                 "profiles",
                 "{{familyProfileId}}",
                 "medicines"
@@ -6946,7 +6944,7 @@
                 "header": [],
                 "body": {
                   "mode": "raw",
-                  "raw": "{\r\n  \"serviceId\": 11,\r\n  \"name\": \"Ramesh Kumar\",\r\n  \"customRole\": \"Sweeper\",\r\n  \"phone\": \"9876543210\",\r\n  \"monthlySalary\": 15000.00,\r\n  \"joiningDate\": \"2026-08-01\"\r\n}",
+                  "raw": "{\r\n  \"serviceId\": 9,\r\n  \"name\": \"Ramesh Kumar\",\r\n  \"customRole\": \"Security\",\r\n  \"rateType\" : \"Hourly\",\r\n  \"phone\": \"9876543210\",\r\n  \"monthlySalary\": 15000.00,\r\n  \"joiningDate\": \"2026-08-01\",\r\n  \"notes\":\"hired today on fixed salary\"\r\n}",
                   "options": {
                     "raw": {
                       "language": "json"
@@ -7444,848 +7442,4422 @@
               ]
             }
           ]
+        },
+        {
+          "name": "Resource And Utilities",
+          "item": [
+            {
+              "name": "Create Quick Tap items",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"label\": \"Electricity Bill\",\r\n  \"icon\": \"bolt\",\r\n  \"supplyName\": \"Electricity\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "quick-tap-items"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-qucik tap items",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"label\": \"Electricity Bill\",\r\n  \"icon\": \"bolt\",\r\n  \"supplyName\": \"Electricity\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:12:07 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"id\": \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\n    \"label\": \"Electricity Bill\",\n    \"icon\": \"bolt\",\n    \"supplyName\": \"Electricity\"\n}"
+                },
+                {
+                  "name": "401 Unauthorized - Wrong family id given",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"label\": \"Electricity Bill\",\r\n  \"icon\": \"bolt\",\r\n  \"supplyName\": \"Electricity\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:14:02 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:14:01.847278Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have write access to this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/quick-tap-items\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Update quick tap items",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "PUT",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"id\" : \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\r\n  \"label\": \"20 l\",\r\n  \"icon\": \"water \",\r\n  \"supplyName\": \"Water Cans\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "quick-tap-items"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-updated Sucessfullly",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"id\" : \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\r\n  \"label\": \"20 l\",\r\n  \"icon\": \"water \",\r\n  \"supplyName\": \"Water Cans\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "text/plain;charset=UTF-8"
+                    },
+                    {
+                      "key": "Content-Length",
+                      "value": "20"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:19:54 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "Updated Successfully"
+                },
+                {
+                  "name": "500 Internal Server Error-Wrong quick tap id given",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"id\" : \"999d91b3-35a4-4066-adfa-c933f2ce1fc\",\r\n  \"label\": \"20 l\",\r\n  \"icon\": \"water \",\r\n  \"supplyName\": \"Water Cans\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "Internal Server Error",
+                  "code": 500,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:20:51 GMT"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "close"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:20:51.188061200Z\",\n    \"status\": 500,\n    \"error\": \"Internal Server Error\",\n    \"message\": \"An unexpected error occurred\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc275/quick-tap-items\",\n    \"details\": []\n}"
+                },
+                {
+                  "name": "401 Unauthorized-Wrong family id given",
+                  "originalRequest": {
+                    "method": "PUT",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"id\" : \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\r\n  \"label\": \"20 l\",\r\n  \"icon\": \"water \",\r\n  \"supplyName\": \"Water Cans\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:21:36 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:21:36.756061200Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have write access to this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/quick-tap-items\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Delete quick tap item",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/quick-tap-items/999d91b3-35a4-4066-adfa-c933f2ce1fc0",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "quick-tap-items",
+                    "999d91b3-35a4-4066-adfa-c933f2ce1fc0"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "204 - set active to false",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/quick-tap-items/999d91b3-35a4-4066-adfa-c933f2ce1fc0",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "quick-tap-items",
+                        "999d91b3-35a4-4066-adfa-c933f2ce1fc0"
+                      ]
+                    }
+                  },
+                  "status": "No Content",
+                  "code": 204,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:24:18 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": null
+                },
+                {
+                  "name": "404 Not Found-Wrong item it given",
+                  "originalRequest": {
+                    "method": "DELETE",
+                    "header": [],
+                    "url": {
+                      "raw": "{{baseUrl}}/quick-tap-items/999d91b3-35a4-4066-adfa-c933f2ce1fc",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "quick-tap-items",
+                        "999d91b3-35a4-4066-adfa-c933f2ce1fc"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:25:48 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:25:48.383721Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Quick tap item not found\",\n    \"path\": \"/api/quick-tap-items/999d91b3-35a4-4066-adfa-c933f2ce1fc\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "List quick tap items",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "quick-tap-items"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK -List quick tap items",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:29:41 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "[\n    {\n        \"id\": \"999d91b3-35a4-4066-adfa-c933f2ce1fc0\",\n        \"label\": \"20 l\",\n        \"icon\": \"water \",\n        \"supplyName\": \"Water Cans\"\n    },\n    {\n        \"id\": \"248bbc43-f48c-4aa7-ba45-956a162ede93\",\n        \"label\": \"Electricity Bill\",\n        \"icon\": \"bolt\",\n        \"supplyName\": \"Electricity\"\n    }\n]"
+                },
+                {
+                  "name": "401 Unauthorized-Wrong family id given",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/quick-tap-items",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "quick-tap-items"
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:30:39 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:30:39.462700Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/quick-tap-items\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Create log action",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"supplyName\": \"Water Cans\",\r\n  \"quantity\": 5,\r\n  \"note\": \"Purchased for weekly stock\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/resource-logs",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "resource-logs"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-Create log action",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"supplyName\": \"Water Cans\",\r\n  \"quantity\": 5,\r\n  \"note\": \"Purchased for weekly stock\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/resource-logs",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "resource-logs"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:34:17 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"id\": \"e856e85d-033c-4991-b2a0-49140b3ee75c\",\n    \"supplyName\": \"Water Cans\",\n    \"note\": \"Purchased for weekly stock\",\n    \"loggedAt\": \"25-34-2026 09:34:16 am\"\n}"
+                },
+                {
+                  "name": "401 Unauthorized-Wrong family id given",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"supplyName\": \"Water Cans\",\r\n  \"quantity\": 5,\r\n  \"note\": \"Purchased for weekly stock\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/resource-logs",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "resource-logs"
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 09:35:16 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T09:35:16.814868300Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You do not have write access to this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/resource-logs\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "List Recent Logs",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/resource-logs?page=0",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "resource-logs"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    }
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-List Recent Logs",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/resource-logs?page=0",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "resource-logs"
+                      ],
+                      "query": [
+                        {
+                          "key": "page",
+                          "value": "0"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 10:38:54 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"content\": [\n        {\n            \"id\": \"a16c9217-1676-4000-83da-d316913c6edf\",\n            \"supplyName\": \"Water Cans\",\n            \"note\": \"Purchased for weekly stock\",\n            \"loggedAt\": \"25-36-2026 10:36:44 am\"\n        },\n        {\n            \"id\": \"e856e85d-033c-4991-b2a0-49140b3ee75c\",\n            \"supplyName\": \"Water Cans\",\n            \"note\": \"Purchased for weekly stock\",\n            \"loggedAt\": \"25-34-2026 09:34:16 am\"\n        }\n    ],\n    \"totalElements\": 2,\n    \"totalPages\": 1,\n    \"page\": 0,\n    \"size\": 10\n}"
+                },
+                {
+                  "name": "401 Unauthorized-Wrong family id given",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/resource-logs?page=0",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "resource-logs"
+                      ],
+                      "query": [
+                        {
+                          "key": "page",
+                          "value": "0"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "Unauthorized",
+                  "code": 401,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 10:39:59 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T10:39:58.971938600Z\",\n    \"status\": 401,\n    \"error\": \"Unauthorized\",\n    \"message\": \"You are not a member of this family\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/resource-logs\",\n    \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Available utility types",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/utilities/utility-types",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "utilities",
+                    "utility-types"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-Available utility types",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/utilities/utility-types",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "utilities",
+                        "utility-types"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 11:18:47 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "[\n    {\n        \"id\": 1,\n        \"utilityName\": \"Electricity\",\n        \"active\": true\n    },\n    {\n        \"id\": 2,\n        \"utilityName\": \"Gas\",\n        \"active\": true\n    },\n    {\n        \"id\": 3,\n        \"utilityName\": \"Internet\",\n        \"active\": true\n    },\n    {\n        \"id\": 4,\n        \"utilityName\": \"Water\",\n        \"active\": true\n    },\n    {\n        \"id\": 5,\n        \"utilityName\": \"Waste Collection\",\n        \"active\": true\n    }\n]"
+                }
+              ]
+            },
+            {
+              "name": "Get bills list",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{family}}/{{familyId}}}/utility-bill",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}}",
+                    "utility-bill"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "Get bills list",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/utility-bill?page=0",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "utility-bill"
+                      ],
+                      "query": [
+                        {
+                          "key": "page",
+                          "value": "0"
+                        }
+                      ]
+                    }
+                  },
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "vary",
+                      "value": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "x-content-type-options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "x-xss-protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "cache-control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "x-frame-options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "content-type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "transfer-encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "date",
+                      "value": "Thu, 03 Sep 2026 11:28:31 GMT"
+                    },
+                    {
+                      "key": "keep-alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n  \"content\": [\n    {\n      \"id\": \"c9d072f0-5955-4889-a7ae-6c6610e01cdc\",\n      \"utilityType\": \"Electricity\",\n      \"utilityTypeName\": \"Electricity\",\n      \"provider\": \"West Bengal State Electricity Distribution Company\",\n      \"billAmount\": 1250.75,\n      \"dueDate\": \"2026-09-15\",\n      \"isPaid\": false\n    },\n    {\n      \"id\": \"2cbfc0b3-9222-434e-836e-7bd541b3acfc\",\n      \"utilityType\": \"Gas\",\n      \"utilityTypeName\": \"Gas\",\n      \"provider\": \"Indane\",\n      \"billAmount\": 950,\n      \"dueDate\": \"2026-08-28\",\n      \"isPaid\": false\n    },\n    {\n      \"id\": \"c4ba5485-50a5-4cb4-b270-c24dba12bc53\",\n      \"utilityType\": \"Electricity\",\n      \"utilityTypeName\": \"Electricity\",\n      \"provider\": \"West Bengal State Electricity Distribution Company\",\n      \"billAmount\": 1250.75,\n      \"dueDate\": \"2026-09-15\",\n      \"isPaid\": false\n    },\n    {\n      \"id\": \"259f3bf0-9155-46a2-b297-b21ea0548757\",\n      \"utilityType\": \"Electricity\",\n      \"utilityTypeName\": \"Electricity\",\n      \"provider\": \"West Bengal State Electricity Distribution Company\",\n      \"billAmount\": 1250.75,\n      \"dueDate\": \"2026-09-15\",\n      \"isPaid\": false\n    }\n  ],\n  \"totalElements\": 4,\n  \"totalPages\": 1,\n  \"page\": 0,\n  \"size\": 10\n}"
+                }
+              ]
+            },
+            {
+              "name": "Save utility bill",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"utilityTypeId\": 1,\r\n  \"provider\": \"West Bengal State Electricity Distribution Company\",\r\n  \"billAmount\": 1250.75,\r\n  \"dueDate\": \"2026-09-15\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{family}}/{{familyId}}/utility-bill/save",
+                  "host": [
+                    "{{family}}"
+                  ],
+                  "path": [
+                    "{{familyId}}",
+                    "utility-bill",
+                    "save"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-Save utility bill",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"utilityTypeId\": 1,\r\n  \"provider\": \"West Bengal State Electricity Distribution Company\",\r\n  \"billAmount\": 1250.75,\r\n  \"dueDate\": \"2026-09-15\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/utility-bill/save",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "utility-bill",
+                        "save"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "text/plain;charset=UTF-8"
+                    },
+                    {
+                      "key": "Content-Length",
+                      "value": "23"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 12:08:49 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "Bill saved successfully"
+                },
+                {
+                  "name": "404 Not found-Wrong family id given",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"utilityTypeId\": 1,\r\n  \"provider\": \"West Bengal State Electricity Distribution Company\",\r\n  \"billAmount\": 1250.75,\r\n  \"dueDate\": \"2026-09-15\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{family}}/{{familyId}}/utility-bill/save",
+                      "host": [
+                        "{{family}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "utility-bill",
+                        "save"
+                      ]
+                    }
+                  },
+                  "status": "Not Found",
+                  "code": 404,
+                  "_postman_previewlanguage": null,
+                  "header": [
+                    {
+                      "key": "Vary",
+                      "value": "Origin"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Method"
+                    },
+                    {
+                      "key": "Vary",
+                      "value": "Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "X-Content-Type-Options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "X-XSS-Protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "Cache-Control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "Pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "Expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "X-Frame-Options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "Content-Type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "Transfer-Encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "Date",
+                      "value": "Tue, 25 Aug 2026 12:09:37 GMT"
+                    },
+                    {
+                      "key": "Keep-Alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "Connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n    \"timestamp\": \"2026-08-25T12:09:37.765802100Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"message\": \"Family not found\",\n    \"path\": \"/api/families/1e10adce-49ea-489c-8ac1-aefa4bcbc27/utility-bill/save\",\n    \"details\": []\n}"
+                }
+              ]
+            }
+          ]
+        },
+        {
+          "name": "Attendance",
+          "item": [
+            {
+              "name": "Mark Attendance",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"date\": \"2026-09-03\",\r\n  \"status\": \"PRESENT\",\r\n  \"note\": \"Attended all classes\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/staff/f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830/attendance",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "staff",
+                    "f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830",
+                    "attendance"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-saved",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"date\": \"2026-09-03\",\r\n  \"status\": \"PRESENT\",\r\n  \"note\": \"Attended all classes\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{baseUrl}}/api/staff/f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830/attendance",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "staff",
+                        "f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830",
+                        "attendance"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "text",
+                  "header": [
+                    {
+                      "key": "vary",
+                      "value": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "x-content-type-options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "x-xss-protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "cache-control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "x-frame-options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "date",
+                      "value": "Thu, 03 Sep 2026 11:48:09 GMT"
+                    },
+                    {
+                      "key": "keep-alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": ""
+                },
+                {
+                  "name": "404 Wrong staff id given",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"date\": \"2026-09-03\",\r\n  \"status\": \"PRESENT\",\r\n  \"note\": \"Attended all classes\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{baseUrl}}/api/staff/f73e7e2b-3c2b-4ee0-ba84-5d77fac7a83/attendance",
+                      "host": [
+                        "{{baseUrl}}"
+                      ],
+                      "path": [
+                        "api",
+                        "staff",
+                        "f73e7e2b-3c2b-4ee0-ba84-5d77fac7a83",
+                        "attendance"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "vary",
+                      "value": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "x-content-type-options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "x-xss-protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "cache-control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "x-frame-options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "content-type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "transfer-encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "date",
+                      "value": "Thu, 03 Sep 2026 11:49:18 GMT"
+                    },
+                    {
+                      "key": "keep-alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n  \"timestamp\": \"2026-09-03T11:49:18.750831Z\",\n  \"status\": 404,\n  \"error\": \"Not Found\",\n  \"message\": \"Staff not found\",\n  \"path\": \"/api/staff/f73e7e2b-3c2b-4ee0-ba84-5d77fac7a83/attendance\",\n  \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "Record Leave",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "POST",
+                "header": [],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\r\n  \"date\": \"2026-09-03\",\r\n  \"note\": \"Personal leave\"\r\n}",
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                },
+                "url": {
+                  "raw": "{{staff}}/f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830/leave",
+                  "host": [
+                    "{{staff}}"
+                  ],
+                  "path": [
+                    "f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830",
+                    "leave"
+                  ]
+                }
+              },
+              "response": [
+                {
+                  "name": "204 Success",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"date\": \"2026-09-03\",\r\n  \"note\": \"Personal leave\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{staff}}/f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830/leave",
+                      "host": [
+                        "{{staff}}"
+                      ],
+                      "path": [
+                        "f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830",
+                        "leave"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "text",
+                  "header": [
+                    {
+                      "key": "vary",
+                      "value": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "x-content-type-options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "x-xss-protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "cache-control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "x-frame-options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "date",
+                      "value": "Thu, 03 Sep 2026 12:00:39 GMT"
+                    },
+                    {
+                      "key": "keep-alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": ""
+                },
+                {
+                  "name": "404 Wrong staff id given",
+                  "originalRequest": {
+                    "method": "POST",
+                    "header": [],
+                    "body": {
+                      "mode": "raw",
+                      "raw": "{\r\n  \"date\": \"2026-09-03\",\r\n  \"note\": \"Personal leave\"\r\n}",
+                      "options": {
+                        "raw": {
+                          "language": "json"
+                        }
+                      }
+                    },
+                    "url": {
+                      "raw": "{{staff}}/f73e7e2b-3c2b-4ee0-ba84-5d77fac7a83/leave",
+                      "host": [
+                        "{{staff}}"
+                      ],
+                      "path": [
+                        "f73e7e2b-3c2b-4ee0-ba84-5d77fac7a83",
+                        "leave"
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "vary",
+                      "value": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "x-content-type-options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "x-xss-protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "cache-control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "x-frame-options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "content-type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "transfer-encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "date",
+                      "value": "Thu, 03 Sep 2026 12:01:01 GMT"
+                    },
+                    {
+                      "key": "keep-alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n  \"timestamp\": \"2026-09-03T12:01:01.478990900Z\",\n  \"status\": 404,\n  \"error\": \"Not Found\",\n  \"message\": \"Staff not found\",\n  \"path\": \"/api/staff/f73e7e2b-3c2b-4ee0-ba84-5d77fac7a83/leave\",\n  \"details\": []\n}"
+                }
+              ]
+            },
+            {
+              "name": "List Attendance",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": ""
+                }
+              },
+              "response": [
+                {
+                  "name": "200 OK-List Attendance",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{staff}}/{{familyId}}/attendance/list?page=0&limit=5",
+                      "host": [
+                        "{{staff}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "attendance",
+                        "list"
+                      ],
+                      "query": [
+                        {
+                          "key": "page",
+                          "value": "0"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "5"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "vary",
+                      "value": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "x-content-type-options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "x-xss-protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "cache-control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "x-frame-options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "content-type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "transfer-encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "date",
+                      "value": "Thu, 03 Sep 2026 15:49:32 GMT"
+                    },
+                    {
+                      "key": "keep-alive",
+                      "value": "timeout=60"
+                    },
+                    {
+                      "key": "connection",
+                      "value": "keep-alive"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "[\n  {\n    \"staffId\": \"f73e7e2b-3c2b-4ee0-ba84-5d77fac7a830\",\n    \"name\": \"Ramesh Kumar\",\n    \"presentDays\": 1,\n    \"totalMonthlyDays\": 30\n  },\n  {\n    \"staffId\": \"284913ed-5441-4dd0-95e1-62897d3ec4aa\",\n    \"name\": \"Ramesh Kumar\",\n    \"presentDays\": 0,\n    \"totalMonthlyDays\": 30\n  },\n  {\n    \"staffId\": \"c1f676b2-9e3a-4de3-b8b4-09d6bd3490a0\",\n    \"name\": \"Ramesh Kumar\",\n    \"presentDays\": 0,\n    \"totalMonthlyDays\": 30\n  },\n  {\n    \"staffId\": \"20e70c37-9b11-419a-843e-e5ae3c0ed732\",\n    \"name\": \"Ramesh Kumar\",\n    \"presentDays\": 0,\n    \"totalMonthlyDays\": 30\n  },\n  {\n    \"staffId\": \"ba7c0219-b513-4821-b3ef-fa6d94cd883e\",\n    \"name\": \"Rakesh Kumar\",\n    \"presentDays\": 0,\n    \"totalMonthlyDays\": 30\n  }\n]"
+                },
+                {
+                  "name": "400 Bad Request- Wrong family id given",
+                  "originalRequest": {
+                    "method": "GET",
+                    "header": [],
+                    "url": {
+                      "raw": "{{staff}}/{{familyId}}/attendance/list?page=0&limit=5",
+                      "host": [
+                        "{{staff}}"
+                      ],
+                      "path": [
+                        "{{familyId}}",
+                        "attendance",
+                        "list"
+                      ],
+                      "query": [
+                        {
+                          "key": "page",
+                          "value": "0"
+                        },
+                        {
+                          "key": "limit",
+                          "value": "5"
+                        }
+                      ]
+                    }
+                  },
+                  "status": "OK",
+                  "code": 200,
+                  "_postman_previewlanguage": "json",
+                  "header": [
+                    {
+                      "key": "vary",
+                      "value": "Origin, Access-Control-Request-Method, Access-Control-Request-Headers"
+                    },
+                    {
+                      "key": "x-content-type-options",
+                      "value": "nosniff"
+                    },
+                    {
+                      "key": "x-xss-protection",
+                      "value": "0"
+                    },
+                    {
+                      "key": "cache-control",
+                      "value": "no-cache, no-store, max-age=0, must-revalidate"
+                    },
+                    {
+                      "key": "pragma",
+                      "value": "no-cache"
+                    },
+                    {
+                      "key": "expires",
+                      "value": "0"
+                    },
+                    {
+                      "key": "x-frame-options",
+                      "value": "DENY"
+                    },
+                    {
+                      "key": "content-type",
+                      "value": "application/json"
+                    },
+                    {
+                      "key": "transfer-encoding",
+                      "value": "chunked"
+                    },
+                    {
+                      "key": "date",
+                      "value": "Thu, 03 Sep 2026 15:50:34 GMT"
+                    },
+                    {
+                      "key": "connection",
+                      "value": "close"
+                    }
+                  ],
+                  "cookie": [],
+                  "body": "{\n  \"timestamp\": \"2026-09-03T15:50:33.826998200Z\",\n  \"status\": 400,\n  \"error\": \"Bad Request\",\n  \"message\": \"Doesn't have read access\",\n  \"path\": \"/api/staff/1e10adce-49ea-489c-8ac1-aefa4bcbc27/attendance/list\",\n  \"details\": []\n}"
+                }
+              ]
+            }
+          ]
         }
       ]
     },
     {
-      "name": "Expense Groups & Multi-Currency Splitting",
-      "description": "SRS Module 11 (§11 'Multi-Currency Expense Groups') & REST endpoints for /api/expense-groups and /api/expenses.\n\nCapabilities:\n- Group lifecycle: Create, List, Get, Update, Soft-Delete\n- Group Membership: Add, Remove (requires settled 0.00 balance)\n- Dynamic bill splitting: EQUAL, PERCENTAGE, SHARES with 1-paise rounding\n- Multi-currency normalization (INR, USD, EUR, AED, GBP)\n- Debt settlement tracking (UPI, Cash, Bank Transfer)\n- Pairwise debt minimization algorithm & group sync (/sync)\n- Rolling 30-day spend rollup for Dashboard tile (/api/expenses/summary/30-day)",
+      "name": "Vault",
+      "description": "Encrypted Vault / Document Hub — household-wide document repository (`/api/vault/documents`) with optional file attachment and client-computed expiry status. See `docs/VAULT_API_SPEC.md` for the full contract. Requires `{{accessToken}}` (run the Auth flow first) and an existing family (run Family > Create Family first, or accept an invite) — a caller with no family gets `404 NO_FAMILY`. `Create Vault Document` captures `{{documentId}}` automatically.",
       "item": [
         {
-          "name": "List Expense Groups",
+          "name": "List Vault Documents",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status code is 200', function () {",
+                  "pm.test(\"Status code is 200\", function () {",
                   "    pm.response.to.have.status(200);",
                   "});",
+                  "",
                   "if (pm.response.code === 200) {",
                   "    const json = pm.response.json();",
-                  "    pm.test('Has summary & groups', function () {",
-                  "        pm.expect(json.summary).to.be.an('object');",
-                  "        pm.expect(json.groups).to.be.an('array');",
-                  "    });",
-                  "    pm.test('Has pagination fields', function () {",
-                  "        pm.expect(json.page).to.be.a('number');",
-                  "        pm.expect(json.size).to.be.a('number');",
-                  "        pm.expect(json.totalElements).to.be.a('number');",
-                  "        pm.expect(json.totalPages).to.be.a('number');",
-                  "    });",
-                  "    if (json.groups && json.groups.length > 0) {",
-                  "        pm.collectionVariables.set('groupId', json.groups[0].id);",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups?page=0&size=8",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups"
-              ],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "0"
-                },
-                {
-                  "key": "size",
-                  "value": "8"
-                }
-              ]
-            },
-            "description": "Retrieves a page of expense groups for the authenticated user, along with the user's net balance in each group. `summary` (totalSpentINR, youAreOwedINR, youOweINR) is always the caller's full aggregate across every group they belong to, not just this page — only `groups` is paginated. `page`/`size` are optional (default 0/8)."
-          }
-        },
-        {
-          "name": "Create Expense Group",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "if (pm.response.code === 201) {",
-                  "    const json = pm.response.json();",
-                  "    pm.collectionVariables.set('groupId', json.id);",
-                  "    if (json.members && json.members.length > 0) {",
-                  "        const owner = json.members.find(m => m.isOwner) || json.members[0];",
-                  "        pm.collectionVariables.set('ownerMemberId', owner.id);",
-                  "        const other = json.members.find(m => !m.isOwner);",
-                  "        if (other) {",
-                  "            pm.collectionVariables.set('memberId', other.id);",
-                  "        }",
-                  "    }",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Weekend Goa Trip\",\n  \"emoji\": \"umbrella\",\n  \"category\": \"Travel & Fun\",\n  \"defaultCurrency\": \"INR\",\n  \"members\": [\n    {\n      \"name\": \"Priya Patel\",\n      \"avatar\": \"👩‍🦰\"\n    }\n  ]\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups"
-              ]
-            },
-            "description": "Creates a new expense group. The creator is automatically added as the owner and first member."
-          }
-        },
-        {
-          "name": "Get Expense Group Details",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "if (pm.response.code === 200) {",
-                  "    const json = pm.response.json();",
-                  "    pm.test('Has valid group id and members', function () {",
-                  "        pm.expect(json.id).to.eql(pm.collectionVariables.get('groupId'));",
-                  "        pm.expect(json.members).to.be.an('array');",
-                  "    });",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}"
-              ]
-            },
-            "description": "Fetches details of a specific expense group including all member profiles."
-          }
-        },
-        {
-          "name": "Update Expense Group",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "PUT",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Goa Trip 2026\",\n  \"emoji\": \"umbrella\",\n  \"category\": \"Vacation\",\n  \"defaultCurrency\": \"INR\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}"
-              ]
-            },
-            "description": "Updates group metadata (name, emoji, category, default currency). `emoji` must be one of the GroupIconKey values: house, umbrella, popcorn, car, graduation-cap, plane, hamburger, gift, users."
-          }
-        },
-        {
-          "name": "Lookup Member By Phone",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "if (pm.response.code === 200) {",
-                  "    pm.test('Status code is 200', function () {",
-                  "        pm.response.to.have.status(200);",
-                  "    });",
-                  "    const json = pm.response.json();",
-                  "    pm.test('Has userId and name', function () {",
-                  "        pm.expect(json.userId).to.be.a('string');",
-                  "        pm.expect(json.name).to.be.a('string');",
-                  "    });",
-                  "    pm.collectionVariables.set('lookedUpMemberUserId', json.userId);",
-                  "} else {",
-                  "    pm.test('Status code is 404 (no registered user for this phone)', function () {",
-                  "        pm.response.to.have.status(404);",
-                  "    });",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/members/lookup-by-phone?phone={{invitedPhone}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "members",
-                "lookup-by-phone"
-              ],
-              "query": [
-                {
-                  "key": "phone",
-                  "value": "{{invitedPhone}}"
-                }
-              ]
-            },
-            "description": "Looks up whether a phone number belongs to a registered user, without creating or modifying anything. Used by the \"add member by phone\" UI to show a verified badge and prefill the real name before the member is actually added. Requires `{{invitedPhone}}` to already belong to a registered user — run the Auth flow a second time for that phone first (see Family folder notes). Returns 200 with `userId`/`name`/`avatarUrl`/`phone` on a match, or 404 `USER_NOT_FOUND` otherwise."
-          }
-        },
-        {
-          "name": "Add Group Member (Verified Phone)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "if (pm.response.code === 201) {",
-                  "    const json = pm.response.json();",
-                  "    pm.collectionVariables.set('newMemberId', json.id);",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Rohan Gupta\",\n  \"avatar\": \"🧔\",\n  \"phone\": \"{{invitedPhone}}\",\n  \"userId\": \"{{lookedUpMemberUserId}}\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/members",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}",
-                "members"
-              ]
-            },
-            "description": "Adds a member using a phone already confirmed via 'Lookup Member By Phone' (run that request first to populate {{lookedUpMemberUserId}}). The backend re-resolves the phone server-side and trusts its own lookup over the client-supplied `userId` — if the phone no longer resolves to a registered user, this returns 400 `PHONE_NO_LONGER_REGISTERED` instead of silently adding an ad-hoc member."
-          }
-        },
-        {
-          "name": "Add Group Member (Ad-hoc, No Phone)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "if (pm.response.code === 201) {",
-                  "    const json = pm.response.json();",
-                  "    pm.collectionVariables.set('newMemberId', json.id);",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"name\": \"Priya Patel\",\n  \"avatar\": \"👩‍🦰\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/members",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}",
-                "members"
-              ]
-            },
-            "description": "Adds an ad-hoc member by name only, no phone/userId — the path used when 'Lookup Member By Phone' returns 404 and the UI offers 'Add without phone number'."
-          }
-        },
-        {
-          "name": "Remove Group Member",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 204', function () {",
-                  "    pm.response.to.have.status(204);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/members/{{newMemberId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}",
-                "members",
-                "{{newMemberId}}"
-              ]
-            },
-            "description": "Removes a member from a group. Precondition: Member's net balance must be 0.00."
-          }
-        },
-        {
-          "name": "List Group Expenses",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "if (pm.response.code === 200) {",
-                  "    const json = pm.response.json();",
-                  "    pm.test('Has content and pagination', function () {",
-                  "        pm.expect(json.content).to.be.an('array');",
-                  "    });",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses?page=0&size=50",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}",
-                "expenses"
-              ],
-              "query": [
-                {
-                  "key": "page",
-                  "value": "0"
-                },
-                {
-                  "key": "size",
-                  "value": "50"
-                },
-                {
-                  "key": "category",
-                  "value": "food",
-                  "disabled": true
-                }
-              ]
-            },
-            "description": "List expenses for the group with optional pagination and category filtering."
-          }
-        },
-        {
-          "name": "Add Expense (Equal Split)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "if (pm.response.code === 201) {",
-                  "    const json = pm.response.json();",
-                  "    pm.collectionVariables.set('expenseId', json.id);",
-                  "    pm.test('Shares calculated', function () {",
-                  "        pm.expect(json.shares).to.be.an('array');",
-                  "        pm.expect(json.shares.length).to.be.above(0);",
-                  "    });",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Monthly Rent Payment\",\n  \"amount\": 36000,\n  \"currency\": \"INR\",\n  \"payerId\": \"{{ownerMemberId}}\",\n  \"splitMode\": \"EQUAL\",\n  \"category\": \"rent\",\n  \"date\": \"2026-08-01\",\n  \"notes\": \"Paid via NetBanking for August\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}",
-                "expenses"
-              ]
-            },
-            "description": "Adds an expense split equally among all group members with 1-paise remainder distribution."
-          }
-        },
-        {
-          "name": "Add Expense (Percentage Split)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Seafood Dinner & Drinks\",\n  \"amount\": 6400.00,\n  \"currency\": \"INR\",\n  \"payerId\": \"{{ownerMemberId}}\",\n  \"splitMode\": \"percentage\",\n  \"category\": \"food\",\n  \"date\": \"2026-08-07\",\n  \"notes\": \"Beach shack dinner\",\n  \"splits\": {\n    \"{{ownerMemberId}}\": 50.0,\n    \"{{memberId}}\": 50.0\n  }\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}",
-                "expenses"
-              ]
-            },
-            "description": "Adds an expense and itemizes exact percentages across group members (validated to strictly sum to 100%)."
-          }
-        },
-        {
-          "name": "Add Expense (Multi-Currency USD)",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "if (pm.response.code === 201) {",
-                  "    const json = pm.response.json();",
-                  "    pm.test('Multi-currency converted to INR', function () {",
-                  "        pm.expect(json.currency).to.eql('USD');",
-                  "        pm.expect(json.exchangeRate).to.eql(83.5);",
-                  "        pm.expect(json.baseAmountINR).to.eql(8350);",
-                  "    });",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"title\": \"Software Subscription\",\n  \"amount\": 100,\n  \"currency\": \"USD\",\n  \"payerId\": \"{{ownerMemberId}}\",\n  \"splitMode\": \"EQUAL\",\n  \"category\": \"bills\",\n  \"date\": \"2026-08-10\",\n  \"notes\": \"Annual cloud hosting in USD\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}",
-                "expenses"
-              ]
-            },
-            "description": "Adds an expense in foreign currency (USD, EUR, AED, GBP) which is automatically converted to base INR using exchange rates."
-          }
-        },
-        {
-          "name": "Get Single Expense",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "if (pm.response.code === 200) {",
-                  "    const json = pm.response.json();",
-                  "    pm.test('Valid expense id', function () {",
-                  "        pm.expect(json.id).to.eql(pm.collectionVariables.get('expenseId'));",
-                  "    });",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "GET",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses/{{expenseId}}",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}",
-                "expenses",
-                "{{expenseId}}"
-              ]
-            },
-            "description": "Gets single expense details with full split itemization and payer metadata."
-          }
-        },
-        {
-          "name": "Record Debt Settlement",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 201', function () {",
-                  "    pm.response.to.have.status(201);",
-                  "});",
-                  "if (pm.response.code === 201) {",
-                  "    const json = pm.response.json();",
-                  "    pm.collectionVariables.set('settlementId', json.id);",
-                  "}"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "POST",
-            "header": [
-              {
-                "key": "Content-Type",
-                "value": "application/json"
-              }
-            ],
-            "body": {
-              "mode": "raw",
-              "raw": "{\n  \"payerMemberId\": \"{{memberId}}\",\n  \"payeeMemberId\": \"{{ownerMemberId}}\",\n  \"amount\": 5000,\n  \"currency\": \"INR\",\n  \"method\": \"UPI\",\n  \"date\": \"2026-08-03\",\n  \"notes\": \"Partial payment towards August rent via Google Pay\"\n}"
-            },
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/settlements",
-              "host": [
-                "{{baseUrl}}"
-              ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}",
-                "settlements"
-              ]
-            },
-            "description": "Records a payment made between two members to settle debt."
-          }
-        },
-        {
-          "name": "List Debt Settlements",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "if (pm.response.code === 200) {",
-                  "    const json = pm.response.json();",
-                  "    pm.test('Is array of settlements', function () {",
+                  "    pm.test(\"Response is an array\", function () {",
                   "        pm.expect(json).to.be.an('array');",
                   "    });",
+                  "    if (json.length > 0) {",
+                  "        pm.collectionVariables.set(\"documentId\", json[0].id);",
+                  "    }",
                   "}"
                 ]
               }
             }
           ],
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/settlements",
+              "raw": "{{baseUrl}}/api/vault/documents?category=&search=",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "expense-groups",
-                "{{groupId}}",
-                "settlements"
+                "vault",
+                "documents"
+              ],
+              "query": [
+                {
+                  "key": "category",
+                  "value": ""
+                },
+                {
+                  "key": "search",
+                  "value": ""
+                }
               ]
             },
-            "description": "List all settlements recorded for the group."
-          }
+            "description": "Lists every document in the caller's family vault (household-wide — any member sees every document). `category` and `search` are optional server-side filters; omit both to fetch the full list."
+          },
+          "response": [
+            {
+              "name": "200 OK — documents in the family vault",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "[\n    {\n        \"id\": \"{{documentId}}\",\n        \"familyId\": \"{{familyId}}\",\n        \"title\": \"Indian Passport (Animesh)\",\n        \"category\": \"passport\",\n        \"docNumber\": \"Z8942104\",\n        \"memberName\": \"Animesh Manna\",\n        \"issueDate\": \"2020-04-12\",\n        \"expiryDate\": \"2030-04-11\",\n        \"notes\": \"Primary passport, kept in desk safe\",\n        \"country\": \"India\",\n        \"issuingAuthority\": \"Passport Seva Kendra Kolkata\",\n        \"coveredMembers\": null,\n        \"fileName\": \"passport_scan.pdf\",\n        \"fileUrl\": \"https://saheli-v1-bucket.s3.ap-south-1.amazonaws.com/vault/{{familyId}}/{{documentId}}.pdf?X-Amz-Expires=600&...\",\n        \"createdAt\": \"2026-09-04T09:00:00Z\",\n        \"updatedAt\": \"2026-09-04T09:00:00Z\"\n    }\n]"
+            },
+            {
+              "name": "200 OK — empty vault",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "[]"
+            },
+            {
+              "name": "404 Not Found — caller has no family yet",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"code\": \"NO_FAMILY\",\n    \"message\": \"You have not created or joined a family yet\",\n    \"path\": \"/api/vault/documents\"\n}"
+            }
+          ]
         },
         {
-          "name": "Get Group Sync & Analytics",
+          "name": "Create Vault Document",
           "event": [
             {
               "listen": "test",
               "script": {
                 "type": "text/javascript",
                 "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
+                  "pm.test(\"Status code is 201\", function () {",
+                  "    pm.response.to.have.status(201);",
                   "});",
-                  "if (pm.response.code === 200) {",
+                  "",
+                  "if (pm.response.code === 201) {",
                   "    const json = pm.response.json();",
-                  "    pm.test('Has group, balances, pairwiseDebts, relationshipBalances and categoryBreakdown', function () {",
-                  "        pm.expect(json.group).to.be.an('object');",
-                  "        pm.expect(json.balances).to.be.an('array');",
-                  "        pm.expect(json.pairwiseDebts).to.be.an('array');",
-                  "        pm.expect(json.relationshipBalances).to.be.an('array');",
-                  "        pm.expect(json.categoryBreakdown).to.be.an('object');",
-                  "    });",
+                  "    pm.collectionVariables.set(\"documentId\", json.id);",
                   "}"
                 ]
               }
             }
           ],
           "request": {
-            "method": "GET",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
             "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "metadata",
+                  "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2030-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                  "type": "text",
+                  "contentType": "application/json"
+                },
+                {
+                  "key": "file",
+                  "type": "file",
+                  "src": "/C:/Users/pkole/Pictures/passport_scan.pdf"
+                }
+              ],
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
             "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/sync",
+              "raw": "{{baseUrl}}/api/vault/documents",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "expense-groups",
-                "{{groupId}}",
-                "sync"
+                "vault",
+                "documents"
               ]
             },
-            "description": "Crucial for GroupDetailsScreen.tsx: Returns group metadata, active expenses, settlements, computed balances, pairwise debts, relationship balances, and category spending analytics in a single performant payload. `pairwiseDebts` is a minimized settlement suggestion; `relationshipBalances` is the true, direct per-pair debt (use this for 'Owed by you'/'Owed to you' sections)."
-          }
+            "description": "Creates a document in the caller's family vault. `metadata` is a required JSON-typed text part (send it as a JSON part, not a plain string, or Spring rejects it as `application/octet-stream`); `file` is an optional PDF/JPEG/PNG attachment up to 10 MB."
+          },
+          "response": [
+            {
+              "name": "201 Created — document with attachment",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "metadata",
+                      "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2030-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                      "type": "text",
+                      "contentType": "application/json"
+                    },
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": "/C:/Users/pkole/Pictures/passport_scan.pdf"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Created",
+              "code": 201,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"{{documentId}}\",\n    \"familyId\": \"{{familyId}}\",\n    \"title\": \"Indian Passport (Animesh)\",\n    \"category\": \"passport\",\n    \"docNumber\": \"Z8942104\",\n    \"memberName\": \"Animesh Manna\",\n    \"issueDate\": \"2020-04-12\",\n    \"expiryDate\": \"2030-04-11\",\n    \"notes\": \"Primary passport, kept in desk safe\",\n    \"country\": \"India\",\n    \"issuingAuthority\": \"Passport Seva Kendra Kolkata\",\n    \"coveredMembers\": null,\n    \"fileName\": \"passport_scan.pdf\",\n    \"fileUrl\": \"https://saheli-v1-bucket.s3.ap-south-1.amazonaws.com/vault/{{familyId}}/{{documentId}}.pdf?X-Amz-Expires=600&...\",\n    \"createdAt\": \"2026-09-04T09:00:00Z\",\n    \"updatedAt\": \"2026-09-04T09:00:00Z\"\n}"
+            },
+            {
+              "name": "400 Bad Request — missing required field",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "metadata",
+                      "value": "{\"title\":\"\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2030-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                      "type": "text",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"code\": \"MISSING_REQUIRED_FIELD\",\n    \"message\": \"title is required\",\n    \"path\": \"/api/vault/documents\"\n}"
+            },
+            {
+              "name": "400 Bad Request — invalid category",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "metadata",
+                      "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"birth_certificate\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2030-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                      "type": "text",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"code\": \"INVALID_CATEGORY\",\n    \"message\": \"Unsupported category: 'birth_certificate'. Supported values are: [PASSPORT, VISA, LICENSE, INSURANCE, WARRANTY, PROPERTY, TAX]\",\n    \"path\": \"/api/vault/documents\"\n}"
+            },
+            {
+              "name": "400 Bad Request — expiryDate before issueDate",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "metadata",
+                      "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2031-01-01\",\"expiryDate\":\"2030-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                      "type": "text",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Bad Request",
+              "code": 400,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 400,\n    \"error\": \"Bad Request\",\n    \"code\": \"INVALID_EXPIRY_DATE\",\n    \"message\": \"expiryDate must be a valid date on or after issueDate\",\n    \"path\": \"/api/vault/documents\"\n}"
+            },
+            {
+              "name": "413 Payload Too Large — attachment exceeds 10 MB",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "metadata",
+                      "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2030-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                      "type": "text",
+                      "contentType": "application/json"
+                    },
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": "/C:/Users/pkole/Pictures/passport_scan.pdf"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Payload Too Large",
+              "code": 413,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 413,\n    \"error\": \"Payload Too Large\",\n    \"code\": \"FILE_TOO_LARGE\",\n    \"message\": \"Attachment exceeds the 10 MB limit\",\n    \"path\": \"/api/vault/documents\"\n}"
+            },
+            {
+              "name": "415 Unsupported Media Type — attachment is not PDF/JPEG/PNG",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "metadata",
+                      "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2030-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                      "type": "text",
+                      "contentType": "application/json"
+                    },
+                    {
+                      "key": "file",
+                      "type": "file",
+                      "src": "/C:/Users/pkole/Pictures/passport_scan.pdf"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Unsupported Media Type",
+              "code": 415,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 415,\n    \"error\": \"Unsupported Media Type\",\n    \"code\": \"UNSUPPORTED_FILE_TYPE\",\n    \"message\": \"Attachment must be a PDF, JPEG, or PNG file\",\n    \"path\": \"/api/vault/documents\"\n}"
+            },
+            {
+              "name": "404 Not Found — caller has no family yet",
+              "originalRequest": {
+                "method": "POST",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "metadata",
+                      "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2030-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                      "type": "text",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"code\": \"NO_FAMILY\",\n    \"message\": \"You have not created or joined a family yet\",\n    \"path\": \"/api/vault/documents\"\n}"
+            }
+          ]
         },
         {
-          "name": "Rolling 30-Day Spend Rollup",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 200', function () {",
-                  "    pm.response.to.have.status(200);",
-                  "});",
-                  "if (pm.response.code === 200) {",
-                  "    const json = pm.response.json();",
-                  "    pm.test('Has spend metric and dates', function () {",
-                  "        pm.expect(json.rolling30DaysSpendINR).to.be.a('number');",
-                  "        pm.expect(json.currency).to.eql('INR');",
-                  "    });",
-                  "}"
-                ]
-              }
-            }
-          ],
+          "name": "Get Vault Document",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "GET",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/expenses/summary/30-day",
+              "raw": "{{baseUrl}}/api/vault/documents/{{documentId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "expenses",
-                "summary",
-                "30-day"
+                "vault",
+                "documents",
+                "{{documentId}}"
               ]
             },
-            "description": "Used by dashboard spend tile: Returns user's rolling 30-day spend total in INR."
-          }
+            "description": "Fetches a single document with a freshly presigned `fileUrl` (~10 minute expiry)."
+          },
+          "response": [
+            {
+              "name": "200 OK",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents/{{documentId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents",
+                    "{{documentId}}"
+                  ]
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"{{documentId}}\",\n    \"familyId\": \"{{familyId}}\",\n    \"title\": \"Indian Passport (Animesh)\",\n    \"category\": \"passport\",\n    \"docNumber\": \"Z8942104\",\n    \"memberName\": \"Animesh Manna\",\n    \"issueDate\": \"2020-04-12\",\n    \"expiryDate\": \"2030-04-11\",\n    \"notes\": \"Primary passport, kept in desk safe\",\n    \"country\": \"India\",\n    \"issuingAuthority\": \"Passport Seva Kendra Kolkata\",\n    \"coveredMembers\": null,\n    \"fileName\": \"passport_scan.pdf\",\n    \"fileUrl\": \"https://saheli-v1-bucket.s3.ap-south-1.amazonaws.com/vault/{{familyId}}/{{documentId}}.pdf?X-Amz-Expires=600&...\",\n    \"createdAt\": \"2026-09-04T09:00:00Z\",\n    \"updatedAt\": \"2026-09-04T09:00:00Z\"\n}"
+            },
+            {
+              "name": "404 Not Found — document does not exist or belongs to another family",
+              "originalRequest": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents/{{documentId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents",
+                    "{{documentId}}"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"code\": \"DOCUMENT_NOT_FOUND\",\n    \"message\": \"Document not found\",\n    \"path\": \"/api/vault/documents/{{documentId}}\"\n}"
+            }
+          ]
         },
         {
-          "name": "Soft-Delete Expense",
-          "event": [
-            {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 204', function () {",
-                  "    pm.response.to.have.status(204);",
-                  "});"
-                ]
-              }
-            }
-          ],
+          "name": "Update Vault Document (Renew)",
           "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "PUT",
+            "header": [],
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "metadata",
+                  "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2035-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                  "type": "text",
+                  "contentType": "application/json"
+                }
+              ],
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/vault/documents/{{documentId}}",
+              "host": [
+                "{{baseUrl}}"
+              ],
+              "path": [
+                "api",
+                "vault",
+                "documents",
+                "{{documentId}}"
+              ]
+            },
+            "description": "Full replace of every field in `metadata` — used both for a regular edit and for the Expiration Alerts screen's quick \"renew\" action (bump `expiryDate` while resending the rest of the current metadata unchanged). `file` is optional; when present it replaces the existing attachment, when omitted the existing attachment is left untouched."
+          },
+          "response": [
+            {
+              "name": "200 OK — renewed",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents/{{documentId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents",
+                    "{{documentId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "metadata",
+                      "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2035-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                      "type": "text",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "OK",
+              "code": 200,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"id\": \"{{documentId}}\",\n    \"familyId\": \"{{familyId}}\",\n    \"title\": \"Indian Passport (Animesh)\",\n    \"category\": \"passport\",\n    \"docNumber\": \"Z8942104\",\n    \"memberName\": \"Animesh Manna\",\n    \"issueDate\": \"2020-04-12\",\n    \"expiryDate\": \"2035-04-11\",\n    \"notes\": \"Primary passport, kept in desk safe\",\n    \"country\": \"India\",\n    \"issuingAuthority\": \"Passport Seva Kendra Kolkata\",\n    \"coveredMembers\": null,\n    \"fileName\": \"passport_scan.pdf\",\n    \"fileUrl\": \"https://saheli-v1-bucket.s3.ap-south-1.amazonaws.com/vault/{{familyId}}/{{documentId}}.pdf?X-Amz-Expires=600&...\",\n    \"createdAt\": \"2026-09-04T09:00:00Z\",\n    \"updatedAt\": \"2026-09-04T10:00:00Z\"\n}"
+            },
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "PUT",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents/{{documentId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents",
+                    "{{documentId}}"
+                  ]
+                },
+                "body": {
+                  "mode": "formdata",
+                  "formdata": [
+                    {
+                      "key": "metadata",
+                      "value": "{\"title\":\"Indian Passport (Animesh)\",\"category\":\"passport\",\"docNumber\":\"Z8942104\",\"memberName\":\"Animesh Manna\",\"issueDate\":\"2020-04-12\",\"expiryDate\":\"2035-04-11\",\"notes\":\"Primary passport, kept in desk safe\",\"country\":\"India\",\"issuingAuthority\":\"Passport Seva Kendra Kolkata\",\"coveredMembers\":null}",
+                      "type": "text",
+                      "contentType": "application/json"
+                    }
+                  ],
+                  "options": {
+                    "raw": {
+                      "language": "json"
+                    }
+                  }
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"code\": \"DOCUMENT_NOT_FOUND\",\n    \"message\": \"Document not found\",\n    \"path\": \"/api/vault/documents/{{documentId}}\"\n}"
+            }
+          ]
+        },
+        {
+          "name": "Delete Vault Document",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{accessToken}}",
+                  "type": "string"
+                }
+              ]
+            },
             "method": "DELETE",
             "header": [],
             "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}/expenses/{{expenseId}}",
+              "raw": "{{baseUrl}}/api/vault/documents/{{documentId}}",
               "host": [
                 "{{baseUrl}}"
               ],
               "path": [
                 "api",
-                "expense-groups",
-                "{{groupId}}",
-                "expenses",
-                "{{expenseId}}"
+                "vault",
+                "documents",
+                "{{documentId}}"
               ]
             },
-            "description": "Soft-deletes the expense, triggering recalculation of balances."
-          }
+            "description": "Permanently deletes the document and its attached file (if any) — no soft-delete/undo. A 404 here is treated as a success by the client (it removes its local copy regardless)."
+          },
+          "response": [
+            {
+              "name": "204 No Content",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents/{{documentId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents",
+                    "{{documentId}}"
+                  ]
+                }
+              },
+              "status": "No Content",
+              "code": 204,
+              "_postman_previewlanguage": null,
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": ""
+            },
+            {
+              "name": "404 Not Found",
+              "originalRequest": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/vault/documents/{{documentId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "vault",
+                    "documents",
+                    "{{documentId}}"
+                  ]
+                }
+              },
+              "status": "Not Found",
+              "code": 404,
+              "_postman_previewlanguage": "json",
+              "header": [
+                {
+                  "key": "Vary",
+                  "value": "Origin"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Method"
+                },
+                {
+                  "key": "Vary",
+                  "value": "Access-Control-Request-Headers"
+                },
+                {
+                  "key": "X-Content-Type-Options",
+                  "value": "nosniff"
+                },
+                {
+                  "key": "X-XSS-Protection",
+                  "value": "0"
+                },
+                {
+                  "key": "Cache-Control",
+                  "value": "no-cache, no-store, max-age=0, must-revalidate"
+                },
+                {
+                  "key": "Pragma",
+                  "value": "no-cache"
+                },
+                {
+                  "key": "Expires",
+                  "value": "0"
+                },
+                {
+                  "key": "X-Frame-Options",
+                  "value": "DENY"
+                },
+                {
+                  "key": "Content-Type",
+                  "value": "application/json"
+                },
+                {
+                  "key": "Transfer-Encoding",
+                  "value": "chunked"
+                },
+                {
+                  "key": "Date",
+                  "value": "Fri, 04 Sep 2026 10:00:00 GMT"
+                },
+                {
+                  "key": "Keep-Alive",
+                  "value": "timeout=60"
+                },
+                {
+                  "key": "Connection",
+                  "value": "keep-alive"
+                }
+              ],
+              "cookie": [],
+              "body": "{\n    \"timestamp\": \"2026-09-04T10:00:00Z\",\n    \"status\": 404,\n    \"error\": \"Not Found\",\n    \"code\": \"DOCUMENT_NOT_FOUND\",\n    \"message\": \"Document not found\",\n    \"path\": \"/api/vault/documents/{{documentId}}\"\n}"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "wellness",
+      "item": [
+        {
+          "name": "3. Exercises & Session Completion",
+          "item": [
+            {
+              "name": "3.1 [POST] Complete Exercise Session",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"durationMinutes\": 4\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/wellness/exercises/{{exerciseId}}/complete",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "wellness",
+                    "exercises",
+                    "{{exerciseId}}",
+                    "complete"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "3.2 [GET] List All Exercises",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/wellness/exercises",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "wellness",
+                    "exercises"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "3.3 [GET] Filter Exercises by Category",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/wellness/exercises?category=CBT_TECHNIQUE",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "wellness",
+                    "exercises"
+                  ],
+                  "query": [
+                    {
+                      "key": "category",
+                      "value": "CBT_TECHNIQUE"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "3.4 [GET] Get Exercise Details by ID",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/wellness/exercises/{{exerciseId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "wellness",
+                    "exercises",
+                    "{{exerciseId}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "3.5 [GET] Get Smart CBT Recommendation",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/wellness/cbt/recommendation",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "wellness",
+                    "cbt",
+                    "recommendation"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
         },
         {
-          "name": "Soft-Delete Expense Group",
-          "event": [
+          "name": "1. Mood Check-Ins",
+          "item": [
             {
-              "listen": "test",
-              "script": {
-                "type": "text/javascript",
-                "exec": [
-                  "pm.test('Status code is 204', function () {",
-                  "    pm.response.to.have.status(204);",
-                  "});"
-                ]
-              }
-            }
-          ],
-          "request": {
-            "method": "DELETE",
-            "header": [],
-            "url": {
-              "raw": "{{baseUrl}}/api/expense-groups/{{groupId}}",
-              "host": [
-                "{{baseUrl}}"
+              "name": "Log Mood Check-in",
+              "event": [
+                {
+                  "listen": "test",
+                  "script": {
+                    "exec": [
+                      "if (pm.response.code === 200) {",
+                      "    var jsonData = pm.response.json();",
+                      "    if (jsonData.id) {",
+                      "        pm.collectionVariables.set('checkInId', jsonData.id);",
+                      "        console.log('checkInId automatically set to: ' + jsonData.id);",
+                      "    }",
+                      "}"
+                    ],
+                    "type": "text/javascript",
+                    "packages": {},
+                    "requests": {}
+                  }
+                }
               ],
-              "path": [
-                "api",
-                "expense-groups",
-                "{{groupId}}"
-              ]
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"mood\": \"LOW\",\n  \"reason\": \"Work deadline stress\",\n  \"tags\": [\"Work\", \"Fatigue\", \"Pressure\"],\n  \"note\": \"Felt overwhelmed after the morning sync meeting.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/wellness/check-ins",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "wellness",
+                    "check-ins"
+                  ]
+                }
+              },
+              "response": []
             },
-            "description": "Soft-deletes an expense group."
-          }
+            {
+              "name": "Get Paginated Mood Check-ins",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/wellness/check-ins?page=0&limit=10",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "wellness",
+                    "check-ins"
+                  ],
+                  "query": [
+                    {
+                      "key": "page",
+                      "value": "0"
+                    },
+                    {
+                      "key": "limit",
+                      "value": "10"
+                    }
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Get Mood Check-in by ID",
+              "request": {
+                "auth": {
+                  "type": "bearer",
+                  "bearer": [
+                    {
+                      "key": "token",
+                      "value": "{{accessToken}}",
+                      "type": "string"
+                    }
+                  ]
+                },
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/wellness/check-ins/{{checkInId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "wellness",
+                    "check-ins",
+                    "{{checkInId}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Update Mood Check-in",
+              "request": {
+                "method": "PUT",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"mood\": \"OKAY\",\n  \"reason\": \"Took a short walk and had water\",\n  \"tags\": [\"Break\", \"FreshAir\"],\n  \"note\": \"Feeling slightly calmer and ready to get back to work.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/wellness/check-ins/{{checkInId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "wellness",
+                    "check-ins",
+                    "{{checkInId}}"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "Delete Mood Check-in",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/wellness/check-ins/{{checkInId}}",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "wellness",
+                    "check-ins",
+                    "{{checkInId}}"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "2. CBT Chat Assistant & AI Uplift",
+          "item": [
+            {
+              "name": "2.1 [POST] Send Message to CBT Assistant",
+              "request": {
+                "method": "POST",
+                "header": [
+                  {
+                    "key": "Content-Type",
+                    "value": "application/json"
+                  }
+                ],
+                "body": {
+                  "mode": "raw",
+                  "raw": "{\n  \"message\": \"I'm having a really stressful day with work and I feel overwhelmed.\"\n}"
+                },
+                "url": {
+                  "raw": "{{baseUrl}}/api/wellness/cbt/chat",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "wellness",
+                    "cbt",
+                    "chat"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "2.2 [GET] Get CBT Chat History",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/wellness/cbt/history",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "wellness",
+                    "cbt",
+                    "history"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "2.3 [GET] Get AI Mood Uplift & Micro-Activity",
+              "request": {
+                "method": "GET",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/wellness/cbt/uplift",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "wellness",
+                    "cbt",
+                    "uplift"
+                  ]
+                }
+              },
+              "response": []
+            },
+            {
+              "name": "2.4 [DELETE] Clear CBT Chat History",
+              "request": {
+                "method": "DELETE",
+                "header": [],
+                "url": {
+                  "raw": "{{baseUrl}}/api/wellness/cbt/history",
+                  "host": [
+                    "{{baseUrl}}"
+                  ],
+                  "path": [
+                    "api",
+                    "wellness",
+                    "cbt",
+                    "history"
+                  ]
+                }
+              },
+              "response": []
+            }
+          ]
+        },
+        {
+          "name": "4. Wellness Dashboard & Analytics",
+          "item": []
+        }
+      ]
+    },
+    {
+      "name": "notification",
+      "item": [
+        {
+          "name": "Register device",
+          "request": {
+            "method": "GET",
+            "header": []
+          },
+          "response": []
         }
       ]
     }
@@ -8353,6 +11925,10 @@
     },
     {
       "key": "familyId",
+      "value": ""
+    },
+    {
+      "key": "documentId",
       "value": ""
     },
     {
@@ -8424,39 +12000,8 @@
       "value": ""
     },
     {
-      "key": "groupId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "ownerMemberId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "memberId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "newMemberId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "lookedUpMemberUserId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "expenseId",
-      "value": "",
-      "type": "string"
-    },
-    {
-      "key": "settlementId",
-      "value": "",
-      "type": "string"
+      "key": "checkInId",
+      "value": ""
     }
   ]
 }

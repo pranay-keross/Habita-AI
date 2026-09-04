@@ -7,6 +7,8 @@ import {
   Pressable,
   TextInput,
   Alert,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
@@ -15,18 +17,65 @@ import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import FileText from 'lucide-react-native/icons/file-text';
+import FilePlus from 'lucide-react-native/icons/file-plus';
 import Upload from 'lucide-react-native/icons/upload';
+import Globe from 'lucide-react-native/icons/globe';
+import CreditCard from 'lucide-react-native/icons/credit-card';
+import ShieldCheck from 'lucide-react-native/icons/shield-check';
+import Tag from 'lucide-react-native/icons/tag';
+import Home from 'lucide-react-native/icons/house';
+import Receipt from 'lucide-react-native/icons/receipt';
 import Button from '../../../../components/Button';
 import { addDocument } from '../docStore';
-import { DOC_TEMPLATES, type DocTemplateType, type DocCategory } from '../types';
+import { DOC_TEMPLATES, type DocTemplateType, type DocCategory, type PickedFile } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../../i18n';
+import useAuth from '../../../../hooks/useAuth';
+import { showNetworkUnavailableAlert } from '../../../../utils/networkStatus';
+import { extractVaultErrorMessage } from '../api';
+import { getItem } from '../../../../utils/storage';
 
 type Props = StackScreenProps<RootStackParamList, 'DocTemplateForm'>;
+
+// Every category the backend accepts (docs/VAULT_API_SPEC.md §3.1). The 4 pre-built
+// templates (passport/visa/license/insurance) fix their category automatically; the
+// "Custom Document" entry point has no such template, so it needs a picker covering the
+// full set — otherwise warranty/property/tax documents (which the custom flow's own
+// description explicitly advertises) would have no way to be saved with the right
+// category at all.
+const ALL_CATEGORIES: { key: DocCategory; labelKey: string }[] = [
+  { key: 'passport', labelKey: 'doc_hub.cat_passport' },
+  { key: 'visa', labelKey: 'doc_hub.cat_visa' },
+  { key: 'license', labelKey: 'doc_hub.cat_license' },
+  { key: 'insurance', labelKey: 'doc_hub.cat_insurance' },
+  { key: 'warranty', labelKey: 'doc_hub.cat_warranty' },
+  { key: 'property', labelKey: 'doc_hub.cat_property' },
+  { key: 'tax', labelKey: 'doc_hub.cat_tax' },
+];
+
+function getCategoryIcon(category: DocCategory, size: number, color: string) {
+  switch (category) {
+    case 'passport':
+      return <FileText size={size} color={color} strokeWidth={1.5} />;
+    case 'visa':
+      return <Globe size={size} color={color} strokeWidth={1.5} />;
+    case 'license':
+      return <CreditCard size={size} color={color} strokeWidth={1.5} />;
+    case 'insurance':
+      return <ShieldCheck size={size} color={color} strokeWidth={1.5} />;
+    case 'warranty':
+      return <Tag size={size} color={color} strokeWidth={1.5} />;
+    case 'property':
+      return <Home size={size} color={color} strokeWidth={1.5} />;
+    case 'tax':
+      return <Receipt size={size} color={color} strokeWidth={1.5} />;
+  }
+}
 
 export default function DocTemplateFormScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
-  const { templateType } = route.params;
+  const { templateType, custom } = route.params;
+  const { getAccessToken } = useAuth();
   const [, setLocaleVersion] = useState(0);
 
   useEffect(() => {
@@ -36,20 +85,29 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
     };
   }, []);
 
+  useEffect(() => {
+    getItem<{ name?: string }>('habita.user_profile', {}).then((prof) => {
+      if (prof?.name) {
+        setMemberName(prof.name);
+      }
+    });
+  }, []);
+
   const templateInfo =
     DOC_TEMPLATES.find((t) => t.type === templateType) || DOC_TEMPLATES[0];
 
   const [saving, setSaving] = useState(false);
-  const [title, setTitle] = useState(`${templateInfo.title} (New)`);
+  const [title, setTitle] = useState(custom ? '' : `${templateInfo.title} (New)`);
+  const [category, setCategory] = useState<DocCategory>(custom ? 'warranty' : templateInfo.category);
   const [docNumber, setDocNumber] = useState('');
-  const [memberName, setMemberName] = useState('Animesh Manna');
+  const [memberName, setMemberName] = useState('');
   const [issueDate, setIssueDate] = useState('2024-01-15');
   const [expiryDate, setExpiryDate] = useState('2030-01-14');
   const [country, setCountry] = useState(templateType === 'passport' ? 'India' : 'United States');
   const [issuingAuthority, setIssuingAuthority] = useState('');
   const [coveredMembers, setCoveredMembers] = useState('');
   const [notes, setNotes] = useState('');
-  const [fileName, setFileName] = useState<string | null>(null);
+  const [pickedFile, setPickedFile] = useState<PickedFile | null>(null);
 
   const handlePickFile = async () => {
     try {
@@ -58,13 +116,17 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
         type: [picker.types.allFiles],
       });
       if (res && res[0]) {
-        setFileName(res[0].name || 'Attached_Document.pdf');
-        Alert.alert('File Attached', `Selected "${res[0].name || 'Document'}"`);
+        const asset = res[0];
+        setPickedFile({
+          uri: asset.uri,
+          name: asset.name || 'Attached_Document.pdf',
+          type: asset.type || 'application/octet-stream',
+        });
       }
     } catch (err: any) {
+      // A cancelled picker rejects with a message containing "cancel" — not a real error.
       if (!err?.message?.includes('cancel')) {
-        setFileName('Scanned_Document.pdf');
-        Alert.alert('File Attached', 'Selected "Scanned_Document.pdf"');
+        Alert.alert(t('doc_hub.cannot_attach_title'), t('doc_hub.cannot_attach_msg'));
       }
     }
   };
@@ -78,25 +140,43 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
       Alert.alert(t('doc_hub.missing_expiry'), t('doc_hub.enter_expiry_msg'));
       return;
     }
+    if (issueDate.trim() && issueDate.trim() > expiryDate.trim()) {
+      Alert.alert(t('doc_hub.invalid_dates_title'), t('doc_hub.invalid_dates_msg'));
+      return;
+    }
 
     setSaving(true);
-    await addDocument({
-      title: title.trim(),
-      category: templateInfo.category as DocCategory,
-      docNumber: docNumber.trim(),
-      memberName: memberName.trim() || 'Household Member',
-      issueDate: issueDate.trim(),
-      expiryDate: expiryDate.trim(),
-      notes: notes.trim(),
-      fileName: fileName || `${templateInfo.type}_scanned.pdf`,
-      country: country.trim(),
-      issuingAuthority: issuingAuthority.trim(),
-      coveredMembers: coveredMembers.trim(),
-    });
-    setSaving(false);
+    try {
+      const token = await getAccessToken().catch(() => null);
+      const { offline } = await addDocument(
+        {
+          title: title.trim(),
+          category,
+          docNumber: docNumber.trim(),
+          memberName: memberName.trim() || 'Household Member',
+          issueDate: issueDate.trim(),
+          expiryDate: expiryDate.trim(),
+          notes: notes.trim(),
+          fileName: pickedFile?.name || `${custom ? 'document' : templateInfo.type}_scanned.pdf`,
+          country: custom ? '' : country.trim(),
+          issuingAuthority: issuingAuthority.trim(),
+          coveredMembers: custom ? '' : coveredMembers.trim(),
+        },
+        token,
+        pickedFile,
+      );
 
-    Alert.alert(t('doc_hub.saved_alert_title'), t('doc_hub.saved_alert_msg', { title }));
-    navigation.popTo('DocHub');
+      if (offline) {
+        showNetworkUnavailableAlert();
+      } else {
+        Alert.alert(t('doc_hub.saved_alert_title'), t('doc_hub.saved_alert_msg', { title }));
+      }
+      navigation.popTo('DocHub');
+    } catch (err) {
+      Alert.alert(t('doc_hub.save_failed_title'), extractVaultErrorMessage(err) || t('doc_hub.save_failed_msg'));
+    } finally {
+      setSaving(false);
+    }
   };
 
   return (
@@ -107,28 +187,73 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
         <Text style={styles.headerTitle}>
-          {t('doc_hub.form_suffix', {
-            title: t(`doc_hub.tmpl_${templateInfo.type}_title`, { defaultValue: templateInfo.title }),
-          })}
+          {custom
+            ? t('doc_hub.custom_doc_title')
+            : t('doc_hub.form_suffix', {
+                title: t(`doc_hub.tmpl_${templateInfo.type}_title`, { defaultValue: templateInfo.title }),
+              })}
         </Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <KeyboardAvoidingView
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        style={styles.keyboardContainer}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 60 : 0}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        keyboardShouldPersistTaps="handled">
         {/* Template Form Hero */}
         <View style={styles.formHeroCard}>
-          <View style={[styles.formHeroBadge, { backgroundColor: templateInfo.bgColor }]}>
-            <FileText size={24} color={templateInfo.accentColor} />
+          <View
+            style={[
+              styles.formHeroBadge,
+              { backgroundColor: custom ? styles.customIconBadge.backgroundColor : templateInfo.bgColor },
+            ]}>
+            {custom ? (
+              <FilePlus size={24} color={styles.primaryIcon.color} />
+            ) : (
+              <FileText size={24} color={templateInfo.accentColor} />
+            )}
           </View>
           <View style={{ flex: 1 }}>
             <Text style={styles.formHeroTitle}>
-              {t(`doc_hub.tmpl_${templateInfo.type}_title`, { defaultValue: templateInfo.title })}
+              {custom
+                ? t('doc_hub.custom_doc_title')
+                : t(`doc_hub.tmpl_${templateInfo.type}_title`, { defaultValue: templateInfo.title })}
             </Text>
             <Text style={styles.formHeroSub}>
-              {t(`doc_hub.tmpl_${templateInfo.type}_desc`, { defaultValue: templateInfo.description })}
+              {custom
+                ? t('doc_hub.custom_doc_sub')
+                : t(`doc_hub.tmpl_${templateInfo.type}_desc`, { defaultValue: templateInfo.description })}
             </Text>
           </View>
         </View>
+
+        {/* Category Picker — only the custom flow needs one; a template already fixes it */}
+        {custom && (
+          <>
+            <Text style={styles.sectionTitle}>{t('doc_hub.select_category')}</Text>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.categoryPickerRow}>
+              {ALL_CATEGORIES.map((cat) => {
+                const active = category === cat.key;
+                return (
+                  <Pressable
+                    key={cat.key}
+                    style={[styles.categoryChip, active && styles.categoryChipActive]}
+                    onPress={() => setCategory(cat.key)}>
+                    {getCategoryIcon(cat.key, 14, active ? '#FFFFFF' : styles.primaryIcon.color)}
+                    <Text style={[styles.chipText, active && styles.chipTextActive]}>{t(cat.labelKey)}</Text>
+                  </Pressable>
+                );
+              })}
+            </ScrollView>
+          </>
+        )}
 
         {/* General Form Fields */}
         <View style={styles.card}>
@@ -146,7 +271,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             style={styles.textInput}
             value={memberName}
             onChangeText={setMemberName}
-            placeholder="e.g. Animesh Manna"
+            placeholder={t('doc_hub.owner_name_placeholder')}
             placeholderTextColor={styles.placeholder.color}
           />
 
@@ -167,7 +292,9 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
         <View style={styles.card}>
           <View style={styles.dateRow}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.inputLabel}>{t('doc_hub.issue_date')} (YYYY-MM-DD)</Text>
+              <Text style={[styles.inputLabel, styles.dateFieldLabel]}>
+                {t('doc_hub.issue_date')} (YYYY-MM-DD)
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={issueDate}
@@ -178,7 +305,9 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             </View>
 
             <View style={{ flex: 1 }}>
-              <Text style={styles.inputLabel}>{t('doc_hub.expiration_date')} * (YYYY-MM-DD)</Text>
+              <Text style={[styles.inputLabel, styles.dateFieldLabel]}>
+                {t('doc_hub.expiration_date')} * (YYYY-MM-DD)
+              </Text>
               <TextInput
                 style={styles.textInput}
                 value={expiryDate}
@@ -199,7 +328,9 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             value={issuingAuthority}
             onChangeText={setIssuingAuthority}
             placeholder={
-              templateType === 'passport'
+              custom
+                ? t('doc_hub.auth_placeholder_default')
+                : templateType === 'passport'
                 ? t('doc_hub.auth_placeholder_passport')
                 : templateType === 'insurance'
                 ? t('doc_hub.auth_placeholder_insurance')
@@ -208,7 +339,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             placeholderTextColor={styles.placeholder.color}
           />
 
-          {templateType === 'insurance' && (
+          {!custom && templateType === 'insurance' && (
             <>
               <Text style={styles.inputLabel}>{t('doc_hub.covered_members')}</Text>
               <TextInput
@@ -221,7 +352,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
             </>
           )}
 
-          {(templateType === 'passport' || templateType === 'visa') && (
+          {!custom && (templateType === 'passport' || templateType === 'visa') && (
             <>
               <Text style={styles.inputLabel}>{t('doc_hub.country')}</Text>
               <TextInput
@@ -251,10 +382,10 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
           <Upload size={22} color={styles.primaryIcon.color} />
           <View style={{ flex: 1 }}>
             <Text style={styles.uploadTitle}>
-              {fileName ? fileName : t('doc_hub.attach_file')}
+              {pickedFile ? pickedFile.name : t('doc_hub.attach_file')}
             </Text>
             <Text style={styles.uploadSub}>
-              {fileName ? t('doc_hub.file_ready_vault') : t('doc_hub.select_file')}
+              {pickedFile ? t('doc_hub.file_ready_vault') : t('doc_hub.select_file')}
             </Text>
           </View>
         </Pressable>
@@ -267,6 +398,7 @@ export default function DocTemplateFormScreen({ navigation, route }: Props) {
           style={styles.saveBtn}
         />
       </ScrollView>
+      </KeyboardAvoidingView>
     </View>
   );
 }
@@ -276,6 +408,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     root: {
       flex: 1,
       backgroundColor: colors.background,
+    },
+    keyboardContainer: {
+      flex: 1,
     },
     headerBar: {
       flexDirection: 'row',
@@ -345,6 +480,37 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textSecondary,
       marginTop: 2,
     },
+    customIconBadge: {
+      backgroundColor: colors.surfaceElevated,
+    },
+    categoryPickerRow: {
+      paddingBottom: spacing.sm,
+      gap: 8,
+    },
+    categoryChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.glassSurface || colors.surface,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 7,
+      gap: 6,
+    },
+    categoryChipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    chipText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.textPrimary,
+    },
+    chipTextActive: {
+      color: colors.textOnPrimary,
+      fontFamily: fonts.sansBold,
+    },
     sectionTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 15,
@@ -367,6 +533,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textSecondary,
       marginBottom: 4,
       marginTop: 8,
+    },
+    dateFieldLabel: {
+      minHeight: 32,
     },
     textInput: {
       backgroundColor: colors.surfaceElevated,

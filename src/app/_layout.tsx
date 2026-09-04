@@ -32,6 +32,7 @@ import {
   AddDocScreen,
   DocTemplateFormScreen,
   ExpirationAlertsScreen,
+  DocViewerScreen,
   type DocTemplateType,
 } from '../features/money/document_hub';
 import PantryScreen from '../features/money/smart_pantry/PantryScreen';
@@ -87,8 +88,9 @@ export type RootStackParamList = {
   DocHub: undefined;
   DocDetails: { docId: string };
   AddDoc: undefined;
-  DocTemplateForm: { templateType: DocTemplateType };
+  DocTemplateForm: { templateType: DocTemplateType; custom?: boolean };
   ExpirationAlerts: undefined;
+  DocViewer: { url: string; fileName?: string; kind: 'pdf' | 'image' };
   Pantry: undefined;
   Wardrobe: undefined;
   StylePantryDashboard: undefined;
@@ -208,6 +210,11 @@ const AppLayout = () => {
           <Stack.Screen name="AddDoc" component={AddDocScreen} />
           <Stack.Screen name="DocTemplateForm" component={DocTemplateFormScreen} />
           <Stack.Screen name="ExpirationAlerts" component={ExpirationAlertsScreen} />
+          <Stack.Screen
+            name="DocViewer"
+            component={DocViewerScreen}
+            options={{ animation: 'fade', presentation: 'fullScreenModal' }}
+          />
           <Stack.Screen name="Pantry" component={PantryScreen} />
           <Stack.Screen name="Wardrobe" component={WardrobeDashboardScreen} />
           <Stack.Screen name="StylePantryDashboard" component={WardrobeDashboardScreen} />

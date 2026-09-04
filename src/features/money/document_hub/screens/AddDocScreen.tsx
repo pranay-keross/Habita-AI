@@ -96,7 +96,7 @@ export default function AddDocScreen({ navigation }: Props) {
         <Pressable
           style={styles.customCard}
           onPress={() =>
-            navigation.navigate('DocTemplateForm', { templateType: 'passport' })
+            navigation.navigate('DocTemplateForm', { templateType: 'passport', custom: true })
           }>
           <View style={styles.customIconBadge}>
             <FilePlus size={22} color={styles.primaryIcon.color} />

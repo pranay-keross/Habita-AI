@@ -36,6 +36,7 @@ import {
 import { loadDocuments, getDocStatus } from '../docStore';
 import type { DocCategory, DocHubEntry } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../../i18n';
+import useAuth from '../../../../hooks/useAuth';
 
 type Props = StackScreenProps<RootStackParamList, 'DocHub'>;
 
@@ -54,6 +55,7 @@ export default function DocHubScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { isExpanded, contentMaxWidth } = useResponsive();
+  const { getAccessToken } = useAuth();
   const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
@@ -68,7 +70,8 @@ export default function DocHubScreen({ navigation }: Props) {
     } else {
       setLoading(true);
     }
-    const list = await loadDocuments();
+    const token = await getAccessToken().catch(() => null);
+    const list = await loadDocuments(token);
     setDocs(list);
     setLoading(false);
     setRefreshing(false);
@@ -261,7 +264,7 @@ export default function DocHubScreen({ navigation }: Props) {
           ) : filteredDocs.length === 0 ? (
             <View style={styles.emptyStateCard}>
               <FileText size={48} color={styles.placeholder.color} />
-              <Text style={styles.emptyTitle}>{t('doc_hub.no_docs_found')}</Text>
+              <Text style={styles.emptyTitle}>{t('doc_hub.no_docs_title')}</Text>
               <Text style={styles.emptySub}>
                 {searchQuery ? t('doc_hub.search_try_another') : t('doc_hub.tap_add_doc')}
               </Text>
@@ -376,7 +379,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerTitle: {
       fontFamily: fonts.serif,
       fontSize: 18,
-      color: colors.textPrimary,
+      color: colors.textOnPrimary,
     },
     content: {
       paddingHorizontal: spacing.lg,
