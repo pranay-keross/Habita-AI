@@ -10,22 +10,28 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Phone from 'lucide-react-native/icons/phone';
 import UsersRound from 'lucide-react-native/icons/users-round';
-import Check from 'lucide-react-native/icons/check';
-import X from 'lucide-react-native/icons/x';
+import Plus from 'lucide-react-native/icons/plus';
 import CalendarClock from 'lucide-react-native/icons/calendar-clock';
-import ChevronUp from 'lucide-react-native/icons/chevron-up';
 import ChevronDown from 'lucide-react-native/icons/chevron-down';
 import type { RootStackParamList } from '../../app/_layout';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
-import Card from '../../components/Card';
-import SectionHeader from '../../components/SectionHeader';
 import useAuth from '../../hooks/useAuth';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
-import { createFamily, getMyPrimaryFamily, getMyProfileName } from '../family/api';
-import { createStaff, listServiceOptions, listStaff, type RemoteStaffMember, type ServiceOption } from './api';
+import { getMyPrimaryFamily } from '../family/api';
+import {
+  createStaff,
+  listAttendanceSummary,
+  listServiceOptions,
+  listStaff,
+  markStaffAttendance,
+  type AttendanceSummary,
+  type RemoteAttendanceStatus,
+  type RemoteStaffMember,
+  type ServiceOption,
+} from './api';
 import {
   loadAttendanceEntries,
   loadCaregiverTransactions,
@@ -72,6 +78,14 @@ const ATTENDANCE_STATUS_COLOR: Record<AttendanceStatus, { tint: string; soft: st
   present: { tint: '#2E7D5B', soft: '#E3F3EA' },
   absent: { tint: '#C0392B', soft: '#FBE7E4' },
   leave: { tint: '#C7791E', soft: '#FBEBDA' },
+  halfDay: { tint: '#2E6E9E', soft: '#E1EEF7' },
+};
+
+const STATUS_TO_REMOTE: Record<AttendanceStatus, RemoteAttendanceStatus> = {
+  present: 'PRESENT',
+  absent: 'ABSENT',
+  leave: 'LEAVE',
+  halfDay: 'HALF_DAY',
 };
 
 type Props = StackScreenProps<RootStackParamList, 'Staff'>;
@@ -105,17 +119,30 @@ export default function StaffScreen({ navigation }: Props) {
   const [extraReason, setExtraReason] = useState('');
   const [attendance, setAttendance] = useState<AttendanceEntry[]>([]);
   const [historyCaregiverId, setHistoryCaregiverId] = useState<string | null>(null);
+  const [activeTab, setActiveTab] = useState<'attendance' | 'caregivers'>('attendance');
+  const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary[]>([]);
+  const [hasFamily, setHasFamily] = useState(false);
+  const [familyChecked, setFamilyChecked] = useState(false);
 
   const loadStaffList = React.useCallback(async () => {
     setLoading(true);
     try {
       const token = await getAccessToken();
       const family = token ? await getMyPrimaryFamily(token).catch(() => null) : null;
+      if (token) setFamilyChecked(true);
+      setHasFamily(!!family);
       if (token && family) {
         const remote = await listStaff(family.id, token);
         setCaregivers(remote.map(toCaregiver));
+        try {
+          const summary = await listAttendanceSummary(family.id, token);
+          setAttendanceSummary(summary);
+        } catch (err) {
+          console.warn('[staff] failed to load attendance summary', err);
+        }
       } else {
         setCaregivers([]);
+        setAttendanceSummary([]);
       }
     } finally {
       setLoading(false);
@@ -164,23 +191,36 @@ export default function StaffScreen({ navigation }: Props) {
   const markAttendance = async (caregiverId: string, status: AttendanceStatus) => {
     const date = todayKey();
     const existing = attendance.find((e) => e.caregiverId === caregiverId && e.date === date);
-    if (existing) {
-      if (existing.status === status) {
-        // Tapping the already-active status again clears it back to unmarked.
-        await persistAttendance(attendance.filter((e) => e.id !== existing.id));
-        return;
-      }
-      await persistAttendance(attendance.map((e) => (e.id === existing.id ? { ...e, status, markedAt: Date.now() } : e)));
+    if (existing && existing.status === status) {
+      // Tapping the already-active status again clears it back to unmarked. No
+      // unmark endpoint exists server-side, so this stays local-only.
+      await persistAttendance(attendance.filter((e) => e.id !== existing.id));
       return;
     }
-    await persistAttendance([
-      ...attendance,
-      { id: `${caregiverId}-${date}`, caregiverId, date, status, markedAt: Date.now() },
-    ]);
+    if (existing) {
+      await persistAttendance(attendance.map((e) => (e.id === existing.id ? { ...e, status, markedAt: Date.now() } : e)));
+    } else {
+      await persistAttendance([
+        ...attendance,
+        { id: `${caregiverId}-${date}`, caregiverId, date, status, markedAt: Date.now() },
+      ]);
+    }
+    const token = await getAccessToken().catch(() => null);
+    if (!token) return;
+    try {
+      await markStaffAttendance(caregiverId, { date, status: STATUS_TO_REMOTE[status] }, token);
+      await loadStaffList();
+    } catch (err) {
+      console.warn('[staff] failed to sync attendance', err);
+    }
   };
 
-  // Present count over the last 30 calendar days, inclusive of today.
+  // Present count over the last 30 calendar days, inclusive of today. Prefers the
+  // server-computed summary (source of truth once attendance is synced); falls back
+  // to the local tally for a caregiver the summary hasn't caught up on yet.
   const monthlyPresentCount = (caregiverId: string): number => {
+    const remote = attendanceSummary.find((entry) => entry.staffId === caregiverId);
+    if (remote) return remote.presentDays;
     const cutoff = Date.now() - 30 * 24 * 60 * 60 * 1000;
     return attendance.filter((e) => e.caregiverId === caregiverId && e.status === 'present' && e.markedAt >= cutoff).length;
   };
@@ -231,13 +271,12 @@ export default function StaffScreen({ navigation }: Props) {
         Alert.alert(t('staff.save_failed_title'), t('staff.save_failed_no_family'));
         return;
       }
-      let family = await getMyPrimaryFamily(token).catch(() => null);
+      const family = await getMyPrimaryFamily(token).catch(() => null);
       if (!family) {
-        // No family yet: caregivers only exist under a family on the backend, so create
-        // one behind the scenes (named after the user) rather than blocking the caregiver
-        // add flow — same pattern as MedicineScreen's profile creation.
-        const profileName = (await getMyProfileName()) ?? t('staff.default_family_name');
-        family = await createFamily(profileName, token);
+        // Caregivers only exist under a family on the backend — no auto-create here;
+        // the user must set up or join a family first (see the no-family banner).
+        Alert.alert(t('staff.save_failed_title'), t('staff.save_failed_no_family'));
+        return;
       }
       await createStaff(family.id, {
         serviceId: addServiceId,
@@ -279,6 +318,7 @@ export default function StaffScreen({ navigation }: Props) {
   };
   const extraFor = (caregiverId: string) => transactions.filter((entry) => entry.caregiverId === caregiverId).reduce((sum, entry) => sum + entry.amount, 0);
   const latestExtraFor = (caregiverId: string) => transactions.find((entry) => entry.caregiverId === caregiverId);
+  const noFamily = familyChecked && !hasFamily;
 
   if (loading) {
     return (
@@ -295,26 +335,80 @@ export default function StaffScreen({ navigation }: Props) {
           <ArrowLeft size={20} color={styles.backIcon.color} strokeWidth={1.8} />
         </Pressable>
         <Text style={styles.headerTitle}>{t('staff.header_title')}</Text>
-        <Pressable accessibilityRole="button" accessibilityLabel={t('staff.add')} style={styles.addButton} onPress={openAddSheet}><Text style={styles.addButtonText}>+</Text></Pressable>
+        {noFamily ? (
+          <View style={styles.addButtonSpacer} />
+        ) : (
+          <Pressable accessibilityRole="button" accessibilityLabel={t('staff.add')} style={styles.addButton} onPress={openAddSheet}>
+            <Plus size={20} color={styles.addIcon.color} strokeWidth={2.4} />
+          </Pressable>
+        )}
       </View>
       <ScrollView contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 28 }]} showsVerticalScrollIndicator={false}>
-        <Card style={styles.hero}>
-          <View style={styles.heroIcon}><UsersRound size={24} color={styles.heroIconColor.color} strokeWidth={1.8} /></View>
-          <Text style={styles.heroTitle}>{t('staff.hero_title')}</Text>
-          <Text style={styles.heroDescription}>{t('staff.hero_description')}</Text>
-          <Text style={styles.count}>{t('staff.count', { count: caregivers.length })}</Text>
-        </Card>
+        {noFamily ? (
+          <View style={styles.noFamilyBanner}>
+            <View style={styles.noFamilyIconCircle}>
+              <UsersRound size={22} color={styles.heroIconColor.color} strokeWidth={1.8} />
+            </View>
+            <Text style={styles.noFamilyTitle}>{t('staff.no_family_title')}</Text>
+            <Text style={styles.noFamilyText}>{t('staff.no_family_banner_message')}</Text>
+            <Pressable style={styles.noFamilyButton} onPress={() => navigation.navigate('Family')}>
+              <Text style={styles.noFamilyButtonText}>{t('staff.go_to_family')}</Text>
+            </Pressable>
+          </View>
+        ) : (
+        <>
+        <View style={styles.hero}>
+          <View style={styles.heroTopRow}>
+            <View style={styles.heroIcon}>
+              <UsersRound size={22} color={styles.heroIconColor.color} strokeWidth={1.8} />
+            </View>
+            <View style={styles.heroCopy}>
+              <Text style={styles.heroTitle}>{t('staff.hero_title')}</Text>
+              <Text style={styles.heroDescription}>{t('staff.hero_description')}</Text>
+            </View>
+          </View>
+          <View style={styles.heroDivider} />
+          <View style={styles.heroCountRow}>
+            <Text style={styles.heroCountValue}>{caregivers.length}</Text>
+            <Text style={styles.heroCountLabel}>{t('staff.count', { count: caregivers.length })}</Text>
+          </View>
+        </View>
 
-        {caregivers.length > 0 ? (
+        <View style={styles.tabBar}>
+          {(
+            [
+              { key: 'attendance' as const, label: 'staff.tab_attendance' },
+              { key: 'caregivers' as const, label: 'staff.tab_caregivers' },
+            ]
+          ).map(tab => {
+            const isActive = activeTab === tab.key;
+            return (
+              <Pressable
+                key={tab.key}
+                style={[styles.tabButton, isActive && styles.tabButtonActive]}
+                onPress={() => setActiveTab(tab.key)}
+              >
+                <Text style={[styles.tabButtonText, isActive && styles.tabButtonTextActive]}>
+                  {t(tab.label)}
+                </Text>
+              </Pressable>
+            );
+          })}
+        </View>
+
+        {activeTab === 'attendance' && caregivers.length > 0 ? (
           <>
-            <SectionHeader title={t('staff.attendance_title')} subtitle={t('staff.attendance_subtitle')} />
-            <Card style={styles.attendanceCard}>
+            <View style={styles.sectionHead}>
+              <Text style={styles.sectionTitle}>{t('staff.attendance_title')}</Text>
+              <Text style={styles.sectionSubtitle}>{t('staff.attendance_subtitle')}</Text>
+            </View>
+            <View style={styles.listCard}>
               {caregivers.map((caregiver, idx) => {
                 const status = todaysStatus(caregiver.id);
                 return (
                   <View
                     key={caregiver.id}
-                    style={[styles.attendanceRow, idx === caregivers.length - 1 && styles.attendanceRowLast]}
+                    style={[styles.attendanceRow, idx === 0 && styles.rowFirst]}
                   >
                     <Pressable style={styles.attendanceIdentity} onPress={() => setHistoryCaregiverId(caregiver.id)}>
                       <View style={styles.attendanceAvatar}>
@@ -334,34 +428,59 @@ export default function StaffScreen({ navigation }: Props) {
                       <Pressable
                         onPress={() => markAttendance(caregiver.id, 'present')}
                         style={[
-                          styles.attendanceBtn,
-                          status === 'present' && { backgroundColor: ATTENDANCE_STATUS_COLOR.present.tint },
+                          styles.attendanceLeaveBtn,
+                          status === 'present' && { backgroundColor: ATTENDANCE_STATUS_COLOR.present.tint, borderColor: ATTENDANCE_STATUS_COLOR.present.tint },
                         ]}
                       >
-                        <Check
-                          size={16}
-                          strokeWidth={2.6}
-                          color={status === 'present' ? '#fff' : ATTENDANCE_STATUS_COLOR.present.tint}
-                        />
+                        <Text
+                          style={[
+                            styles.attendanceLeaveText,
+                            { color: ATTENDANCE_STATUS_COLOR.present.tint },
+                            status === 'present' && styles.attendanceLeaveTextActive,
+                          ]}
+                        >
+                          {t('staff.attendance_status_present')}
+                        </Text>
                       </Pressable>
                       <Pressable
                         onPress={() => markAttendance(caregiver.id, 'absent')}
                         style={[
-                          styles.attendanceBtn,
-                          status === 'absent' && { backgroundColor: ATTENDANCE_STATUS_COLOR.absent.tint },
+                          styles.attendanceLeaveBtn,
+                          status === 'absent' && { backgroundColor: ATTENDANCE_STATUS_COLOR.absent.tint, borderColor: ATTENDANCE_STATUS_COLOR.absent.tint },
                         ]}
                       >
-                        <X
-                          size={16}
-                          strokeWidth={2.6}
-                          color={status === 'absent' ? '#fff' : ATTENDANCE_STATUS_COLOR.absent.tint}
-                        />
+                        <Text
+                          style={[
+                            styles.attendanceLeaveText,
+                            { color: ATTENDANCE_STATUS_COLOR.absent.tint },
+                            status === 'absent' && styles.attendanceLeaveTextActive,
+                          ]}
+                        >
+                          {t('staff.attendance_status_absent')}
+                        </Text>
+                      </Pressable>
+                      <Pressable
+                        onPress={() => markAttendance(caregiver.id, 'halfDay')}
+                        style={[
+                          styles.attendanceLeaveBtn,
+                          status === 'halfDay' && { backgroundColor: ATTENDANCE_STATUS_COLOR.halfDay.tint, borderColor: ATTENDANCE_STATUS_COLOR.halfDay.tint },
+                        ]}
+                      >
+                        <Text
+                          style={[
+                            styles.attendanceLeaveText,
+                            { color: ATTENDANCE_STATUS_COLOR.halfDay.tint },
+                            status === 'halfDay' && styles.attendanceLeaveTextActive,
+                          ]}
+                        >
+                          {t('staff.attendance_half_day')}
+                        </Text>
                       </Pressable>
                       <Pressable
                         onPress={() => markAttendance(caregiver.id, 'leave')}
                         style={[
                           styles.attendanceLeaveBtn,
-                          status === 'leave' && { backgroundColor: ATTENDANCE_STATUS_COLOR.leave.tint },
+                          status === 'leave' && { backgroundColor: ATTENDANCE_STATUS_COLOR.leave.tint, borderColor: ATTENDANCE_STATUS_COLOR.leave.tint },
                         ]}
                       >
                         <Text
@@ -377,21 +496,83 @@ export default function StaffScreen({ navigation }: Props) {
                   </View>
                 );
               })}
-            </Card>
+            </View>
           </>
         ) : null}
+        {activeTab === 'attendance' && caregivers.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconCircle}>
+              <UsersRound size={22} color={styles.heroIconColor.color} strokeWidth={1.8} />
+            </View>
+            <Text style={styles.emptyTitle}>{t('staff.attendance_empty_title')}</Text>
+            <Text style={styles.emptyText}>{t('staff.attendance_empty_text')}</Text>
+            <Button title={t('staff.add_first')} onPress={openAddSheet} style={styles.emptyButton} />
+          </View>
+        ) : null}
 
-        <SectionHeader title={t('staff.section_title')} subtitle={t('staff.section_subtitle')} />
+        {activeTab === 'caregivers' ? (
+        <>
+        <View style={styles.sectionHead}>
+          <Text style={styles.sectionTitle}>{t('staff.section_title')}</Text>
+          <Text style={styles.sectionSubtitle}>{t('staff.section_subtitle')}</Text>
+        </View>
         {caregivers.length === 0 ? (
-          <Card style={styles.empty}><Text style={styles.emptyTitle}>{t('staff.empty_title')}</Text><Text style={styles.emptyText}>{t('staff.empty_text')}</Text><Button title={t('staff.add_first')} onPress={openAddSheet} style={styles.emptyButton} /></Card>
-        ) : caregivers.map((caregiver) => (
-          <Card key={caregiver.id} style={styles.caregiverCard} onPress={() => openExtraPayment(caregiver.id)}>
-            <View style={styles.cardTop}><View style={styles.avatar}><Text style={styles.avatarText}>{caregiver.name.slice(0, 1).toUpperCase()}</Text></View><View style={styles.cardTitleWrap}><Text style={styles.name}>{caregiver.name}</Text><Text style={styles.service}>{caregiver.service}</Text></View></View>
-            <Text style={styles.rate}>{t(caregiver.rateType === 'hourly' ? 'staff.hourly_rate' : 'staff.monthly_rate', { rate: caregiver.rate.toLocaleString() })}</Text>
-            {extraFor(caregiver.id) > 0 ? <View style={styles.paymentSummary}><Text style={styles.extraTotal}>{t('staff.extra_total', { amount: extraFor(caregiver.id).toLocaleString() })}</Text>{latestExtraFor(caregiver.id)?.reason ? <Text style={styles.extraReason}>{latestExtraFor(caregiver.id)?.reason}</Text> : null}<Text style={styles.totalPayable}>{t('staff.total_payable', { amount: (caregiver.rate + extraFor(caregiver.id)).toLocaleString() })}</Text></View> : null}
-            {caregiver.phone ? <View style={styles.phoneRow}><Phone size={14} color={styles.phoneIcon.color} /><Text style={styles.phone}>{caregiver.phone}</Text></View> : null}
-          </Card>
-        ))}
+          <View style={styles.emptyCard}>
+            <View style={styles.emptyIconCircle}>
+              <UsersRound size={22} color={styles.heroIconColor.color} strokeWidth={1.8} />
+            </View>
+            <Text style={styles.emptyTitle}>{t('staff.empty_title')}</Text>
+            <Text style={styles.emptyText}>{t('staff.empty_text')}</Text>
+            <Button title={t('staff.add_first')} onPress={openAddSheet} style={styles.emptyButton} />
+          </View>
+        ) : (
+          caregivers.map((caregiver) => (
+            <Pressable
+              key={caregiver.id}
+              style={({ pressed }) => [styles.caregiverCard, pressed && styles.caregiverCardPressed]}
+              onPress={() => openExtraPayment(caregiver.id)}
+            >
+              <View style={styles.cardTop}>
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>{caregiver.name.slice(0, 1).toUpperCase()}</Text>
+                </View>
+                <View style={styles.cardTitleWrap}>
+                  <Text style={styles.name} numberOfLines={1}>{caregiver.name}</Text>
+                  <View style={styles.subtitleRow}>
+                    {caregiver.service ? (
+                      <Text style={styles.service} numberOfLines={1}>{caregiver.service}</Text>
+                    ) : null}
+                    {caregiver.phone ? (
+                      <>
+                        {caregiver.service ? <Text style={styles.subtitleDot}>·</Text> : null}
+                        <Phone size={11} color={styles.phoneIcon.color} strokeWidth={1.8} />
+                        <Text style={styles.phone} numberOfLines={1}>{caregiver.phone}</Text>
+                      </>
+                    ) : null}
+                  </View>
+                </View>
+                <Text style={styles.rate}>
+                  {t(caregiver.rateType === 'hourly' ? 'staff.hourly_rate' : 'staff.monthly_rate', { rate: caregiver.rate.toLocaleString() })}
+                </Text>
+              </View>
+              {extraFor(caregiver.id) > 0 ? (
+                <View style={styles.paymentSummary}>
+                  <Text style={styles.extraTotal}>{t('staff.extra_total', { amount: extraFor(caregiver.id).toLocaleString() })}</Text>
+                  {latestExtraFor(caregiver.id)?.reason ? (
+                    <Text style={styles.extraReason}>{latestExtraFor(caregiver.id)?.reason}</Text>
+                  ) : null}
+                  <Text style={styles.totalPayable}>
+                    {t('staff.total_payable', { amount: (caregiver.rate + extraFor(caregiver.id)).toLocaleString() })}
+                  </Text>
+                </View>
+              ) : null}
+            </Pressable>
+          ))
+        )}
+        </>
+        ) : null}
+        </>
+        )}
       </ScrollView>
       <BottomSheet visible={addSheetVisible} onClose={() => setAddSheetVisible(false)} title={t('staff.add_title')}>
         <Text style={styles.label}>{t('staff.name_label')}</Text>
@@ -401,7 +582,11 @@ export default function StaffScreen({ navigation }: Props) {
           <Text style={selectedService ? styles.serviceValue : styles.placeholder}>
             {selectedService?.serviceName ?? t('staff.service_placeholder')}
           </Text>
-          <Text style={styles.selectCaret}>{addServiceOptionsVisible ? '▴' : '▾'}</Text>
+          <ChevronDown
+            size={16}
+            color={styles.selectCaret.color}
+            style={addServiceOptionsVisible ? styles.selectCaretFlipped : undefined}
+          />
         </Pressable>
         {addServiceOptionsVisible ? (
           <View style={styles.serviceOptions}>
@@ -473,8 +658,16 @@ export default function StaffScreen({ navigation }: Props) {
       </BottomSheet>
       <BottomSheet visible={extraSheetVisible} onClose={() => setExtraSheetVisible(false)} title={t('staff.extra_title')}>
         <Text style={styles.extraHelp}>{t('staff.extra_help')}</Text>
-        <Text style={styles.label}>{t('staff.extra_amount')}</Text><TextInput value={extraAmount} onChangeText={setExtraAmount} keyboardType="decimal-pad" placeholder={t('staff.extra_amount_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
-        <Text style={styles.label}>{t('staff.extra_reason')}</Text><View style={styles.reasonRow}>{['rainy', 'overtime', 'bonus'].map((reason) => <Pressable key={reason} onPress={() => setExtraReason(t(`staff.reason_${reason}`))} style={styles.reasonChip}><Text style={styles.reasonText}>{t(`staff.reason_${reason}`)}</Text></Pressable>)}</View>
+        <Text style={styles.label}>{t('staff.extra_amount')}</Text>
+        <TextInput value={extraAmount} onChangeText={setExtraAmount} keyboardType="decimal-pad" placeholder={t('staff.extra_amount_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
+        <Text style={styles.label}>{t('staff.extra_reason')}</Text>
+        <View style={styles.reasonRow}>
+          {['rainy', 'overtime', 'bonus'].map((reason) => (
+            <Pressable key={reason} onPress={() => setExtraReason(t(`staff.reason_${reason}`))} style={styles.reasonChip}>
+              <Text style={styles.reasonText}>{t(`staff.reason_${reason}`)}</Text>
+            </Pressable>
+          ))}
+        </View>
         <TextInput value={extraReason} onChangeText={setExtraReason} placeholder={t('staff.extra_reason_placeholder')} placeholderTextColor={styles.placeholder.color} style={styles.input} />
         <Button title={t('staff.save_extra')} onPress={saveExtraPayment} style={styles.saveButton} />
       </BottomSheet>
@@ -502,32 +695,375 @@ export default function StaffScreen({ navigation }: Props) {
   );
 }
 
-const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) => StyleSheet.create({
-  screen: { flex: 1, backgroundColor: colors.background }, center: { alignItems: 'center', justifyContent: 'center' }, header: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.lg, paddingBottom: spacing.md, borderBottomWidth: 1, borderBottomColor: colors.border },
-  backButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }, backIcon: { color: colors.textPrimary }, headerTitle: { flex: 1, marginLeft: spacing.md, fontFamily: fonts.serif, fontSize: 21, color: colors.textPrimary }, addButton: { width: 40, height: 40, borderRadius: 20, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.primary }, addButtonText: { fontFamily: fonts.sansMedium, fontSize: 24, color: colors.surface },
-  content: { padding: spacing.lg, gap: spacing.md }, hero: { backgroundColor: colors.surfaceElevated, marginBottom: spacing.md }, heroIcon: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.blush, marginBottom: spacing.md }, heroIconColor: { color: colors.primary }, heroTitle: { fontFamily: fonts.serif, fontSize: 25, color: colors.textPrimary, marginBottom: 5 }, heroDescription: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, count: { marginTop: spacing.md, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary },
-  empty: { alignItems: 'flex-start' }, emptyTitle: { fontFamily: fonts.serif, fontSize: 20, color: colors.textPrimary, marginBottom: 5 }, emptyText: { fontFamily: fonts.sans, fontSize: 14, lineHeight: 20, color: colors.textSecondary }, emptyButton: { marginTop: spacing.lg, alignSelf: 'stretch' }, caregiverCard: { padding: spacing.lg }, cardTop: { flexDirection: 'row', alignItems: 'center' }, avatar: { width: 42, height: 42, borderRadius: 21, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', marginRight: spacing.md }, avatarText: { fontFamily: fonts.serif, fontSize: 19, color: colors.primary }, cardTitleWrap: { flex: 1 }, name: { fontFamily: fonts.sansMedium, fontSize: 16, color: colors.textPrimary }, service: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary, marginTop: 2 }, rate: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.primary, marginTop: spacing.md }, paymentSummary: { marginTop: 4 }, extraTotal: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.forest }, extraReason: { marginTop: 2, fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary }, totalPayable: { marginTop: 3, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, phoneRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.sm }, phoneIcon: { color: colors.textMuted }, phone: { marginLeft: spacing.xs, fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary },
-  label: { marginTop: spacing.md, marginBottom: spacing.xs, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, input: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary, backgroundColor: colors.surface }, placeholder: { color: colors.textMuted },
-  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm }, choice: { borderWidth: 1, borderColor: colors.border, borderRadius: radius.pill, paddingHorizontal: spacing.md, paddingVertical: spacing.sm }, choiceSelected: { backgroundColor: colors.blush, borderColor: colors.primary }, choiceText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary }, choiceTextSelected: { color: colors.primary }, serviceSelect: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, paddingHorizontal: spacing.md, paddingVertical: spacing.sm, backgroundColor: colors.surface }, serviceValue: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary }, selectCaret: { marginLeft: spacing.sm, fontSize: 15, color: colors.textMuted }, serviceOptions: { marginTop: spacing.xs, borderWidth: 1, borderColor: colors.border, borderRadius: radius.md, backgroundColor: colors.surface, overflow: 'hidden' }, serviceOption: { paddingHorizontal: spacing.md, paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border }, serviceOptionSelected: { backgroundColor: colors.blush }, serviceOptionText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary }, serviceOptionTextSelected: { color: colors.primary }, saveButton: { marginTop: spacing.lg }, extraHelp: { marginTop: spacing.sm, fontFamily: fonts.sans, fontSize: 13, lineHeight: 19, color: colors.textSecondary }, reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm }, reasonChip: { paddingVertical: spacing.xs, paddingHorizontal: spacing.sm, borderRadius: radius.pill, backgroundColor: colors.blush }, reasonText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.primary },
-  attendanceCard: { padding: spacing.sm },
-  attendanceRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm, paddingHorizontal: spacing.xs, borderBottomWidth: 1, borderBottomColor: colors.border },
-  attendanceRowLast: { borderBottomWidth: 0 },
-  attendanceIdentity: { flexDirection: 'row', alignItems: 'center', flex: 1, marginRight: spacing.sm },
-  attendanceAvatar: { width: 36, height: 36, borderRadius: 18, backgroundColor: colors.blush, alignItems: 'center', justifyContent: 'center', marginRight: spacing.sm },
-  attendanceAvatarText: { fontFamily: fonts.serif, fontSize: 16, color: colors.primary },
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => StyleSheet.create({
+  screen: { flex: 1, backgroundColor: colors.background },
+  center: { alignItems: 'center', justifyContent: 'center' },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: spacing.lg,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  backIcon: { color: colors.textPrimary },
+  headerTitle: {
+    flex: 1,
+    marginLeft: spacing.md,
+    fontFamily: fonts.serif,
+    fontSize: 21,
+    color: colors.textPrimary,
+  },
+  addButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    ...shadow.soft,
+  },
+  addIcon: { color: colors.textOnPrimary },
+  addButtonSpacer: { width: 40, height: 40 },
+  content: { padding: spacing.lg },
+  noFamilyBanner: {
+    alignItems: 'center',
+    backgroundColor: colors.glassSurface || colors.surfaceElevated,
+    borderRadius: radius.card || 20,
+    borderWidth: 1,
+    borderColor: colors.glassBorder || colors.border,
+    padding: spacing.xl,
+    ...shadow.soft,
+  },
+  noFamilyIconCircle: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.blush,
+    marginBottom: spacing.md,
+  },
+  noFamilyTitle: {
+    fontFamily: fonts.serif,
+    fontSize: 20,
+    color: colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: spacing.xs,
+  },
+  noFamilyText: {
+    fontFamily: fonts.sans,
+    fontSize: 14,
+    lineHeight: 20,
+    color: colors.textSecondary,
+    textAlign: 'center',
+    marginBottom: spacing.lg,
+  },
+  noFamilyButton: {
+    alignSelf: 'stretch',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    borderRadius: radius.lg,
+    paddingVertical: spacing.sm + 2,
+  },
+  noFamilyButtonText: {
+    fontFamily: fonts.sansBold,
+    fontSize: 14,
+    color: colors.textOnPrimary,
+  },
+  hero: {
+    backgroundColor: colors.glassSurface || colors.surfaceElevated,
+    borderRadius: radius.card || 20,
+    borderWidth: 1,
+    borderColor: colors.glassBorder || colors.border,
+    padding: spacing.lg,
+    marginBottom: spacing.xl,
+    ...shadow.soft,
+  },
+  heroTopRow: { flexDirection: 'row', alignItems: 'flex-start' },
+  heroIcon: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.blush,
+    marginRight: spacing.md,
+  },
+  heroIconColor: { color: colors.primary },
+  heroCopy: { flex: 1 },
+  heroTitle: {
+    fontFamily: fonts.serif,
+    fontSize: 22,
+    color: colors.textPrimary,
+    marginBottom: 4,
+  },
+  heroDescription: {
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+  },
+  heroDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginTop: spacing.lg,
+    marginBottom: spacing.md,
+  },
+  heroCountRow: { flexDirection: 'row', alignItems: 'baseline', gap: spacing.xs },
+  heroCountValue: { fontFamily: fonts.serif, fontSize: 24, color: colors.primary },
+  heroCountLabel: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  tabBar: {
+    flexDirection: 'row',
+    backgroundColor: colors.surfaceElevated,
+    borderRadius: radius.pill,
+    padding: 4,
+    marginBottom: spacing.md,
+  },
+  tabButton: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 9,
+    borderRadius: radius.pill,
+  },
+  tabButtonActive: {
+    backgroundColor: colors.surface,
+    ...shadow.soft,
+  },
+  tabButtonText: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.textSecondary,
+  },
+  tabButtonTextActive: {
+    fontFamily: fonts.sansBold,
+    color: colors.primary,
+  },
+  sectionHead: { marginBottom: spacing.md },
+  sectionTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textPrimary },
+  sectionSubtitle: {
+    marginTop: 2,
+    fontFamily: fonts.sans,
+    fontSize: 12,
+    color: colors.textSecondary,
+  },
+  listCard: {
+    backgroundColor: colors.glassSurface || colors.surface,
+    borderRadius: radius.card || 18,
+    borderWidth: 1,
+    borderColor: colors.glassBorder || colors.border,
+    paddingHorizontal: spacing.md,
+    ...shadow.soft,
+  },
+  rowFirst: { borderTopWidth: 0 },
+  emptyCard: {
+    alignItems: 'flex-start',
+    backgroundColor: colors.surface,
+    borderRadius: radius.card || 18,
+    borderWidth: 1,
+    borderColor: colors.border,
+    padding: spacing.lg,
+    ...shadow.soft,
+  },
+  emptyIconCircle: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.blush,
+    marginBottom: spacing.sm,
+  },
+  emptyTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textPrimary },
+  emptyText: {
+    marginTop: 4,
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+  },
+  emptyButton: { alignSelf: 'stretch', marginTop: spacing.lg },
+  caregiverCard: {
+    backgroundColor: colors.glassSurface || colors.surface,
+    borderRadius: radius.card || 18,
+    borderWidth: 1,
+    borderColor: colors.glassBorder || colors.border,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    marginBottom: spacing.sm,
+    ...shadow.soft,
+  },
+  caregiverCardPressed: { opacity: 0.85 },
+  cardTop: { flexDirection: 'row', alignItems: 'center' },
+  avatar: {
+    width: 38,
+    height: 38,
+    borderRadius: 19,
+    backgroundColor: colors.blush,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  avatarText: { fontFamily: fonts.serif, fontSize: 16, color: colors.primary },
+  cardTitleWrap: { flex: 1, marginRight: spacing.xs },
+  name: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.textPrimary },
+  subtitleRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 },
+  subtitleDot: { fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted },
+  service: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary },
+  rate: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.primary },
+  paymentSummary: {
+    marginTop: spacing.sm,
+    paddingTop: spacing.sm,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  extraTotal: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.forest },
+  extraReason: { marginTop: 2, fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary },
+  totalPayable: { marginTop: 3, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary },
+  phoneIcon: { color: colors.textMuted },
+  phone: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary },
+  label: {
+    marginTop: spacing.md,
+    marginBottom: spacing.xs,
+    fontFamily: fonts.sansMedium,
+    fontSize: 13,
+    color: colors.textPrimary,
+  },
+  input: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    fontFamily: fonts.sans,
+    fontSize: 15,
+    color: colors.textPrimary,
+    backgroundColor: colors.surface,
+  },
+  placeholder: { color: colors.textMuted },
+  choiceRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+  choice: {
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.pill,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+  },
+  choiceSelected: { backgroundColor: colors.blush, borderColor: colors.primary },
+  choiceText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary },
+  choiceTextSelected: { color: colors.primary },
+  serviceSelect: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+  },
+  serviceValue: { flex: 1, fontFamily: fonts.sans, fontSize: 15, color: colors.textPrimary },
+  selectCaret: { color: colors.textMuted },
+  selectCaretFlipped: { transform: [{ rotate: '180deg' }] },
+  serviceOptions: {
+    marginTop: spacing.xs,
+    borderWidth: 1,
+    borderColor: colors.border,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    overflow: 'hidden',
+  },
+  serviceOption: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  serviceOptionSelected: { backgroundColor: colors.blush },
+  serviceOptionText: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary },
+  serviceOptionTextSelected: { color: colors.primary },
+  saveButton: { marginTop: spacing.lg },
+  extraHelp: {
+    marginTop: spacing.sm,
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    lineHeight: 19,
+    color: colors.textSecondary,
+  },
+  reasonRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
+  reasonChip: {
+    paddingVertical: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.blush,
+  },
+  reasonText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.primary },
+  attendanceRow: {
+    paddingVertical: spacing.md,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  attendanceIdentity: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm },
+  attendanceAvatar: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    backgroundColor: colors.blush,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.sm,
+  },
+  attendanceAvatarText: { fontFamily: fonts.serif, fontSize: 15, color: colors.primary },
   attendanceIdentityText: { flex: 1 },
   attendanceName: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.textPrimary },
   attendanceMonthlyRow: { flexDirection: 'row', alignItems: 'center', marginTop: 2, gap: 4 },
   attendanceMonthlyIcon: { color: colors.textMuted },
   attendanceMonthly: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted },
   attendanceActions: { flexDirection: 'row', alignItems: 'center', gap: 6 },
-  attendanceBtn: { width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
-  attendanceLeaveBtn: { paddingHorizontal: 10, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border },
+  attendanceLeaveBtn: {
+    flex: 1.3,
+    paddingHorizontal: 6,
+    height: 32,
+    borderRadius: 16,
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
   attendanceLeaveText: { fontFamily: fonts.sansBold, fontSize: 11, color: ATTENDANCE_STATUS_COLOR.leave.tint },
   attendanceLeaveTextActive: { color: '#fff' },
-  historyRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingVertical: spacing.sm, borderBottomWidth: 1, borderBottomColor: colors.border },
+  historyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
   historyDate: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.textPrimary },
   historyBadge: { paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
   historyBadgeText: { fontFamily: fonts.sansBold, fontSize: 12 },
-  historyEmpty: { marginTop: spacing.md, fontFamily: fonts.sans, fontSize: 13, color: colors.textMuted, textAlign: 'center' },
+  historyEmpty: {
+    marginTop: spacing.md,
+    fontFamily: fonts.sans,
+    fontSize: 13,
+    color: colors.textMuted,
+    textAlign: 'center',
+  },
 });

@@ -75,3 +75,42 @@ export async function createStaff(
     token,
   });
 }
+
+export type RemoteAttendanceStatus = 'PRESENT' | 'ABSENT' | 'LEAVE' | 'HALF_DAY';
+
+export interface MarkAttendanceInput {
+  date: string; // "YYYY-MM-DD"
+  status: RemoteAttendanceStatus;
+  note?: string;
+}
+
+export async function markStaffAttendance(
+  staffId: string,
+  input: MarkAttendanceInput,
+  token: string,
+): Promise<void> {
+  await apiFetch<void>(`/staff/${staffId}/attendance`, {
+    method: 'POST',
+    body: input,
+    token,
+  });
+}
+
+export interface AttendanceSummary {
+  staffId: string;
+  name: string;
+  presentDays: number;
+  totalMonthlyDays: number;
+}
+
+export async function listAttendanceSummary(
+  familyId: string,
+  token: string,
+  page = 0,
+  limit = 50,
+): Promise<AttendanceSummary[]> {
+  return apiFetch<AttendanceSummary[]>(
+    `/staff/${familyId}/attendance/list?page=${page}&limit=${limit}`,
+    { method: 'GET', token },
+  );
+}

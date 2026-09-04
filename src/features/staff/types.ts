@@ -19,7 +19,7 @@ export interface CaregiverTransaction {
   createdAt: number;
 }
 
-export type AttendanceStatus = 'present' | 'absent' | 'leave';
+export type AttendanceStatus = 'present' | 'absent' | 'leave' | 'halfDay';
 
 export interface AttendanceEntry {
   id: string;
