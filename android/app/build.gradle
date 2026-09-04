@@ -132,6 +132,10 @@ dependencies {
     // When using the BoM, don't specify versions in Firebase dependencies
     implementation 'com.google.firebase:firebase-analytics'
 
+    // Required to receive a push at all — the pre-existing setup was
+    // analytics-only, which cannot deliver messages (docs/DECISIONS.md D-059).
+    implementation 'com.google.firebase:firebase-messaging'
+
     // Add the dependencies for any other desired Firebase products
     // https://firebase.google.com/docs/android/setup#available-libraries
 }

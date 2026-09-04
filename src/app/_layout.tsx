@@ -1,5 +1,7 @@
 import React from 'react';
-import { NavigationContainer } from '@react-navigation/native';
+import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import { usePushRegistration } from '../hooks/usePushNotifications';
+import type { PushRoute } from '../features/notifications/parse';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import LanguageScreen from './onboarding/language';
@@ -58,14 +60,18 @@ export type RootStackParamList = {
   // on every focus — see docs/DECISIONS.md.
   Dashboard: { profileUpdated?: boolean } | undefined;
   Family: undefined;
-  Medicine: { openAddModal?: boolean } | undefined;
+  // `focus`: set by a notification tap so the screen opens on the part the alert
+  // was about — 'dosage' for DOSAGE_REMINDER, 'stock' for LOW_STOCK. See
+  // `features/notifications/parse.ts` `routeFor`.
+  Medicine: { openAddModal?: boolean; focus?: 'dosage' | 'stock' } | undefined;
   Prescriptions: { familyProfileId: string };
   Wellness: undefined;
   Cycle: undefined;
   HouseholdOperations: undefined;
   HouseholdArea: { area: 'caregiver' | 'resources' | 'events' | 'assets' };
   Staff: undefined;
-  Resources: undefined;
+  // `focus: 'bills'`: set by a utility-bill notification tap.
+  Resources: { focus?: 'bills' } | undefined;
   EventBudgets: undefined;
   Vehicles: undefined;
   ExpenseGroups: undefined;
@@ -97,10 +103,43 @@ export type RootStackParamList = {
 
 const Stack = createNativeStackNavigator<RootStackParamList>();
 
+/**
+ * Lets a notification tap navigate from outside the tree.
+ *
+ * A tap can arrive before any screen has mounted — the cold-start case, where
+ * the OS launches the app straight from the notification — so the handler cannot
+ * rely on a screen's `navigation` prop. `isReady()` guards exactly that window;
+ * dropping a tap that lands a few milliseconds early is better than throwing
+ * inside a handler the user cannot see.
+ */
+export const navigationRef = createNavigationContainerRef<RootStackParamList>();
+
 const AppLayout = () => {
   const { theme } = useTheme();
   const { pending, signedIn } = useAuth();
   const [splashFinished, setSplashFinished] = React.useState(false);
+
+  // Mounted once, above the navigator: this is what registers the device with
+  // `POST /api/devices/register` and turns a notification tap into a route.
+  // Stable identity so the delivery listeners are not torn down each render.
+  const openFromNotification = React.useCallback((route: PushRoute) => {
+    if (!navigationRef.isReady()) {
+      return;
+    }
+    // Switched rather than spread: `navigate(route.screen, route.params)` does
+    // not type-check, because TypeScript cannot tell that this screen's params
+    // belong to this screen name. Narrowing per case is what makes the pairing
+    // checked instead of asserted.
+    switch (route.screen) {
+      case 'Medicine':
+        navigationRef.navigate('Medicine', route.params);
+        break;
+      case 'Resources':
+        navigationRef.navigate('Resources', route.params);
+        break;
+    }
+  }, []);
+  usePushRegistration(openFromNotification);
 
   // Show luxury animated splash screen on app start / restore from killed state
   if (pending || !splashFinished) {
@@ -116,7 +155,7 @@ const AppLayout = () => {
 
   return (
     <SafeAreaProvider>
-      <NavigationContainer>
+      <NavigationContainer ref={navigationRef}>
         <Stack.Navigator
           initialRouteName={signedIn ? 'Dashboard' : 'Language'}
           screenOptions={{

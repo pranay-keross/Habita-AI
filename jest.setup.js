@@ -47,3 +47,39 @@ jest.mock('@react-native-documents/picker', () => ({
   errorCodes: { OPERATION_CANCELED: 'OPERATION_CANCELED' },
   types: { pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', images: 'image/*' },
 }));
+
+// @react-native-firebase and @notifee both reach for native binaries at import
+// time. Mocked here rather than left to fail, so `firebaseMessaging.ts` — the
+// newest and least build-verified code in the app — can actually be exercised
+// (docs/DECISIONS.md D-059). Each listener registration returns its unsubscribe,
+// matching the real API, so a test can assert teardown.
+jest.mock('@react-native-firebase/app', () => ({
+  getApp: jest.fn(() => ({ name: '[DEFAULT]' })),
+}));
+
+jest.mock('@react-native-firebase/messaging', () => {
+  const unsub = () => jest.fn();
+  return {
+    AuthorizationStatus: { NOT_DETERMINED: -1, DENIED: 0, AUTHORIZED: 1, PROVISIONAL: 2 },
+    getMessaging: jest.fn(() => ({})),
+    getToken: jest.fn(async () => 'test-fcm-token'),
+    requestPermission: jest.fn(async () => 1),
+    onMessage: jest.fn(() => unsub()),
+    onNotificationOpenedApp: jest.fn(() => unsub()),
+    onTokenRefresh: jest.fn(() => unsub()),
+    getInitialNotification: jest.fn(async () => null),
+    setBackgroundMessageHandler: jest.fn(),
+  };
+});
+
+jest.mock('@notifee/react-native', () => ({
+  __esModule: true,
+  default: {
+    createChannel: jest.fn(async () => 'habita_alerts'),
+    displayNotification: jest.fn(async () => 'notif-id'),
+    requestPermission: jest.fn(async () => ({ authorizationStatus: 1 })),
+    onForegroundEvent: jest.fn(() => jest.fn()),
+  },
+  AndroidImportance: { HIGH: 4, DEFAULT: 3 },
+  EventType: { PRESS: 1, DISMISSED: 0, DELIVERED: 3 },
+}));

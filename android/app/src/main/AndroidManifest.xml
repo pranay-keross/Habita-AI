@@ -1,6 +1,10 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <!-- Android 13+ requires this at runtime before any notification is shown;
+         `PushMessaging.requestPermission()` is what asks for it. Older versions
+         grant it at install time. -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 
@@ -13,6 +17,17 @@
       android:theme="@style/AppTheme"
       android:usesCleartextTraffic="${usesCleartextTraffic}"
       android:supportsRtl="true">
+
+      <!-- The default notification channel is NOT declared here.
+           @react-native-firebase/messaging already declares this same meta-data key
+           in its own manifest, as the placeholder ${firebaseJsonNotificationChannelId},
+           so declaring it again fails the manifest merger outright. The supported way
+           to set it is `firebase.json` at the project root
+           (`messaging_android_notification_channel_id`), which fills that placeholder.
+           Keep the two in step: the id must match ANDROID_CHANNEL_ID in
+           src/features/notifications/firebaseMessaging.ts, or Android 8+ silently
+           drops every backgrounded message. A test asserts they match. -->
+
       <activity
         android:name=".MainActivity"
         android:label="@string/app_name"

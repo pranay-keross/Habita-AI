@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import DateTimePicker, {
   type DateTimePickerEvent,
 } from '@react-native-community/datetimepicker';
@@ -33,6 +33,7 @@ import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
 import useAuth from '../../hooks/useAuth';
 import useThemedStyles from '../../hooks/useThemedStyles';
+import usePushNotifications from '../../hooks/usePushNotifications';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
 import { getMyPrimaryFamily } from '../family/api';
@@ -83,7 +84,27 @@ function startOfToday(): number {
   return date.getTime();
 }
 
-export default function ResourcesScreen({ navigation }: Props) {
+export default function ResourcesScreen({ navigation, route }: Props) {
+  // Utility-bill alerts that arrived while the user was elsewhere. Opening this
+  // screen is what "seeing" them means, so they are marked read on mount.
+  const { utilities: utilityAlerts, markAsRead, markSectionAsRead } = usePushNotifications();
+
+  // Set by a bill-alert tap: open on the utility bills list rather than at the
+  // top of the screen, which is several sections above it.
+  const scrollRef = useRef<ScrollView>(null);
+  const billsY = useRef(0);
+
+  useEffect(() => {
+    if (!route.params?.focus) {
+      return;
+    }
+    // After layout, or the offset is still 0 and it scrolls nowhere.
+    const timer = setTimeout(() => {
+      scrollRef.current?.scrollTo({ y: billsY.current, animated: true });
+    }, 350);
+    navigation.setParams({ focus: undefined });
+    return () => clearTimeout(timer);
+  }, [route.params?.focus, navigation]);
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
@@ -481,6 +502,7 @@ export default function ResourcesScreen({ navigation }: Props) {
         )}
       </View>
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={[
           styles.content,
           { paddingBottom: insets.bottom + 28 },

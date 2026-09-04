@@ -13,6 +13,8 @@ import ModernBottomNav, { type BottomNavTab } from '../../components/ModernBotto
 import { SkeletonCard, SkeletonHeroCard } from '../../components/Skeleton';
 import Avatar from '../../components/Avatar';
 import useAuth from '../../hooks/useAuth';
+import usePushNotifications from '../../hooks/usePushNotifications';
+import AlertsCard from '../../components/AlertsCard';
 import {
   ChevronRight,
   Pill,
@@ -162,6 +164,15 @@ const MIN_DOB = new Date(1900, 0, 1);
 const ALL_CATEGORIES: FamilyProfileCategory[] = ['SELF', 'KID', 'ELDER', 'OTHER'];
 
 export default function MedicineScreen({ navigation, route }: Props) {
+  // Dosage and low-stock alerts that arrived while the user was elsewhere.
+  const { medchest: medchestAlerts, markAsRead, markSectionAsRead } = usePushNotifications();
+
+  // A notification tap sets `focus`, so the screen opens on the part the alert
+  // was actually about instead of at the top: 'dosage' for a dose reminder,
+  // 'stock' for a low-stock alert. Without this the two click_actions the
+  // backend distinguishes would look identical to the user.
+  const scrollRef = useRef<ScrollView>(null);
+  const sectionY = useRef<{ dosage: number; stock: number }>({ dosage: 0, stock: 0 });
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { getAccessToken, getUserId } = useAuth();
@@ -267,11 +278,53 @@ export default function MedicineScreen({ navigation, route }: Props) {
   };
 
   const showRemoteError = (err: unknown) => {
+    // The alert shows a friendly message, which is right for the user but leaves
+    // nothing to debug from: a network failure, a backend 400 and a TypeError in
+    // our own post-save code all surface as the same "unexpected error" string.
+    // Log the real one in dev so a report like "it says unexpected error" is
+    // actionable without guessing.
+    if (__DEV__) {
+      const e = err as { status?: number; body?: unknown; message?: string; stack?: string };
+      console.warn(
+        '[medchest] request failed:',
+        JSON.stringify({ status: e?.status, body: e?.body, message: e?.message }),
+        e?.stack ?? '',
+      );
+    }
     const detail = extractMedchestErrorMessage(err);
     if (detail) {
       Alert.alert(t('onboarding.error_title'), detail);
     } else {
       Alert.alert(t('onboarding.error_title'), t(errorMessageKey(parseMedchestError(err))));
+    }
+  };
+
+  /**
+   * Re-reads the list after a successful create/update, treating a failure here
+   * as a *display* problem rather than a save problem.
+   *
+   * Without this split, a 500 from `GET /profiles/{id}/medicines` is caught by
+   * the caller's try/catch and reported as "an unexpected error" — so the user
+   * believes the save failed, tries again, and gets "medicine already exists"
+   * because the first save had in fact worked. That is exactly the confusion
+   * seen on 2026-09-01, where the list endpoint 500s for some accounts while
+   * POST succeeds (docs/DECISIONS.md D-060).
+   *
+   * The write is already committed by the time this runs. So: log it, leave the
+   * previously loaded list on screen, and let the next pull-to-refresh or screen
+   * focus try again — rather than telling the user something false.
+   */
+  const refreshAfterWrite = async (profileId: string, token: string) => {
+    try {
+      await refreshRemoteMedicines(profileId, token);
+    } catch (err) {
+      if (__DEV__) {
+        const e = err as { status?: number; body?: unknown };
+        console.warn(
+          '[medchest] save succeeded but the follow-up list failed:',
+          JSON.stringify({ status: e?.status, body: e?.body }),
+        );
+      }
     }
   };
 
@@ -398,6 +451,18 @@ export default function MedicineScreen({ navigation, route }: Props) {
     setIsLiquid(false);
     setShowSheet(true);
   }, [familyId, familyProfileId, profiles.length, openAddProfileSheet]);
+
+  useEffect(() => {
+    if (route.params?.focus) {
+      const target = route.params.focus;
+      // After layout, or the offsets are still 0 and it scrolls nowhere.
+      const timer = setTimeout(() => {
+        scrollRef.current?.scrollTo({ y: sectionY.current[target] ?? 0, animated: true });
+      }, 350);
+      navigation.setParams({ focus: undefined });
+      return () => clearTimeout(timer);
+    }
+  }, [route.params?.focus, navigation]);
 
   useEffect(() => {
     if (route.params?.openAddModal) {
@@ -617,7 +682,7 @@ export default function MedicineScreen({ navigation, route }: Props) {
           const flags = await loadLiquidFlags();
           flags[updated.id] = isLiquid;
           await saveLiquidFlags(flags);
-          await refreshRemoteMedicines(familyProfileId, token);
+          await refreshAfterWrite(familyProfileId, token);
         } else {
           const created = await createMedicine(
             familyProfileId,
@@ -633,7 +698,7 @@ export default function MedicineScreen({ navigation, route }: Props) {
           const flags = await loadLiquidFlags();
           flags[created.id] = isLiquid;
           await saveLiquidFlags(flags);
-          await refreshRemoteMedicines(familyProfileId, token);
+          await refreshAfterWrite(familyProfileId, token);
         }
         setShowSheet(false);
       } catch (err) {
@@ -767,6 +832,7 @@ export default function MedicineScreen({ navigation, route }: Props) {
       </View>
 
       <ScrollView
+        ref={scrollRef}
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
@@ -785,6 +851,12 @@ export default function MedicineScreen({ navigation, route }: Props) {
           </View>
         ) : (
           <>
+            <AlertsCard
+              section="medchest"
+              items={medchestAlerts}
+              onDismiss={markAsRead}
+              onMarkAllRead={() => markSectionAsRead('medchest')}
+            />
             {/* Mature Hero Health Intelligence Card */}
             <View style={styles.heroCard}>
               <View style={styles.heroTopRow}>
@@ -893,9 +965,13 @@ export default function MedicineScreen({ navigation, route }: Props) {
               )}
             </View>
 
-            {/* Slot Filter Chips */}
+            {/* Slot Filter Chips — the 'dosage' scroll target */}
             {familyProfileId && medicines.length > 0 && (
-              <View style={styles.slotFilterContainer}>
+              <View
+                style={styles.slotFilterContainer}
+                onLayout={(e) => {
+                  sectionY.current.dosage = e.nativeEvent.layout.y;
+                }}>
                 <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.slotFilterRow}>
                   <Pressable
                     style={[styles.filterChip, selectedSlotFilter === 'all' && styles.filterChipActive]}
@@ -928,7 +1004,11 @@ export default function MedicineScreen({ navigation, route }: Props) {
             {/* Medicine Routine Cards */}
             {familyProfileId ? (
               <>
-                <View style={styles.sectionHeader}>
+                <View
+                  style={styles.sectionHeader}
+                  onLayout={(e) => {
+                    sectionY.current.stock = e.nativeEvent.layout.y;
+                  }}>
                   <Text style={styles.sectionTitle}>{t('medicine.section_title')}</Text>
                   <Text style={styles.sectionSub}>Prescribed doses & live stock trackers</Text>
                 </View>

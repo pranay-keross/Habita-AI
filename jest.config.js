@@ -7,6 +7,8 @@ module.exports = {
     'node_modules/(?!((jest-)?react-native|@react-native(-community)?' +
       '|@react-native-async-storage' +
       '|@react-native-documents' +
+      '|@react-native-firebase' +
+      '|@notifee/react-native' +
       '|@react-navigation' +
       '|react-native-gesture-handler' +
       '|react-native-safe-area-context' +
