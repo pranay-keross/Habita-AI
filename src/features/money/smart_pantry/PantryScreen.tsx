@@ -7,6 +7,7 @@ import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 import { ArrowLeft } from 'lucide-react-native';
+import { SkeletonCard, SkeletonHeroCard } from '../../../components/Skeleton';
 
 import { ScreenTab } from './types';
 import { useSmartPantry } from './hooks/useSmartPantry';
@@ -35,6 +36,7 @@ export default function PantryScreen({ navigation }: Props) {
   const {
     loading,
     items,
+    recipes,
     filteredItems,
     searchQuery,
     setSearchQuery,
@@ -50,6 +52,11 @@ export default function PantryScreen({ navigation }: Props) {
     updateQuantity,
     deleteItem,
     cookRecipe,
+    lookupBarcode,
+    scanReceipt,
+    recipeDietaryFilter,
+    setRecipeDietaryFilter,
+    triggerSpoilageAlerts,
     totalItemsCount,
     expiringSoonItems,
     lowStockItems,
@@ -60,7 +67,7 @@ export default function PantryScreen({ navigation }: Props) {
       {/* Header Bar */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
         <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
-          <ArrowLeft size={18} color="#000000" strokeWidth={1.5} />
+          <ArrowLeft size={18} color={styles.backIcon.color} strokeWidth={1.5} />
         </Pressable>
         <View style={{ flex: 1, marginLeft: 10 }}>
           <Text style={styles.headerTitle}>{t('smart_pantry.header_title')}</Text>
@@ -122,7 +129,12 @@ export default function PantryScreen({ navigation }: Props) {
       {/* Main Screen Content */}
       <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
         {loading ? (
-          <ActivityIndicator color={styles.headerAddBtn.backgroundColor} style={{ marginTop: 60 }} size="large" />
+          <View style={{ paddingTop: 8 }}>
+            <SkeletonHeroCard />
+            <SkeletonCard />
+            <SkeletonCard />
+            <SkeletonCard />
+          </View>
         ) : (
           <>
             {activeTab === 'dashboard' && (
@@ -133,6 +145,10 @@ export default function PantryScreen({ navigation }: Props) {
                 lowStockItems={lowStockItems}
                 onNavigateTab={setActiveTab}
                 onSelectLocation={setSelectedLocation}
+                onSelectItem={(item) => {
+                  setSelectedItem(item);
+                  setActiveTab('details');
+                }}
               />
             )}
 
@@ -158,6 +174,8 @@ export default function PantryScreen({ navigation }: Props) {
             {activeTab === 'add' && (
               <AddScanView
                 onAddItem={addItem}
+                onLookupBarcode={lookupBarcode}
+                onScanReceipt={scanReceipt}
                 onNavigateDetails={() => setActiveTab('details')}
               />
             )}
@@ -176,11 +194,17 @@ export default function PantryScreen({ navigation }: Props) {
               <ExpiryRadarView
                 items={items}
                 onNavigateRecipes={() => setActiveTab('recipes')}
+                onTriggerSpoilageAlerts={triggerSpoilageAlerts}
               />
             )}
 
             {activeTab === 'recipes' && (
-              <ZeroWasteRecipesView onCookRecipe={cookRecipe} />
+              <ZeroWasteRecipesView
+                recipes={recipes}
+                onCookRecipe={cookRecipe}
+                activeDietaryFilter={recipeDietaryFilter}
+                onSelectDietaryFilter={setRecipeDietaryFilter}
+              />
             )}
           </>
         )}

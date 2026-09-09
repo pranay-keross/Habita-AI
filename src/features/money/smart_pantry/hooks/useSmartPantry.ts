@@ -1,76 +1,208 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
+import useAuth from '../../../../hooks/useAuth';
 import { AllergenTag, PantryItem, StorageLocation, ZeroWasteRecipe } from '../types';
-import { BARCODE_CATALOG, MOCK_ZERO_WASTE_RECIPES } from '../data/mockPantryData';
-import { getDaysUntilExpiry, loadPantryItems, savePantryItems } from '../services/pantryStorage';
+import { MOCK_ZERO_WASTE_RECIPES } from '../data/mockPantryData';
+import {
+  cookPantryRecipe,
+  getDaysUntilExpiry,
+  loadPantryItems,
+  modifyPantryQuantity,
+  removePantryItem,
+  savePantryItem,
+} from '../services/pantryStorage';
+import {
+  getZeroWasteRecipesRemote,
+  lookupBarcodeRemote,
+  notifyExpiringPantryItemsRemote,
+  scanReceiptRemote,
+} from '../api';
 
 export function useSmartPantry() {
+  const { getAccessToken, pending, signedIn } = useAuth();
   const [loading, setLoading] = useState(true);
   const [items, setItems] = useState<PantryItem[]>([]);
+  const [recipes, setRecipes] = useState<ZeroWasteRecipe[]>(MOCK_ZERO_WASTE_RECIPES);
+  const [recipeDietaryFilter, setRecipeDietaryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedLocation, setSelectedLocation] = useState<StorageLocation | 'All'>('All');
   const [selectedAllergenFilter, setSelectedAllergenFilter] = useState<AllergenTag | 'all'>('all');
   const [sortBy, setSortBy] = useState<'expiry' | 'name' | 'quantity'>('expiry');
   const [selectedItem, setSelectedItem] = useState<PantryItem | null>(null);
 
-  const fetchItems = async () => {
+  const fetchRecipes = useCallback(
+    async (dietaryPref?: string) => {
+      let token: string | null = null;
+      try {
+        token = await getAccessToken();
+      } catch {}
+
+      if (token) {
+        try {
+          const pref = dietaryPref !== undefined ? dietaryPref : recipeDietaryFilter;
+          const remoteRecipes = await getZeroWasteRecipesRemote(token, 5, pref);
+          if (remoteRecipes && remoteRecipes.length > 0) {
+            setRecipes(remoteRecipes);
+          }
+        } catch (err) {
+          console.warn('Failed to load remote zero-waste recipes:', err);
+        }
+      }
+    },
+    [getAccessToken, recipeDietaryFilter],
+  );
+
+  const fetchItems = useCallback(async () => {
     setLoading(true);
-    const data = await loadPantryItems();
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {
+      // Offline / guest
+    }
+
+    const data = await loadPantryItems(token);
     setItems(data);
     if (data.length > 0 && !selectedItem) {
       setSelectedItem(data[0]);
     }
+
+    await fetchRecipes();
+
     setLoading(false);
-  };
+  }, [getAccessToken, selectedItem, fetchRecipes]);
 
   useEffect(() => {
-    fetchItems();
-  }, []);
+    if (!pending) {
+      fetchItems();
+    }
+  }, [pending, signedIn, fetchItems]);
 
-  const updateItems = async (newItems: PantryItem[]) => {
-    setItems(newItems);
-    await savePantryItems(newItems);
+  const changeRecipeDietaryFilter = async (filter: string) => {
+    setRecipeDietaryFilter(filter);
+    await fetchRecipes(filter);
   };
 
+
   const addItem = async (newItem: PantryItem) => {
-    const updated = [newItem, ...items];
-    await updateItems(updated);
-    setSelectedItem(newItem);
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {}
+
+    const saved = await savePantryItem(newItem, token);
+    setItems((prev) => [saved, ...prev.filter((i) => i.id !== saved.id)]);
+    setSelectedItem(saved);
   };
 
   const updateQuantity = async (id: string, delta: number) => {
-    const target = items.find((i) => i.id === id);
-    if (!target) return;
-    const newQty = Math.max(0, target.quantity + delta);
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {}
+
+    const newQty = await modifyPantryQuantity(id, delta, token);
     if (newQty === 0) {
-      deleteItem(id);
-      return;
-    }
-    const updated = items.map((i) => (i.id === id ? { ...i, quantity: newQty } : i));
-    await updateItems(updated);
-    if (selectedItem?.id === id) {
-      setSelectedItem({ ...selectedItem, quantity: newQty });
+      setItems((prev) => prev.filter((i) => i.id !== id));
+      if (selectedItem?.id === id) {
+        setSelectedItem(null);
+      }
+    } else {
+      setItems((prev) =>
+        prev.map((i) => (i.id === id ? { ...i, quantity: newQty, isLowStock: newQty <= 1 } : i)),
+      );
+      if (selectedItem?.id === id) {
+        setSelectedItem((prev) =>
+          prev ? { ...prev, quantity: newQty, isLowStock: newQty <= 1 } : null,
+        );
+      }
     }
   };
 
   const deleteItem = async (id: string) => {
-    const updated = items.filter((i) => i.id !== id);
-    await updateItems(updated);
-    setSelectedItem(updated.length > 0 ? updated[0] : null);
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {}
+
+    await removePantryItem(id, token);
+    setItems((prev) => prev.filter((i) => i.id !== id));
+    if (selectedItem?.id === id) {
+      setSelectedItem(null);
+    }
   };
 
   const cookRecipe = async (recipe: ZeroWasteRecipe) => {
-    const updated = items.map((item) => {
-      if (getDaysUntilExpiry(item.expiryDate) <= 5 && item.quantity > 0) {
-        return { ...item, quantity: Math.max(0, item.quantity - 1) };
-      }
-      return item;
-    });
-    await updateItems(updated);
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {}
+
+    await cookPantryRecipe(recipe, token);
+    // Reload items from cache / remote
+    const reloaded = await loadPantryItems(token);
+    setItems(reloaded);
   };
 
-  const totalItemsCount = items.reduce((acc, i) => acc + i.quantity, 0);
+  const lookupBarcode = async (barcode: string) => {
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {}
+
+    if (token) {
+      try {
+        return await lookupBarcodeRemote(barcode, token);
+      } catch (err) {
+        console.warn('Barcode remote lookup failed:', err);
+      }
+    }
+    return null;
+  };
+
+  const scanReceipt = async (
+    file: { uri: string; name?: string; type?: string },
+    autoAdd: boolean = false,
+  ) => {
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {}
+
+    if (token) {
+      try {
+        const resp = await scanReceiptRemote(file, token, autoAdd);
+        if (resp && resp.extractedItems && resp.extractedItems.length > 0) {
+          if (autoAdd) {
+            await fetchItems();
+          }
+          return resp.extractedItems;
+        }
+      } catch (err) {
+        console.warn('Receipt remote scan failed:', err);
+      }
+    }
+    return [];
+  };
+
+  const triggerSpoilageAlerts = async () => {
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {}
+
+    if (token) {
+      try {
+        return await notifyExpiringPantryItemsRemote(token);
+      } catch (err) {
+        console.warn('Trigger spoilage alerts failed:', err);
+      }
+    }
+    return { itemsAlerted: 0, message: 'Could not trigger notifications.' };
+  };
+
+  const totalItemsCount = items.reduce((acc, i) => acc + (i.quantity || 1), 0);
   const expiringSoonItems = items.filter((i) => getDaysUntilExpiry(i.expiryDate) <= 5);
-  const lowStockItems = items.filter((i) => i.isLowStock || i.quantity <= 1);
+  const lowStockItems = items.filter((i) => i.isLowStock || (i.quantity && i.quantity <= 1));
 
   const filteredItems = items
     .filter((item) => {
@@ -92,6 +224,9 @@ export function useSmartPantry() {
   return {
     loading,
     items,
+    recipes,
+    recipeDietaryFilter,
+    setRecipeDietaryFilter: changeRecipeDietaryFilter,
     filteredItems,
     searchQuery,
     setSearchQuery,
@@ -107,6 +242,10 @@ export function useSmartPantry() {
     updateQuantity,
     deleteItem,
     cookRecipe,
+    lookupBarcode,
+    scanReceipt,
+    triggerSpoilageAlerts,
+    refresh: fetchItems,
     totalItemsCount,
     expiringSoonItems,
     lowStockItems,

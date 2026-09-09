@@ -211,7 +211,7 @@ Found via live testing, documented here so they aren't rediscovered from scratch
 | `vehicles` | Property Asset Vault & Vehicle Upkeep | `M5-T12` | Not built |
 | `expensegroups` | Multi-Currency Expense Groups | `M6-T1..T4` | Client fully integrated against Postman contract (D-050, `src/features/money/expenses/api.ts`, `expenseStore.ts`, screens); full backend spec in `docs/EXPENSES_API_SPEC.md` |
 | `payments`, `upi` | Payment Rails & Global Subscriptions | `M6-T6` | Not built; blocked on gateway decision (`docs/BACKLOG.md` open question 3) |
-| `pantry` | Smart Pantry & Allergen Radar | `M7-T1/T2` | Not built |
+| `pantry` | Smart Pantry & Allergen Radar | `M7-T1/T2` | Server LIVE (Port 8080). Digital pantry CRUD, Expiry Radar, Allergen matrix, Barcode catalog lookup, Receipt OCR scanner with autoAdd, AI Zero-Waste recipes & 1-tap cook ingredient deduction, V31 Flyway migration. Client wired Remote-First in `src/features/money/smart_pantry/api.ts` with AsyncStorage offline fallback. Full spec in `docs/SMART_PANTRY_API_SPEC.md` |
 | `wardrobe` | Wardrobe & Weather-Adaptive Style Mirror | `M7-T3/T4` | Server not built. Client fully restyled to the CRED design system and wired online-first against the contract (`src/features/style_pantry/api.ts`, `stylePantryStore.ts`, screens), falling back to a local rule-based recommendation + AsyncStorage until the backend ships; full backend spec in `docs/WARDROBE_API_SPEC.md` |
 | `voice` | Voice Command & Orchestration | `M7-T5` | Not built |
 | `dashboard` | Home Dashboard aggregation | `M7-T6` | Client dashboard is fully static/local; real aggregation needs this package |

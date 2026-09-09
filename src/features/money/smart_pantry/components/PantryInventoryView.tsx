@@ -1,9 +1,9 @@
-import React from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
+import Pagination from '../../../../components/Pagination';
 import { AllergenTag, PantryItem, StorageLocation } from '../types';
 import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../data/mockPantryData';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
-import { PANTRY_COLORS } from '../constants/colors';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
@@ -37,6 +37,8 @@ const LOCATION_ICONS: Record<StorageLocation, typeof Refrigerator> = {
   'Pantry Shelf': Archive,
 };
 
+const INVENTORY_PAGE_SIZE = 8;
+
 export const PantryInventoryView: React.FC<Props> = ({
   filteredItems,
   searchQuery,
@@ -53,35 +55,32 @@ export const PantryInventoryView: React.FC<Props> = ({
   const { theme } = useTheme();
   const styles = useThemedStyles(makeStyles);
 
+  const [currentPage, setCurrentPage] = useState(1);
+
+  useEffect(() => {
+    setCurrentPage(1);
+  }, [searchQuery, selectedLocation, selectedAllergenFilter, sortBy]);
+
+  const totalPages = Math.max(1, Math.ceil(filteredItems.length / INVENTORY_PAGE_SIZE));
+  const paginatedItems = useMemo(() => {
+    const start = (currentPage - 1) * INVENTORY_PAGE_SIZE;
+    return filteredItems.slice(start, start + INVENTORY_PAGE_SIZE);
+  }, [filteredItems, currentPage]);
+
+  const getLocName = (loc: string) => {
+    const lower = (loc || '').toLowerCase();
+    if (lower.includes('fridge')) return t('smart_pantry.loc_fridge');
+    if (lower.includes('freezer')) return t('smart_pantry.loc_freezer');
+    if (lower.includes('pantry') || lower.includes('shelf')) return t('smart_pantry.loc_pantry_shelf');
+    return loc;
+  };
+
   const getLocLabel = (loc: StorageLocation | 'All') => {
-    switch (loc) {
-      case 'All':
-        return t('smart_pantry.loc_all');
-      case 'Fridge':
-        return t('smart_pantry.loc_fridge');
-      case 'Freezer':
-        return t('smart_pantry.loc_freezer');
-      case 'Pantry Shelf':
-        return t('smart_pantry.loc_pantry_shelf');
-      default:
-        return loc;
-    }
+    if (loc === 'All') return t('smart_pantry.loc_all');
+    return getLocName(loc);
   };
 
   const getLocIcon = (loc: StorageLocation | 'All') => (loc === 'All' ? Globe : LOCATION_ICONS[loc]);
-
-  const getLocName = (loc: StorageLocation) => {
-    switch (loc) {
-      case 'Fridge':
-        return t('smart_pantry.loc_fridge');
-      case 'Freezer':
-        return t('smart_pantry.loc_freezer');
-      case 'Pantry Shelf':
-        return t('smart_pantry.loc_pantry_shelf');
-      default:
-        return loc;
-    }
-  };
 
   return (
     <View style={styles.container}>
@@ -181,43 +180,56 @@ export const PantryInventoryView: React.FC<Props> = ({
           </Pressable>
         </View>
       ) : (
-        filteredItems.map((item) => {
-          const daysLeft = getDaysUntilExpiry(item.expiryDate);
-          const isUrgent = daysLeft <= 2;
-          const isWarning = daysLeft > 2 && daysLeft <= 5;
-          const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
-          return (
-            <Pressable
-              key={item.id}
-              style={styles.inventoryCard}
-              onPress={() => onSelectItem(item)}>
-              <View style={styles.inventoryMainRow}>
-                <View style={styles.categoryCircle}>
-                  <CategoryIcon size={22} color={styles.inventoryName.color} strokeWidth={1.8} />
-                </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.inventoryName}>{item.name}</Text>
-                  <Text style={styles.inventorySub}>
-                    {t('smart_pantry.quantity', { defaultValue: 'Qty' })}: {item.quantity} {item.unit} · {getLocName(item.storageLocation)}
-                  </Text>
-                </View>
-                <View
-                  style={[
-                    styles.expiryPill,
-                    isUrgent ? styles.expiryPillUrgent : isWarning ? styles.expiryPillWarning : styles.expiryPillSafe,
-                  ]}>
-                  <Text
+        <>
+          {paginatedItems.map((item) => {
+            const daysLeft = getDaysUntilExpiry(item.expiryDate);
+            const isUrgent = daysLeft <= 2;
+            const isWarning = daysLeft > 2 && daysLeft <= 5;
+            const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+            return (
+              <Pressable
+                key={item.id}
+                style={styles.inventoryCard}
+                onPress={() => onSelectItem(item)}>
+                <View style={styles.inventoryMainRow}>
+                  <View style={styles.categoryCircle}>
+                    <CategoryIcon size={22} color={styles.inventoryName.color} strokeWidth={1.8} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.inventoryName}>{item.name}</Text>
+                    <Text style={styles.inventorySub}>
+                      {t('smart_pantry.quantity', { defaultValue: 'Qty' })}: {item.quantity} {item.unit} · {getLocName(item.storageLocation)}
+                    </Text>
+                  </View>
+                  <View
                     style={[
-                      styles.expiryPillText,
-                      isUrgent ? styles.expiryPillTextUrgent : isWarning ? styles.expiryPillTextWarning : styles.expiryPillTextSafe,
+                      styles.expiryPill,
+                      isUrgent ? styles.expiryPillUrgent : isWarning ? styles.expiryPillWarning : styles.expiryPillSafe,
                     ]}>
-                    {daysLeft <= 0 ? (t('doc_hub.status_expired', { defaultValue: 'Expired' })) : `${daysLeft}d left`}
-                  </Text>
+                    <Text
+                      style={[
+                        styles.expiryPillText,
+                        isUrgent ? styles.expiryPillTextUrgent : isWarning ? styles.expiryPillTextWarning : styles.expiryPillTextSafe,
+                      ]}>
+                      {daysLeft < 0
+                        ? t('smart_pantry.status_expired', { defaultValue: 'Expired' })
+                        : daysLeft === 0
+                        ? t('smart_pantry.status_expires_today', { defaultValue: 'Expires Today' })
+                        : daysLeft === 1
+                        ? t('smart_pantry.status_expires_tomorrow', { defaultValue: 'Expires Tomorrow' })
+                        : t('smart_pantry.status_days_remaining', { days: daysLeft, defaultValue: `${daysLeft}d remaining` })}
+                    </Text>
+                  </View>
                 </View>
-              </View>
-            </Pressable>
-          );
-        })
+              </Pressable>
+            );
+          })}
+          <Pagination
+            currentPage={currentPage}
+            totalPages={totalPages}
+            onPageChange={setCurrentPage}
+          />
+        </>
       )}
     </View>
   );

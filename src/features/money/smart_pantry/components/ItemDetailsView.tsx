@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
 import { PantryItem, StorageLocation } from '../types';
 import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../data/mockPantryData';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
@@ -25,17 +25,30 @@ export const ItemDetailsView: React.FC<Props> = ({
 }) => {
   const styles = useThemedStyles(makeStyles);
 
-  const getLocName = (loc: StorageLocation) => {
-    switch (loc) {
-      case 'Fridge':
-        return t('smart_pantry.loc_fridge');
-      case 'Freezer':
-        return t('smart_pantry.loc_freezer');
-      case 'Pantry Shelf':
-        return t('smart_pantry.loc_pantry_shelf');
-      default:
-        return loc;
-    }
+  const getLocName = (loc: string) => {
+    const lower = (loc || '').toLowerCase();
+    if (lower.includes('fridge')) return t('smart_pantry.loc_fridge');
+    if (lower.includes('freezer')) return t('smart_pantry.loc_freezer');
+    if (lower.includes('pantry') || lower.includes('shelf')) return t('smart_pantry.loc_pantry_shelf');
+    return loc;
+  };
+
+  const handleDeleteConfirm = (item: PantryItem) => {
+    Alert.alert(
+      t('smart_pantry.delete_confirm_title', { defaultValue: 'Delete Food Item' }),
+      t('smart_pantry.delete_confirm_msg', {
+        name: item.name,
+        defaultValue: `Are you sure you want to delete ${item.name} from your pantry?`,
+      }),
+      [
+        { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+        {
+          text: t('smart_pantry.delete_item', { defaultValue: 'Delete' }),
+          style: 'destructive',
+          onPress: () => onDeleteItem(item.id),
+        },
+      ],
+    );
   };
 
   return (
@@ -121,7 +134,7 @@ export const ItemDetailsView: React.FC<Props> = ({
 
           {/* Actions */}
           <View style={styles.detailsActionRow}>
-            <Pressable style={styles.deleteBtn} onPress={() => onDeleteItem(selectedItem.id)}>
+            <Pressable style={styles.deleteBtn} onPress={() => handleDeleteConfirm(selectedItem)}>
               <Text style={styles.deleteBtnText}>{t('smart_pantry.delete_item')}</Text>
             </Pressable>
             <Pressable style={styles.consumeBtn} onPress={() => onUpdateQuantity(selectedItem.id, -1)}>

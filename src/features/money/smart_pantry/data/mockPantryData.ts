@@ -44,6 +44,15 @@ export const BARCODE_CATALOG: Record<string, Partial<PantryItem>> = {
   },
 };
 
+function getRelativeDate(days: number): string {
+  const d = new Date();
+  d.setDate(d.getDate() + days);
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+}
+
 export const INITIAL_PANTRY_ITEMS: PantryItem[] = [
   {
     id: 'p_101',
@@ -51,7 +60,7 @@ export const INITIAL_PANTRY_ITEMS: PantryItem[] = [
     category: 'beverages',
     quantity: 1,
     unit: 'carton',
-    expiryDate: '2026-08-20',
+    expiryDate: getRelativeDate(2),
     storageLocation: 'Fridge',
     allergens: ['gluten-free', 'vegan', 'dairy-free', 'halal', 'kosher'],
     barcode: '8901234567890',
@@ -63,7 +72,7 @@ export const INITIAL_PANTRY_ITEMS: PantryItem[] = [
     category: 'dairy',
     quantity: 2,
     unit: 'carton',
-    expiryDate: '2026-08-21',
+    expiryDate: getRelativeDate(4),
     storageLocation: 'Fridge',
     allergens: ['gluten-free', 'nut-free', 'halal', 'kosher'],
   },
@@ -73,7 +82,7 @@ export const INITIAL_PANTRY_ITEMS: PantryItem[] = [
     category: 'produce',
     quantity: 4,
     unit: 'pcs',
-    expiryDate: '2026-08-22',
+    expiryDate: getRelativeDate(7),
     storageLocation: 'Pantry Shelf',
     allergens: ['gluten-free', 'vegan', 'nut-free', 'dairy-free', 'halal', 'kosher'],
   },
@@ -83,7 +92,7 @@ export const INITIAL_PANTRY_ITEMS: PantryItem[] = [
     category: 'dairy',
     quantity: 1,
     unit: 'tub',
-    expiryDate: '2026-08-28',
+    expiryDate: getRelativeDate(12),
     storageLocation: 'Fridge',
     allergens: ['gluten-free', 'nut-free', 'halal'],
     isLowStock: true,
@@ -94,7 +103,7 @@ export const INITIAL_PANTRY_ITEMS: PantryItem[] = [
     category: 'bakery',
     quantity: 2,
     unit: 'loaf',
-    expiryDate: '2026-08-25',
+    expiryDate: getRelativeDate(5),
     storageLocation: 'Pantry Shelf',
     allergens: ['gluten-free', 'vegan', 'nut-free', 'dairy-free'],
   },
@@ -104,7 +113,7 @@ export const INITIAL_PANTRY_ITEMS: PantryItem[] = [
     category: 'meat',
     quantity: 1,
     unit: 'pack',
-    expiryDate: '2026-08-19',
+    expiryDate: getRelativeDate(1),
     storageLocation: 'Freezer',
     allergens: ['gluten-free', 'dairy-free', 'nut-free', 'halal', 'kosher'],
     isLowStock: true,

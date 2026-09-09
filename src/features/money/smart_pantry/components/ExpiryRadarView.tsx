@@ -1,41 +1,76 @@
-import React from 'react';
-import { View, Text, StyleSheet, Pressable } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { PantryItem, StorageLocation } from '../types';
 import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../data/mockPantryData';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
+import Bell from 'lucide-react-native/icons/bell';
 
 interface Props {
   items: PantryItem[];
   onNavigateRecipes: () => void;
+  onTriggerSpoilageAlerts?: () => Promise<{ itemsAlerted?: number; message?: string }>;
 }
 
-export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) => {
+export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes, onTriggerSpoilageAlerts }) => {
   const styles = useThemedStyles(makeStyles);
+  const [alerting, setAlerting] = useState(false);
 
   const urgentItems = items.filter((i) => getDaysUntilExpiry(i.expiryDate) <= 2);
   const upcomingItems = items.filter((i) => getDaysUntilExpiry(i.expiryDate) > 2 && getDaysUntilExpiry(i.expiryDate) <= 7);
 
-  const getLocName = (loc: StorageLocation) => {
-    switch (loc) {
-      case 'Fridge':
-        return t('smart_pantry.loc_fridge');
-      case 'Freezer':
-        return t('smart_pantry.loc_freezer');
-      case 'Pantry Shelf':
-        return t('smart_pantry.loc_pantry_shelf');
-      default:
-        return loc;
+  const handleTriggerPush = async () => {
+    if (!onTriggerSpoilageAlerts) return;
+    setAlerting(true);
+    try {
+      const res = await onTriggerSpoilageAlerts();
+      Alert.alert(
+        t('smart_pantry.push_sent_title', { defaultValue: 'Spoilage Alert Sent' }),
+        t('smart_pantry.push_sent_msg', {
+          count: res?.itemsAlerted ?? urgentItems.length,
+          defaultValue: `Dispatched push notifications to household members for ${res?.itemsAlerted ?? urgentItems.length} expiring items.`,
+        }),
+      );
+    } catch (err) {
+      console.warn('Failed to dispatch spoilage alerts:', err);
+      Alert.alert('Notification Error', 'Could not send push notification at this moment.');
+    } finally {
+      setAlerting(false);
     }
+  };
+
+  const getLocName = (loc: string) => {
+    const lower = (loc || '').toLowerCase();
+    if (lower.includes('fridge')) return t('smart_pantry.loc_fridge');
+    if (lower.includes('freezer')) return t('smart_pantry.loc_freezer');
+    if (lower.includes('pantry') || lower.includes('shelf')) return t('smart_pantry.loc_pantry_shelf');
+    return loc;
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.radarHeaderCard}>
-        <Text style={styles.radarHeaderTitle}>{t('smart_pantry.radar_title')}</Text>
-        <Text style={styles.radarHeaderSub}>{t('smart_pantry.radar_sub')}</Text>
+        <View style={{ flex: 1, paddingRight: 8 }}>
+          <Text style={styles.radarHeaderTitle}>{t('smart_pantry.radar_title')}</Text>
+          <Text style={styles.radarHeaderSub}>{t('smart_pantry.radar_sub')}</Text>
+        </View>
+        {onTriggerSpoilageAlerts && (
+          <Pressable
+            style={({ pressed }) => [styles.notifyBtn, pressed && { opacity: 0.85 }]}
+            onPress={handleTriggerPush}
+            disabled={alerting}>
+            {alerting ? (
+              <ActivityIndicator size="small" color={styles.notifyBtnText.color} />
+            ) : (
+              <>
+                <Bell size={13} color={styles.notifyBtnText.color} strokeWidth={2} style={{ marginRight: 4 }} />
+                <Text style={styles.notifyBtnText}>{t('smart_pantry.push_alert_btn', { defaultValue: 'Send Push' })}</Text>
+              </>
+            )}
+          </Pressable>
+        )}
       </View>
 
       {/* Expiry Urgency Sections */}
@@ -67,23 +102,27 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes }) =
       )}
 
       <Text style={[styles.sectionHeading, { marginTop: 16 }]}>{t('smart_pantry.upcoming_exp')}</Text>
-      {upcomingItems.map((item) => {
-        const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
-        return (
-        <View key={item.id} style={[styles.radarItemCard, styles.radarItemCardWarning]}>
-          <CategoryIcon size={22} color={styles.radarItemName.color} strokeWidth={1.8} style={{ marginRight: 10 }} />
-          <View style={{ flex: 1 }}>
-            <Text style={styles.radarItemName}>{item.name}</Text>
-            <Text style={styles.radarItemSub}>
-              {t('smart_pantry.expires_in_days_loc', {
-                days: getDaysUntilExpiry(item.expiryDate),
-                location: getLocName(item.storageLocation),
-              })}
-            </Text>
+      {upcomingItems.length === 0 ? (
+        <Text style={styles.noUrgentText}>{t('smart_pantry.no_upcoming', { defaultValue: 'No upcoming expirations in 3-7 days.' })}</Text>
+      ) : (
+        upcomingItems.map((item) => {
+          const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+          return (
+          <View key={item.id} style={[styles.radarItemCard, styles.radarItemCardWarning]}>
+            <CategoryIcon size={22} color={styles.radarItemName.color} strokeWidth={1.8} style={{ marginRight: 10 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={styles.radarItemName}>{item.name}</Text>
+              <Text style={styles.radarItemSub}>
+                {t('smart_pantry.expires_in_days_loc', {
+                  days: getDaysUntilExpiry(item.expiryDate),
+                  location: getLocName(item.storageLocation),
+                })}
+              </Text>
+            </View>
           </View>
-        </View>
-        );
-      })}
+          );
+        })
+      )}
 
       {/* Dietary Allergen Safety Matrix */}
       <Text style={[styles.sectionHeading, { marginTop: 20 }]}>{t('smart_pantry.allergen_matrix')}</Text>
@@ -110,9 +149,29 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
   StyleSheet.create({
     container: { marginTop: spacing.sm },
     sectionHeading: { fontFamily: fonts.serif, fontSize: 17, color: colors.textPrimary, marginBottom: 8 },
-    radarHeaderCard: { backgroundColor: colors.primary, borderRadius: radius.xl, padding: spacing.md, marginBottom: spacing.md },
+    radarHeaderCard: {
+      backgroundColor: colors.primary,
+      borderRadius: radius.xl,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
     radarHeaderTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textOnPrimary },
     radarHeaderSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textOnPrimaryMuted, marginTop: 2 },
+    notifyBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: radius.pill,
+    },
+    notifyBtnText: {
+      fontFamily: fonts.sansBold,
+      fontSize: 11,
+      color: colors.primary,
+    },
     radarItemCard: { flexDirection: 'row', alignItems: 'center', backgroundColor: colors.surface, borderRadius: radius.lg, borderWidth: 1, borderColor: colors.border, borderLeftWidth: 4, padding: spacing.md, marginBottom: 8 },
     radarItemCardUrgent: { borderLeftColor: colors.danger },
     radarItemCardWarning: { borderLeftColor: colors.turmeric },
