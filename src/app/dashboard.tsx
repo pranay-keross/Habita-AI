@@ -22,7 +22,6 @@ import {
   Droplets,
   Frown,
   Fuel,
-  Info,
   Laugh,
   Meh,
   PartyPopper,
@@ -45,8 +44,6 @@ import StatWaveChart from '../components/StatWaveChart';
 import QuickActionTile from '../components/QuickActionTile';
 import SearchPill from '../components/SearchPill';
 import ModernBottomNav, { type BottomNavTab } from '../components/ModernBottomNav';
-import BottomSheet from '../components/BottomSheet';
-import Button from '../components/Button';
 import HabitaLogo from '../components/HabitaLogo';
 import { SkeletonBox, SkeletonCircle, SkeletonText } from '../components/Skeleton';
 import { subscribeToLanguageChanges, setLanguage, SUPPORTED_LANGS, t } from '../i18n';
@@ -140,7 +137,6 @@ export default function DashboardScreen({ navigation, route }: Props) {
   const [resourceItems, setResourceItems] = useState<QuickTapItem[]>([]);
   const [selectedInsightsTab, setSelectedInsightsTab] = useState<InsightsTab>('adherence');
   const [selectedDayIndex, setSelectedDayIndex] = useState(5);
-  const [infoModule, setInfoModule] = useState<BentoModule | null>(null);
   const [moodSummary, setMoodSummary] = useState<WellnessSummaryResponse | null>(null);
   const [moodUplift, setMoodUplift] = useState<AiMoodUpliftResponse | null>(null);
   const [loggingMood, setLoggingMood] = useState<MoodLevel | null>(null);
@@ -616,15 +612,9 @@ export default function DashboardScreen({ navigation, route }: Props) {
               {/* Minimalist Greeting & Status */}
               <View style={styles.heroSection}>
                 <View style={styles.greetingHeader}>
-                  <View style={styles.greetingTextGroup}>
-                    <Text style={styles.greetingTitle} numberOfLines={1}>
-                      {greetingPrefix ? `${greetingPrefix}, ${firstName}` : `Hello, ${firstName}`}
-                    </Text>
-                  </View>
-                  <View style={styles.statusPill}>
-                    <View style={styles.statusDot} />
-                    <Text style={styles.statusText}>2 pending · 4 due</Text>
-                  </View>
+                  <Text style={styles.greetingTitle} numberOfLines={1}>
+                    {greetingPrefix ? `${greetingPrefix}, ${firstName}` : `Hello, ${firstName}`}
+                  </Text>
                 </View>
 
                 {/* Minimalist Search Bar - Direct AI Voice/Chat Entry */}
@@ -867,23 +857,10 @@ export default function DashboardScreen({ navigation, route }: Props) {
                         <View style={styles.bentoIconBox}>
                           <module.Icon size={18} color="#000000" strokeWidth={1.5} />
                         </View>
-                        <View style={styles.bentoTopRight}>
-                          <View style={styles.bentoTag}>
-                            <Text style={[styles.bentoTagText, { color: module.tagColor }]}>
-                              {module.tag}
-                            </Text>
-                          </View>
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityLabel={`Info for ${module.title}`}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            style={styles.bentoInfoBtn}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              setInfoModule(module);
-                            }}>
-                            <Info size={13} color="#888888" strokeWidth={1.8} />
-                          </Pressable>
+                        <View style={styles.bentoTag}>
+                          <Text style={[styles.bentoTagText, { color: module.tagColor }]}>
+                            {module.tag}
+                          </Text>
                         </View>
                       </View>
 
@@ -892,7 +869,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
                           <Text style={styles.bentoTitle} numberOfLines={2}>
                             {module.title}
                           </Text>
-                          <Text style={styles.bentoSubtitle} numberOfLines={2}>
+                          <Text style={styles.bentoSubtitle} numberOfLines={1}>
                             {module.subtitle}
                           </Text>
                         </View>
@@ -922,23 +899,10 @@ export default function DashboardScreen({ navigation, route }: Props) {
                         <View style={styles.bentoIconBox}>
                           <module.Icon size={18} color="#000000" strokeWidth={1.5} />
                         </View>
-                        <View style={styles.bentoTopRight}>
-                          <View style={styles.bentoTag}>
-                            <Text style={[styles.bentoTagText, { color: module.tagColor }]}>
-                              {module.tag}
-                            </Text>
-                          </View>
-                          <Pressable
-                            accessibilityRole="button"
-                            accessibilityLabel={`Info for ${module.title}`}
-                            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-                            style={styles.bentoInfoBtn}
-                            onPress={(e) => {
-                              e.stopPropagation();
-                              setInfoModule(module);
-                            }}>
-                            <Info size={13} color="#888888" strokeWidth={1.8} />
-                          </Pressable>
+                        <View style={styles.bentoTag}>
+                          <Text style={[styles.bentoTagText, { color: module.tagColor }]}>
+                            {module.tag}
+                          </Text>
                         </View>
                       </View>
 
@@ -947,7 +911,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
                           <Text style={styles.bentoTitle} numberOfLines={2}>
                             {module.title}
                           </Text>
-                          <Text style={styles.bentoSubtitle} numberOfLines={2}>
+                          <Text style={styles.bentoSubtitle} numberOfLines={1}>
                             {module.subtitle}
                           </Text>
                         </View>
@@ -967,47 +931,6 @@ export default function DashboardScreen({ navigation, route }: Props) {
           )}
         </View>
       </ScrollView>
-
-      {/* Workspace Info BottomSheet */}
-      <BottomSheet
-        visible={!!infoModule}
-        onClose={() => setInfoModule(null)}
-        title={infoModule?.title || 'Workspace Info'}>
-        {infoModule && (
-          <View style={styles.infoSheetContent}>
-            <View style={styles.infoSheetHeader}>
-              <View style={styles.infoSheetIconBox}>
-                <infoModule.Icon size={22} color="#000000" strokeWidth={1.5} />
-              </View>
-              <View style={styles.infoSheetHeaderText}>
-                <Text style={styles.infoSheetTitle}>{infoModule.title}</Text>
-                <View style={[styles.bentoTag, { alignSelf: 'flex-start', marginTop: 4 }]}>
-                  <Text style={[styles.bentoTagText, { color: infoModule.tagColor }]}>
-                    {infoModule.tag}
-                  </Text>
-                </View>
-              </View>
-            </View>
-
-            <Text style={styles.infoSheetSubTitle}>{infoModule.subtitle}</Text>
-            <Text style={styles.infoSheetDesc}>{infoModule.description}</Text>
-
-            <Button
-              title={`Open ${infoModule.title}`}
-              onPress={() => {
-                const mod = infoModule;
-                setInfoModule(null);
-                if (mod.id === 'pantry' || mod.id === 'style') {
-                  handleLifeOsPress(mod.id);
-                } else {
-                  handleHomeOpPress(mod.id);
-                }
-              }}
-              style={styles.infoSheetCta}
-            />
-          </View>
-        )}
-      </BottomSheet>
 
       {/* Solid Black Minimalist Bottom Nav Dock */}
       <ModernBottomNav
@@ -1122,40 +1045,13 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: '#000000',
       letterSpacing: -0.3,
     },
-    statusPill: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      backgroundColor: '#FFFFFF',
-      borderRadius: radius.pill,
-      borderWidth: 1,
-      borderColor: '#EAEAEA',
-      paddingHorizontal: 9,
-      paddingVertical: 5,
-      flexShrink: 0,
-      alignSelf: 'center',
-    },
-    statusDot: {
-      width: 6,
-      height: 6,
-      borderRadius: 3,
-      backgroundColor: '#10B981',
-    },
-    statusText: {
-      fontFamily: fonts.sans,
-      fontSize: 11,
-      fontWeight: '500',
-      color: '#444444',
-    },
     insightsCard: {
       backgroundColor: '#FFFFFF',
       borderRadius: radius.card,
       borderWidth: 1,
-      borderColor: '#ECECEE',
+      borderColor: '#F1F1F3',
       padding: spacing.md,
       marginBottom: spacing.lg,
-      ...shadow.soft,
-      elevation: 2,
     },
     insightsHeader: {
       marginBottom: spacing.xs,
@@ -1413,10 +1309,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       backgroundColor: '#FFFFFF',
       borderRadius: radius.md,
       borderWidth: 1,
-      borderColor: '#ECECEE',
+      borderColor: '#F1F1F3',
       padding: spacing.sm,
       justifyContent: 'space-between',
-      ...shadow.soft,
     },
     resourceTapPlusCircle: {
       width: 20,
@@ -1446,14 +1341,13 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     bentoCard: {
       width: '48%',
-      minHeight: 112,
+      minHeight: 104,
       backgroundColor: '#FFFFFF',
       borderRadius: radius.card,
       borderWidth: 1,
-      borderColor: '#ECECEE',
+      borderColor: '#F1F1F3',
       padding: spacing.md,
       justifyContent: 'space-between',
-      ...shadow.soft,
     },
     bentoCardPressed: {
       opacity: 0.7,
@@ -1472,11 +1366,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       alignItems: 'center',
       justifyContent: 'center',
     },
-    bentoTopRight: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-    },
     bentoTag: {
       paddingHorizontal: 6,
       paddingVertical: 2,
@@ -1487,14 +1376,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       fontFamily: fonts.sans,
       fontSize: 9,
       fontWeight: '500',
-    },
-    bentoInfoBtn: {
-      width: 20,
-      height: 20,
-      borderRadius: 10,
-      backgroundColor: '#F5F5F7',
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     bentoCardBottom: {
       flexDirection: 'row',
@@ -1520,50 +1401,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: '#888888',
       marginTop: 2,
       lineHeight: 13,
-    },
-    infoSheetContent: {
-      paddingBottom: spacing.lg,
-    },
-    infoSheetHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      marginBottom: spacing.md,
-    },
-    infoSheetIconBox: {
-      width: 44,
-      height: 44,
-      borderRadius: 12,
-      backgroundColor: '#F5F5F7',
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    infoSheetHeaderText: {
-      flex: 1,
-    },
-    infoSheetTitle: {
-      fontFamily: fonts.sans,
-      fontSize: 17,
-      fontWeight: '600',
-      color: '#000000',
-    },
-    infoSheetSubTitle: {
-      fontFamily: fonts.sans,
-      fontSize: 13,
-      fontWeight: '500',
-      color: '#444444',
-      marginBottom: spacing.sm,
-    },
-    infoSheetDesc: {
-      fontFamily: fonts.sans,
-      fontSize: 13,
-      fontWeight: '300',
-      color: '#666666',
-      lineHeight: 20,
-      marginBottom: spacing.lg,
-    },
-    infoSheetCta: {
-      marginTop: spacing.xs,
     },
     footerContainer: {
       alignItems: 'center',
