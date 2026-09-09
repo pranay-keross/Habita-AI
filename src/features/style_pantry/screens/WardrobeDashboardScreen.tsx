@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   View,
   Text,
@@ -6,19 +6,22 @@ import {
   StyleSheet,
   Pressable,
   TextInput,
-  ActivityIndicator,
+  RefreshControl,
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
+import useAuth from '../../../hooks/useAuth';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Search from 'lucide-react-native/icons/search';
 import Plus from 'lucide-react-native/icons/plus';
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import Shirt from 'lucide-react-native/icons/shirt';
+import GlassCard from '../../../components/GlassCard';
+import { SkeletonBox, SkeletonCircle, SkeletonText } from '../../../components/Skeleton';
 import { loadClothingItems } from '../stylePantryStore';
 import { CATEGORY_ICON_KEYS, getClothingIconComponent } from '../clothingIcons';
 import type { ClothingCategory, ClothingItem } from '../types';
@@ -38,30 +41,38 @@ const CATEGORIES: { key: ClothingCategory | 'all'; labelKey: string; iconKey: st
 export default function WardrobeDashboardScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { getAccessToken } = useAuth();
   const [, setLocaleVersion] = useState(0);
 
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [selectedCat, setSelectedCat] = useState<ClothingCategory | 'all'>('all');
   const [searchQuery, setSearchQuery] = useState('');
 
-  const fetchItems = async () => {
-    setLoading(true);
-    const list = await loadClothingItems();
+  const fetchItems = useCallback(async () => {
+    const token = await getAccessToken();
+    const list = await loadClothingItems(token);
     setItems(list);
-    setLoading(false);
-  };
+  }, [getAccessToken]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchItems();
+    setRefreshing(false);
+  }, [fetchItems]);
 
   useEffect(() => {
     const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
     const unsubFocus = navigation.addListener('focus', () => {
-      fetchItems();
+      setLoading(true);
+      fetchItems().finally(() => setLoading(false));
     });
     return () => {
       unsubLang();
       unsubFocus();
     };
-  }, [navigation]);
+  }, [navigation, fetchItems]);
 
   const filteredItems = items.filter((item) => {
     const matchesCat = selectedCat === 'all' || item.category === selectedCat;
@@ -83,11 +94,16 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
         <Pressable
           onPress={() => navigation.navigate('AddEditClothing', {})}
           style={styles.addNavBtn}>
-          <Plus size={20} color="#FFFFFF" />
+          <Plus size={20} color={styles.headerIconOnPrimary.color} />
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={styles.headerIcon.color} colors={[styles.headerIcon.color]} />
+        }>
         {/* Search Bar */}
         <View style={styles.searchBarRow}>
           <Search size={18} color={styles.placeholder.color} style={{ marginRight: 8 }} />
@@ -101,20 +117,23 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
         </View>
 
         {/* AI Style Mirror Banner */}
-        <Pressable
+        <GlassCard
+          variant="default"
           style={styles.aiBannerCard}
           onPress={() => navigation.navigate('StyleMirror')}>
-          <View style={styles.aiBannerLeft}>
-            <View style={styles.sparkleCircle}>
-              <Sparkles size={22} color="#7C3AED" />
+          <View style={styles.aiBannerRow}>
+            <View style={styles.aiBannerLeft}>
+              <View style={styles.sparkleCircle}>
+                <Sparkles size={22} color={styles.aiAccent.color} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.aiBannerTitle}>{t('style_pantry.ai_banner_title')}</Text>
+                <Text style={styles.aiBannerSub}>{t('style_pantry.ai_banner_sub')}</Text>
+              </View>
             </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.aiBannerTitle}>{t('style_pantry.ai_banner_title')}</Text>
-              <Text style={styles.aiBannerSub}>{t('style_pantry.ai_banner_sub')}</Text>
-            </View>
+            <ChevronRight size={20} color={styles.aiAccent.color} />
           </View>
-          <ChevronRight size={20} color="#7C3AED" />
-        </Pressable>
+        </GlassCard>
 
         {/* Category Horizontal Filter Chips */}
         <ScrollView
@@ -133,7 +152,7 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
               onPress={() => setSelectedCat(cat.key)}>
               <CatIcon
                 size={14}
-                color={selectedCat === cat.key ? '#FFFFFF' : styles.chipText.color}
+                color={selectedCat === cat.key ? styles.headerIconOnPrimary.color : styles.chipText.color}
                 style={styles.chipIcon}
               />
               <Text
@@ -161,7 +180,15 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
         </View>
 
         {loading ? (
-          <ActivityIndicator color="#004F63" style={{ marginTop: 24 }} />
+          <View style={styles.gridWrap}>
+            {[0, 1, 2, 3].map((i) => (
+              <View key={i} style={styles.clothingCard}>
+                <SkeletonCircle size={56} style={{ alignSelf: 'center', marginBottom: 12 }} />
+                <SkeletonText width="70%" style={{ alignSelf: 'center', marginBottom: 6 }} />
+                <SkeletonText width="50%" height={11} style={{ alignSelf: 'center' }} />
+              </View>
+            ))}
+          </View>
         ) : filteredItems.length === 0 ? (
           <View style={styles.emptyCard}>
             <Shirt size={36} color={styles.placeholder.color} />
@@ -175,12 +202,13 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
             {filteredItems.map((item) => {
               const ItemIcon = getClothingIconComponent(item.emoji);
               return (
-              <Pressable
+              <GlassCard
                 key={item.id}
+                variant="default"
                 style={styles.clothingCard}
                 onPress={() => navigation.navigate('ClothingDetails', { itemId: item.id })}>
                 <View style={styles.cardEmojiBadge}>
-                  <ItemIcon size={28} color="#004F63" />
+                  <ItemIcon size={28} color={styles.iconTint.color} />
                 </View>
                 <Text style={styles.cardItemName} numberOfLines={1}>
                   {item.name}
@@ -193,7 +221,7 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
                     {t('style_pantry.item_worn_times', { count: item.wearCount })}
                   </Text>
                 </View>
-              </Pressable>
+              </GlassCard>
               );
             })}
           </View>
@@ -231,6 +259,15 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    headerIconOnPrimary: {
+      color: colors.textOnPrimary,
+    },
+    iconTint: {
+      color: colors.primary,
+    },
+    aiAccent: {
+      color: colors.primary,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -240,7 +277,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: '#004F63',
+      backgroundColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
       ...shadow.soft,
@@ -271,16 +308,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textSecondary,
     },
     aiBannerCard: {
+      marginBottom: spacing.md,
+    },
+    aiBannerRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      backgroundColor: '#F3E8FF',
-      borderRadius: radius.lg,
-      padding: spacing.md,
-      borderWidth: 1,
-      borderColor: '#DDD6FE',
-      marginBottom: spacing.md,
-      ...shadow.soft,
     },
     aiBannerLeft: {
       flexDirection: 'row',
@@ -292,7 +325,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.blush,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.sm,
@@ -300,12 +333,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     aiBannerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 15,
-      color: '#5B21B6',
+      color: colors.textPrimary,
     },
     aiBannerSub: {
       fontFamily: fonts.sans,
       fontSize: 12,
-      color: '#6D28D9',
+      color: colors.textSecondary,
       marginTop: 2,
     },
     categoriesContainer: {
@@ -325,8 +358,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginRight: 6,
     },
     categoryChipActive: {
-      backgroundColor: '#004F63',
-      borderColor: '#004F63',
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     chipIcon: {
       marginRight: 6,
@@ -337,7 +370,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textSecondary,
     },
     chipTextActive: {
-      color: '#FFFFFF',
+      color: colors.textOnPrimary,
     },
     listHeaderRow: {
       flexDirection: 'row',
@@ -357,7 +390,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     inlineAddBtnText: {
       fontFamily: fonts.sansBold,
       fontSize: 13,
-      color: '#004F63',
+      color: colors.primary,
     },
     emptyCard: {
       backgroundColor: colors.surface,
@@ -389,19 +422,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     clothingCard: {
       width: '48%',
-      backgroundColor: colors.surface,
-      borderRadius: radius.lg,
-      padding: spacing.md,
-      borderWidth: 1,
-      borderColor: colors.border,
       marginBottom: spacing.md,
-      ...shadow.soft,
+      padding: spacing.md,
     },
     cardEmojiBadge: {
       width: 56,
       height: 56,
       borderRadius: radius.md,
-      backgroundColor: '#F1F5F9',
+      backgroundColor: colors.surfaceElevated,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.sm,
@@ -427,6 +455,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     wearCountText: {
       fontFamily: fonts.sansMedium,
       fontSize: 11,
-      color: '#004F63',
+      color: colors.primary,
     },
   });

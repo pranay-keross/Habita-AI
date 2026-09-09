@@ -1,5 +1,8 @@
 import React from 'react';
-import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
+import {
+  NavigationContainer,
+  createNavigationContainerRef,
+} from '@react-navigation/native';
 import { usePushRegistration } from '../hooks/usePushNotifications';
 import type { PushRoute } from '../features/notifications/parse';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
@@ -42,6 +45,7 @@ import {
   ClothingDetailsScreen,
   StyleMirrorScreen,
   OutfitDetailsScreen,
+  StyleLogScreen,
   type OutfitRecommendation,
 } from '../features/style_pantry';
 import VoiceScreen from '../features/money/voice_assistant/VoiceScreen';
@@ -98,6 +102,7 @@ export type RootStackParamList = {
   ClothingDetails: { itemId: string };
   StyleMirror: undefined;
   OutfitDetails: { outfit: OutfitRecommendation };
+  StyleLog: undefined;
   Voice: undefined;
   VoiceSettings: undefined;
   SmartLife: undefined;
@@ -199,8 +204,14 @@ const AppLayout = () => {
           <Stack.Screen name="Vehicles" component={VehiclesScreen} />
           <Stack.Screen name="ExpenseGroups" component={ExpenseGroupsScreen} />
           <Stack.Screen name="GroupDetails" component={GroupDetailsScreen} />
-          <Stack.Screen name="AddSplitExpense" component={AddSplitExpenseScreen} />
-          <Stack.Screen name="ExpenseDetailsSettleUp" component={ExpenseDetailsSettleUpScreen} />
+          <Stack.Screen
+            name="AddSplitExpense"
+            component={AddSplitExpenseScreen}
+          />
+          <Stack.Screen
+            name="ExpenseDetailsSettleUp"
+            component={ExpenseDetailsSettleUpScreen}
+          />
           <Stack.Screen
             name="DocHub"
             component={DocHubScreen}
@@ -208,8 +219,14 @@ const AppLayout = () => {
           />
           <Stack.Screen name="DocDetails" component={DocDetailsScreen} />
           <Stack.Screen name="AddDoc" component={AddDocScreen} />
-          <Stack.Screen name="DocTemplateForm" component={DocTemplateFormScreen} />
-          <Stack.Screen name="ExpirationAlerts" component={ExpirationAlertsScreen} />
+          <Stack.Screen
+            name="DocTemplateForm"
+            component={DocTemplateFormScreen}
+          />
+          <Stack.Screen
+            name="ExpirationAlerts"
+            component={ExpirationAlertsScreen}
+          />
           <Stack.Screen
             name="DocViewer"
             component={DocViewerScreen}
@@ -217,11 +234,21 @@ const AppLayout = () => {
           />
           <Stack.Screen name="Pantry" component={PantryScreen} />
           <Stack.Screen name="Wardrobe" component={WardrobeDashboardScreen} />
-          <Stack.Screen name="StylePantryDashboard" component={WardrobeDashboardScreen} />
-          <Stack.Screen name="AddEditClothing" component={AddEditClothingScreen} />
-          <Stack.Screen name="ClothingDetails" component={ClothingDetailsScreen} />
+          <Stack.Screen
+            name="StylePantryDashboard"
+            component={WardrobeDashboardScreen}
+          />
+          <Stack.Screen
+            name="AddEditClothing"
+            component={AddEditClothingScreen}
+          />
+          <Stack.Screen
+            name="ClothingDetails"
+            component={ClothingDetailsScreen}
+          />
           <Stack.Screen name="StyleMirror" component={StyleMirrorScreen} />
           <Stack.Screen name="OutfitDetails" component={OutfitDetailsScreen} />
+          <Stack.Screen name="StyleLog" component={StyleLogScreen} />
           <Stack.Screen
             name="Voice"
             component={VoiceScreen}
@@ -229,8 +256,8 @@ const AppLayout = () => {
           />
           <Stack.Screen name="VoiceSettings" component={VoiceSettingsScreen} />
           <Stack.Screen name="SmartLife" component={SmartLifeScreen} />
-        </Stack.Navigator >
-      </NavigationContainer >
+        </Stack.Navigator>
+      </NavigationContainer>
     </SafeAreaProvider>
   );
 };

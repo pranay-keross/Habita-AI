@@ -212,7 +212,7 @@ Found via live testing, documented here so they aren't rediscovered from scratch
 | `expensegroups` | Multi-Currency Expense Groups | `M6-T1..T4` | Client fully integrated against Postman contract (D-050, `src/features/money/expenses/api.ts`, `expenseStore.ts`, screens); full backend spec in `docs/EXPENSES_API_SPEC.md` |
 | `payments`, `upi` | Payment Rails & Global Subscriptions | `M6-T6` | Not built; blocked on gateway decision (`docs/BACKLOG.md` open question 3) |
 | `pantry` | Smart Pantry & Allergen Radar | `M7-T1/T2` | Not built |
-| `wardrobe` | Wardrobe & Weather-Adaptive Style Mirror | `M7-T3/T4` | Not built |
+| `wardrobe` | Wardrobe & Weather-Adaptive Style Mirror | `M7-T3/T4` | Server not built. Client fully restyled to the CRED design system and wired online-first against the contract (`src/features/style_pantry/api.ts`, `stylePantryStore.ts`, screens), falling back to a local rule-based recommendation + AsyncStorage until the backend ships; full backend spec in `docs/WARDROBE_API_SPEC.md` |
 | `voice` | Voice Command & Orchestration | `M7-T5` | Not built |
 | `dashboard` | Home Dashboard aggregation | `M7-T6` | Client dashboard is fully static/local; real aggregation needs this package |
 | `ai` | LlmClientService (OpenAI + Gemini) | `M4-T7`, `M5-T5`, `M7-T4/T5`, all `M8-T4` hook-points | Not built; every client-side hook-point currently has a manual/local fallback per D-002/D-012 precedent, waiting on this |

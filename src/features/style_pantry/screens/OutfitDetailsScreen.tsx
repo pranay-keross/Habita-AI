@@ -12,11 +12,17 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
+import useAuth from '../../../hooks/useAuth';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import CheckCircle2 from 'lucide-react-native/icons/circle-check';
 import Bookmark from 'lucide-react-native/icons/bookmark';
 import Button from '../../../components/Button';
-import { recordWearOutfit, saveOutfit } from '../stylePantryStore';
+import GlassCard from '../../../components/GlassCard';
+import {
+  logStyleHistoryEntry,
+  recordWearOutfit,
+  saveOutfit,
+} from '../stylePantryStore';
 import { getClothingIconComponent } from '../clothingIcons';
 import type { OutfitRecommendation } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
@@ -26,6 +32,7 @@ type Props = StackScreenProps<RootStackParamList, 'OutfitDetails'>;
 export default function OutfitDetailsScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
+  const { getAccessToken } = useAuth();
   const { outfit } = route.params;
   const [, setLocaleVersion] = useState(0);
 
@@ -33,7 +40,9 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
   const [saving, setSaving] = useState(false);
 
   useEffect(() => {
-    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
+    const unsubLang = subscribeToLanguageChanges(() =>
+      setLocaleVersion(v => v + 1),
+    );
     return () => {
       unsubLang();
     };
@@ -41,23 +50,28 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
 
   const handleWearToday = async () => {
     setWearing(true);
-    const itemIds = outfit.items.map((i) => i.id);
-    await recordWearOutfit(itemIds);
+    const token = await getAccessToken();
+    const itemIds = outfit.items.map(i => i.id);
+    await Promise.all([
+      recordWearOutfit(itemIds, token),
+      logStyleHistoryEntry(outfit, token),
+    ]);
     setWearing(false);
     Alert.alert(
       t('style_pantry.worn_alert_title'),
-      t('style_pantry.worn_alert_msg')
+      t('style_pantry.worn_alert_msg'),
     );
     navigation.popTo('StylePantryDashboard');
   };
 
   const handleSaveOutfit = async () => {
     setSaving(true);
-    await saveOutfit(outfit);
+    const token = await getAccessToken();
+    await saveOutfit(outfit, token);
     setSaving(false);
     Alert.alert(
       t('style_pantry.outfit_saved_title'),
-      t('style_pantry.outfit_saved_msg')
+      t('style_pantry.outfit_saved_msg'),
     );
   };
 
@@ -68,56 +82,82 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
         <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
           <ArrowLeft size={20} color={styles.headerIcon.color} />
         </Pressable>
-        <Text style={styles.headerTitle}>{t('style_pantry.outfit_preview_title')}</Text>
+        <Text style={styles.headerTitle}>
+          {t('style_pantry.outfit_preview_title')}
+        </Text>
         <Pressable onPress={handleSaveOutfit} style={styles.headerBtn}>
-          <Bookmark size={18} color="#7C3AED" />
+          <Bookmark size={18} color={styles.aiAccent.color} />
         </Pressable>
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+      >
         {/* Title Hero Card */}
-        <View style={styles.heroCard}>
+        <GlassCard variant="glow" style={styles.heroCard}>
           <Text style={styles.occasionBadge}>{outfit.occasion}</Text>
           <Text style={styles.heroTitle}>{outfit.title}</Text>
           <Text style={styles.eventTitle}>{outfit.eventTitle}</Text>
 
           <View style={styles.scoresWrap}>
-            <View style={styles.scorePillPurple}>
-              <CheckCircle2 size={14} color="#7C3AED" style={{ marginRight: 4 }} />
-              <Text style={styles.scoreTextPurple}>{outfit.occasionSuitability}</Text>
+            <View style={styles.scorePillPrimary}>
+              <CheckCircle2
+                size={14}
+                color={styles.aiAccent.color}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.scoreTextPrimary}>
+                {outfit.occasionSuitability}
+              </Text>
             </View>
             <View style={styles.scorePillGreen}>
-              <CheckCircle2 size={14} color="#16A34A" style={{ marginRight: 4 }} />
-              <Text style={styles.scoreTextGreen}>{outfit.weatherSuitability}</Text>
+              <CheckCircle2
+                size={14}
+                color={styles.successColor.color}
+                style={{ marginRight: 4 }}
+              />
+              <Text style={styles.scoreTextGreen}>
+                {outfit.weatherSuitability}
+              </Text>
             </View>
           </View>
-        </View>
+        </GlassCard>
 
         {/* Stylist Note */}
-        <Text style={styles.sectionTitle}>{t('style_pantry.stylist_note')}</Text>
-        <View style={styles.card}>
+        <Text style={styles.sectionTitle}>
+          {t('style_pantry.stylist_note')}
+        </Text>
+        <GlassCard variant="default" style={styles.card}>
           <Text style={styles.noteText}>{outfit.stylistNote}</Text>
-        </View>
+        </GlassCard>
 
         {/* Items List */}
         <Text style={styles.sectionTitle}>
           {t('style_pantry.items_in_outfit', { count: outfit.items.length })}
         </Text>
         <View style={styles.itemsWrap}>
-          {outfit.items.map((item) => {
+          {outfit.items.map(item => {
             const ItemIcon = getClothingIconComponent(item.emoji);
             return (
-              <View key={item.id} style={styles.itemCard}>
-                <View style={styles.itemEmojiBadge}>
-                  <ItemIcon size={24} color="#004F63" />
+              <GlassCard
+                key={item.id}
+                variant="default"
+                style={styles.itemCard}
+              >
+                <View style={styles.itemRow}>
+                  <View style={styles.itemEmojiBadge}>
+                    <ItemIcon size={24} color={styles.iconTint.color} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles.itemName}>{item.name}</Text>
+                    <Text style={styles.itemSub}>
+                      {item.category.toUpperCase()} · {item.color}{' '}
+                      {item.brand ? `(${item.brand})` : ''}
+                    </Text>
+                  </View>
                 </View>
-                <View style={{ flex: 1 }}>
-                  <Text style={styles.itemName}>{item.name}</Text>
-                  <Text style={styles.itemSub}>
-                    {item.category.toUpperCase()} · {item.color} {item.brand ? `(${item.brand})` : ''}
-                  </Text>
-                </View>
-              </View>
+              </GlassCard>
             );
           })}
         </View>
@@ -128,11 +168,16 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
             title={t('style_pantry.wear_today')}
             onPress={handleWearToday}
             loading={wearing}
-            style={styles.wearBtn}
           />
           <Pressable style={styles.saveOutlineBtn} onPress={handleSaveOutfit}>
-            <Bookmark size={18} color="#7C3AED" style={{ marginRight: 6 }} />
-            <Text style={styles.saveOutlineText}>{t('style_pantry.save_outfit')}</Text>
+            <Bookmark
+              size={18}
+              color={styles.aiAccent.color}
+              style={{ marginRight: 6 }}
+            />
+            <Text style={styles.saveOutlineText}>
+              {t('style_pantry.save_outfit')}
+            </Text>
           </Pressable>
         </View>
       </ScrollView>
@@ -168,6 +213,15 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerIcon: {
       color: colors.textPrimary,
     },
+    aiAccent: {
+      color: colors.primary,
+    },
+    successColor: {
+      color: colors.forest,
+    },
+    iconTint: {
+      color: colors.primary,
+    },
     headerTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 18,
@@ -178,18 +232,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingBottom: spacing.xxl,
     },
     heroCard: {
-      backgroundColor: '#F3E8FF',
-      borderRadius: radius.lg,
-      padding: spacing.lg,
-      borderWidth: 1,
-      borderColor: '#DDD6FE',
       marginBottom: spacing.md,
-      ...shadow.soft,
     },
     occasionBadge: {
       fontFamily: fonts.sansBold,
       fontSize: 11,
-      color: '#7C3AED',
+      color: colors.primary,
       letterSpacing: 1,
       marginBottom: 4,
     },
@@ -201,30 +249,30 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     eventTitle: {
       fontFamily: fonts.sansMedium,
       fontSize: 13,
-      color: '#6D28D9',
+      color: colors.textSecondary,
       marginTop: 2,
       marginBottom: spacing.md,
     },
     scoresWrap: {
       gap: spacing.xs,
     },
-    scorePillPurple: {
+    scorePillPrimary: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
       paddingHorizontal: spacing.md,
       paddingVertical: 6,
       borderRadius: radius.md,
     },
-    scoreTextPurple: {
+    scoreTextPrimary: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#6D28D9',
+      color: colors.primary,
     },
     scorePillGreen: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: '#FFFFFF',
+      backgroundColor: colors.surface,
       paddingHorizontal: spacing.md,
       paddingVertical: 6,
       borderRadius: radius.md,
@@ -232,7 +280,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     scoreTextGreen: {
       fontFamily: fonts.sansMedium,
       fontSize: 12,
-      color: '#15803D',
+      color: colors.forest,
     },
     sectionTitle: {
       fontFamily: fonts.sansBold,
@@ -241,13 +289,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: spacing.xs,
     },
     card: {
-      backgroundColor: colors.surface,
-      borderRadius: radius.lg,
-      padding: spacing.md,
-      borderWidth: 1,
-      borderColor: colors.border,
       marginBottom: spacing.md,
-      ...shadow.soft,
     },
     noteText: {
       fontFamily: fonts.sans,
@@ -260,20 +302,17 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: spacing.lg,
     },
     itemCard: {
+      padding: spacing.md,
+    },
+    itemRow: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: radius.lg,
-      padding: spacing.md,
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...shadow.soft,
     },
     itemEmojiBadge: {
       width: 48,
       height: 48,
       borderRadius: radius.md,
-      backgroundColor: '#F1F5F9',
+      backgroundColor: colors.surfaceElevated,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: spacing.md,
@@ -292,9 +331,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     btnRow: {
       gap: spacing.sm,
     },
-    wearBtn: {
-      backgroundColor: '#7C3AED',
-    },
     saveOutlineBtn: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -303,11 +339,11 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderRadius: radius.md,
       paddingVertical: spacing.md,
       borderWidth: 1,
-      borderColor: '#7C3AED',
+      borderColor: colors.primary,
     },
     saveOutlineText: {
       fontFamily: fonts.sansBold,
       fontSize: 14,
-      color: '#7C3AED',
+      color: colors.primary,
     },
   });
