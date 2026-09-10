@@ -138,6 +138,13 @@ dependencies {
     // analytics-only, which cannot deliver messages (docs/DECISIONS.md D-059).
     implementation 'com.google.firebase:firebase-messaging'
 
-    // Add the dependencies for any other desired Firebase products
-    // https://firebase.google.com/docs/android/setup#available-libraries
+    // Google ML Kit Barcode Scanning (bundled model, works offline on device)
+    implementation 'com.google.mlkit:barcode-scanning:17.3.0'
+
+    // CameraX for Live Real-Time Hardware Barcode Scanning
+    def camerax_version = "1.3.4"
+    implementation "androidx.camera:camera-core:${camerax_version}"
+    implementation "androidx.camera:camera-camera2:${camerax_version}"
+    implementation "androidx.camera:camera-lifecycle:${camerax_version}"
+    implementation "androidx.camera:camera-view:${camerax_version}"
 }

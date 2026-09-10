@@ -11,6 +11,7 @@ import {
   Modal,
   Platform,
   PermissionsAndroid,
+  Linking,
 } from 'react-native';
 import {
   AddMode,
@@ -41,6 +42,12 @@ import X from 'lucide-react-native/icons/x';
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import ImageUp from 'lucide-react-native/icons/image-up';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
+import { AiProcessingModal } from './AiProcessingModal';
+import {
+  startRealtimeBarcodeScan,
+  scanBarcodeFromImage,
+  lookupOpenFoodFacts,
+} from '../services/realBarcodeService';
 
 interface Props {
   onAddItem: (item: PantryItem) => Promise<void>;
@@ -116,6 +123,11 @@ export const AddScanView: React.FC<Props> = ({
   const [pendingReceiptItems, setPendingReceiptItems] = useState<PendingReceiptItem[]>([]);
   const [savingReceiptItems, setSavingReceiptItems] = useState(false);
 
+  // AI Animation Modal State
+  const [showAiModal, setShowAiModal] = useState(false);
+  const [aiModalMode, setAiModalMode] = useState<'receipt' | 'barcode'>('receipt');
+  const [aiPreviewUri, setAiPreviewUri] = useState<string | null>(null);
+
   const getLocName = (loc: string) => {
     const lower = (loc || '').toLowerCase();
     if (lower.includes('fridge')) return t('smart_pantry.loc_fridge');
@@ -125,9 +137,16 @@ export const AddScanView: React.FC<Props> = ({
     return loc;
   };
 
-  const requestCameraPermission = async () => {
+  const requestCameraPermission = async (): Promise<boolean> => {
     if (Platform.OS === 'android') {
       try {
+        const isGranted = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+        );
+        if (isGranted) {
+          return true;
+        }
+
         const granted = await PermissionsAndroid.request(
           PermissionsAndroid.PERMISSIONS.CAMERA,
           {
@@ -186,30 +205,53 @@ export const AddScanView: React.FC<Props> = ({
     onNavigateDetails();
   };
 
-  const handleLookupBarcode = async (code: string) => {
-    const trimmed = (code || '').trim();
+  const handleLookupBarcode = async (code?: string, imageUri?: string) => {
+    const trimmed = (code || manualBarcode || '').trim();
     if (!trimmed) {
       Alert.alert(
-        t('smart_pantry.alert_missing_info_title'),
-        t('smart_pantry.alert_barcode_empty_msg'),
+        t('smart_pantry.alert_missing_info_title', { defaultValue: 'Missing Barcode' }),
+        t('smart_pantry.alert_barcode_empty_msg', { defaultValue: 'Please enter a barcode number to lookup.' }),
       );
       return;
     }
 
     setScannedBarcode(trimmed);
+    setManualBarcode(trimmed);
+    setAiModalMode('barcode');
+    setAiPreviewUri(imageUri || null);
+    setShowAiModal(true);
     setIsScanning(true);
+
+    const minAnimationDuration = new Promise((resolve) => setTimeout(resolve, 1400));
+
     try {
       let catalogItem: any = null;
-      if (onLookupBarcode) {
-        try {
-          catalogItem = await onLookupBarcode(trimmed);
-        } catch (err) {
-          console.warn('Barcode remote lookup failed:', err);
+      const lookupPromise = (async () => {
+        // 1. Check remote backend barcode catalog
+        if (onLookupBarcode) {
+          try {
+            const res = await onLookupBarcode(trimmed);
+            if (res) return res;
+          } catch (err) {
+            console.warn('Barcode remote lookup failed:', err);
+          }
         }
-      }
-      if (!catalogItem) {
-        catalogItem = BARCODE_CATALOG[trimmed];
-      }
+        // 2. Real-time Open Food Facts global database lookup (3M+ items)
+        try {
+          const offItem = await lookupOpenFoodFacts(trimmed);
+          if (offItem) return offItem;
+        } catch (err) {
+          console.warn('Open Food Facts lookup failed:', err);
+        }
+        // 3. Fallback to local catalog if predefined
+        return BARCODE_CATALOG[trimmed] || null;
+      })();
+
+      const [item] = await Promise.all([lookupPromise, minAnimationDuration]);
+      catalogItem = item;
+
+      setShowAiModal(false);
+
       if (catalogItem) {
         setName(catalogItem.name || '');
         if (catalogItem.category) setCategory(catalogItem.category as CategoryType);
@@ -227,51 +269,121 @@ export const AddScanView: React.FC<Props> = ({
           setExpiryDate(catalogItem.suggestedExpiryDate);
         }
         Alert.alert(
-          t('smart_pantry.alert_barcode_found_title'),
-          t('smart_pantry.alert_barcode_found_msg', { name: catalogItem.name }),
+          t('smart_pantry.alert_barcode_found_title', { defaultValue: 'Product Identified' }),
+          t('smart_pantry.alert_barcode_found_msg', {
+            name: catalogItem.name,
+            defaultValue: `Identified: ${catalogItem.name}. Confirm details to save.`,
+          }),
         );
       } else {
-        setName('Scanned Product #' + trimmed.slice(-4));
+        setName('');
         Alert.alert(
-          t('smart_pantry.alert_barcode_not_found_title'),
-          t('smart_pantry.alert_barcode_not_found_msg', { code: trimmed }),
+          t('smart_pantry.alert_barcode_not_found_title', { defaultValue: 'Barcode Recorded' }),
+          t('smart_pantry.alert_barcode_not_found_msg', {
+            code: trimmed,
+            defaultValue: `Barcode ${trimmed} recorded. Enter product name and details to save.`,
+          }),
         );
       }
       setAddMode('manual');
+    } catch (err) {
+      console.warn('Barcode lookup error:', err);
+      setShowAiModal(false);
     } finally {
       setIsScanning(false);
     }
   };
 
-  // Live Hardware Camera Scanning for Barcode
+  // Live Hardware Camera Scanning for Barcode (Continuous Realtime Frame Analysis)
   const handleLiveCameraBarcodeScan = async () => {
     const hasPerm = await requestCameraPermission();
     if (!hasPerm) {
       Alert.alert(
-        t('smart_pantry.camera_perm_denied_title', { defaultValue: 'Camera Permission Denied' }),
+        t('smart_pantry.camera_perm_denied_title', { defaultValue: 'Camera Permission Required' }),
         t('smart_pantry.camera_perm_denied_msg', {
-          defaultValue: 'Please enable camera permission in device settings to scan barcodes.',
+          defaultValue: 'Please enable camera permission to scan food packaging barcodes.',
         }),
+        [
+          { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+          {
+            text: t('smart_pantry.open_settings', { defaultValue: 'Open Settings' }),
+            onPress: () => Linking.openSettings().catch(() => {}),
+          },
+        ],
       );
       return;
     }
 
     try {
       setIsScanning(true);
+
+      // Realtime continuous CameraX + ML Kit scanning on Android
+      if (Platform.OS === 'android') {
+        const detectedCode = await startRealtimeBarcodeScan();
+        if (detectedCode && detectedCode.trim().length > 0) {
+          const realBarcode = detectedCode.trim();
+          await handleLookupBarcode(realBarcode);
+        }
+        return;
+      }
+
+      // Fallback for non-Android platforms: take photo and scan
       const res = await launchCamera({
         mediaType: 'photo',
         cameraType: 'back',
-        quality: 0.8,
+        quality: 0.9,
         saveToPhotos: false,
       });
 
+      if (res.errorCode === 'permission') {
+        Alert.alert(
+          t('smart_pantry.camera_perm_denied_title', { defaultValue: 'Camera Permission Required' }),
+          t('smart_pantry.camera_perm_denied_msg', {
+            defaultValue: 'Please enable camera permission in device settings to scan barcodes.',
+          }),
+          [
+            { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+            {
+              text: t('smart_pantry.open_settings', { defaultValue: 'Open Settings' }),
+              onPress: () => Linking.openSettings().catch(() => {}),
+            },
+          ],
+        );
+        return;
+      }
+
+      if (res.errorCode === 'camera_unavailable') {
+        Alert.alert('Camera Unavailable', 'No camera hardware found on this device or emulator.');
+        return;
+      }
+
       if (!res.didCancel && res.assets && res.assets[0]?.uri) {
-        const simulatedCode = manualBarcode.trim() || '8901234567890';
-        await handleLookupBarcode(simulatedCode);
+        const photoUri = res.assets[0].uri;
+        setAiModalMode('barcode');
+        setAiPreviewUri(photoUri);
+        setShowAiModal(true);
+
+        const detectedCode = await scanBarcodeFromImage(photoUri);
+        if (detectedCode && detectedCode.trim().length > 0) {
+          await handleLookupBarcode(detectedCode.trim(), photoUri);
+        } else {
+          setShowAiModal(false);
+          setIsScanning(false);
+          Alert.alert(
+            t('smart_pantry.barcode_not_detected_title', {
+              defaultValue: 'No Barcode Detected',
+            }),
+            t('smart_pantry.barcode_not_detected_msg', {
+              defaultValue:
+                'Could not detect a clear barcode in this photo. Please hold your camera steady, ensure good lighting over the barcode stripes, or enter the numbers manually below.',
+            }),
+          );
+        }
       }
     } catch (err) {
       console.warn('Camera barcode scan error:', err);
-      Alert.alert('Camera Error', 'Could not open camera on this device.');
+      setShowAiModal(false);
+      Alert.alert('Camera Error', 'Could not open live barcode scanner.');
     } finally {
       setIsScanning(false);
     }
@@ -279,19 +391,31 @@ export const AddScanView: React.FC<Props> = ({
 
   // Process Receipt Image file and open Itemized Review Modal
   const processReceiptFile = async (file?: { uri: string; name?: string; type?: string }) => {
+    setAiModalMode('receipt');
+    setAiPreviewUri(file?.uri || null);
+    setShowAiModal(true);
     setIsScanning(true);
+
+    const minAnimationDuration = new Promise((resolve) => setTimeout(resolve, 2000));
+
     try {
       let extracted: any[] = [];
-      if (file && onScanReceipt) {
-        try {
-          const res = await onScanReceipt(file);
-          if (res && res.length > 0) {
-            extracted = res;
+      const fetchPromise = (async () => {
+        if (file && onScanReceipt) {
+          try {
+            const res = await onScanReceipt(file);
+            if (res && res.length > 0) {
+              return res;
+            }
+          } catch (err) {
+            console.warn('Remote receipt OCR error:', err);
           }
-        } catch (err) {
-          console.warn('Remote receipt OCR error:', err);
         }
-      }
+        return [];
+      })();
+
+      const [res] = await Promise.all([fetchPromise, minAnimationDuration]);
+      extracted = res;
 
       // Realistic OCR fallback items if offline / emulator
       if (!extracted || extracted.length === 0) {
@@ -349,9 +473,11 @@ export const AddScanView: React.FC<Props> = ({
       }));
 
       setPendingReceiptItems(pending);
+      setShowAiModal(false);
       setShowReceiptReviewModal(true);
     } catch (err) {
       console.warn('Receipt processing error:', err);
+      setShowAiModal(false);
       Alert.alert(
         t('smart_pantry.alert_receipt_failed_title', { defaultValue: 'Scan Failed' }),
         t('smart_pantry.alert_receipt_failed_msg', {
@@ -368,10 +494,17 @@ export const AddScanView: React.FC<Props> = ({
     const hasPerm = await requestCameraPermission();
     if (!hasPerm) {
       Alert.alert(
-        t('smart_pantry.camera_perm_denied_title', { defaultValue: 'Camera Permission Denied' }),
+        t('smart_pantry.camera_perm_denied_title', { defaultValue: 'Camera Permission Required' }),
         t('smart_pantry.camera_perm_denied_msg', {
-          defaultValue: 'Please enable camera permission in device settings to capture receipts.',
+          defaultValue: 'Please enable camera permission to capture grocery receipts.',
         }),
+        [
+          { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+          {
+            text: t('smart_pantry.open_settings', { defaultValue: 'Open Settings' }),
+            onPress: () => Linking.openSettings().catch(() => {}),
+          },
+        ],
       );
       return;
     }
@@ -383,6 +516,28 @@ export const AddScanView: React.FC<Props> = ({
         quality: 0.8,
         saveToPhotos: false,
       });
+
+      if (res.errorCode === 'permission') {
+        Alert.alert(
+          t('smart_pantry.camera_perm_denied_title', { defaultValue: 'Camera Permission Required' }),
+          t('smart_pantry.camera_perm_denied_msg', {
+            defaultValue: 'Please enable camera permission in device settings to capture receipts.',
+          }),
+          [
+            { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+            {
+              text: t('smart_pantry.open_settings', { defaultValue: 'Open Settings' }),
+              onPress: () => Linking.openSettings().catch(() => {}),
+            },
+          ],
+        );
+        return;
+      }
+
+      if (res.errorCode === 'camera_unavailable') {
+        Alert.alert('Camera Unavailable', 'No camera hardware found on this device or emulator.');
+        return;
+      }
 
       if (!res.didCancel && res.assets && res.assets[0]?.uri) {
         await processReceiptFile({
@@ -582,26 +737,6 @@ export const AddScanView: React.FC<Props> = ({
               {t('smart_pantry.scan_with_camera_btn', { defaultValue: 'Scan Barcode with Camera' })}
             </Text>
           </Pressable>
-
-          {/* Quick Demo Barcode Chips */}
-          <View style={styles.quickBarcodeRow}>
-            <Text style={styles.quickBarcodeLabel}>
-              {t('smart_pantry.quick_demo_barcodes', { defaultValue: 'Demo Barcodes:' })}
-            </Text>
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6 }}>
-              {Object.keys(BARCODE_CATALOG).map((code) => {
-                const item = BARCODE_CATALOG[code];
-                return (
-                  <Pressable
-                    key={code}
-                    style={styles.quickBarcodeChip}
-                    onPress={() => handleLookupBarcode(code)}>
-                    <Text style={styles.quickBarcodeChipText}>{item.name?.split(' ')[0]} ({code.slice(-4)})</Text>
-                  </Pressable>
-                );
-              })}
-            </ScrollView>
-          </View>
 
           {/* Manual Barcode Lookup Input */}
           <View style={styles.manualBarcodeInputCard}>
@@ -1110,6 +1245,14 @@ export const AddScanView: React.FC<Props> = ({
           </View>
         </View>
       </Modal>
+
+      {/* Futuristic AI Processing Animation Modal */}
+      <AiProcessingModal
+        visible={showAiModal}
+        mode={aiModalMode}
+        previewUri={aiPreviewUri}
+        onCancel={() => setShowAiModal(false)}
+      />
     </View>
   );
 };
