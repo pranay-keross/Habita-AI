@@ -1,12 +1,31 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ViewStyle } from 'react-native';
-import { BellRing, Check, Pill, ReceiptText } from 'lucide-react-native';
+import { BellRing, Check, FileText, Pill, ReceiptText, Users } from 'lucide-react-native';
 import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
 import { t } from '../i18n';
 import { pushCopy } from '../features/notifications/parse';
 import type { PushSection } from '../features/notifications/types';
 import type { StoredNotification } from '../features/notifications/notificationStore';
+
+/**
+ * Per-section chrome. Kept as exhaustive `Record`s rather than a chain of
+ * ternaries so that adding a `PushSection` fails to compile here — the previous
+ * two-branch ternary would have silently labelled a new section "Bill alerts".
+ */
+const SECTION_ICON: Record<PushSection, typeof Pill> = {
+  medchest: Pill,
+  utilities: ReceiptText,
+  documents: FileText,
+  staff: Users,
+};
+
+const SECTION_TITLE_KEY: Record<PushSection, string> = {
+  medchest: 'notifications.medchest_title',
+  utilities: 'notifications.utilities_title',
+  documents: 'notifications.documents_title',
+  staff: 'notifications.staff_title',
+};
 
 interface AlertsCardProps {
   section: PushSection;
@@ -42,9 +61,8 @@ export default function AlertsCard({
   }
 
   const unread = items.filter((n) => !n.read).length;
-  const SectionIcon = section === 'medchest' ? Pill : ReceiptText;
-  const titleKey =
-    section === 'medchest' ? 'notifications.medchest_title' : 'notifications.utilities_title';
+  const SectionIcon = SECTION_ICON[section];
+  const titleKey = SECTION_TITLE_KEY[section];
 
   return (
     <View style={[styles.card, style]}>

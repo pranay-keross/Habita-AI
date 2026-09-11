@@ -8,6 +8,7 @@ import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../_layout';
 import type { ThemeTokens } from '../../theme';
 import useThemedStyles from '../../hooks/useThemedStyles';
+import { requestPermissionExclusively } from '../../utils/permissionQueue';
 import useAuth from '../../hooks/useAuth';
 import { apiFetch, postMultipart, ApiError } from '../../features/auth/api';
 import { SUPPORTED_LANGS, getCurrentLanguage, setLanguage, subscribeToLanguageChanges, t } from '../../i18n';
@@ -188,8 +189,12 @@ export default function ProfileScreen({ route, navigation }: Props) {
     const prefillLocation = async () => {
       try {
         if (Platform.OS === 'android') {
-          const granted = await PermissionsAndroid.request(
-            PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION,
+          // Queued against every other runtime permission in the app — see
+          // `utils/permissionQueue.ts`. Without this, this request and the
+          // notification one fired together after sign-in and Android dropped
+          // one of them without showing a dialog.
+          const granted = await requestPermissionExclusively(() =>
+            PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.ACCESS_FINE_LOCATION),
           );
           if (granted !== PermissionsAndroid.RESULTS.GRANTED) {
             return;

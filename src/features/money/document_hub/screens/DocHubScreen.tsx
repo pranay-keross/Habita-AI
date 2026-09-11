@@ -34,6 +34,7 @@ import {
   Receipt,
 } from 'lucide-react-native';
 import { loadDocuments, getDocStatus } from '../docStore';
+import { syncDocumentReminders } from '../reminders';
 import type { DocCategory, DocHubEntry } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../../i18n';
 import useAuth from '../../../../hooks/useAuth';
@@ -75,6 +76,11 @@ export default function DocHubScreen({ navigation }: Props) {
     setDocs(list);
     setLoading(false);
     setRefreshing(false);
+    // Keeps expiry reminders in step with the vault without the user ever having
+    // to open the alerts screen — adding or renewing a document here is exactly
+    // when the schedule changes. Idempotent by design (stable ids, whole-group
+    // replace), so calling it on every load and pull-to-refresh is safe.
+    void syncDocumentReminders(list);
   };
 
   const onRefresh = () => {

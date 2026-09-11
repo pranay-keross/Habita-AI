@@ -65,19 +65,24 @@ import {
   saveLiquidFlags,
   saveMedicines,
 } from './medicineStore';
-import { SCHEDULE_SLOTS, timeToSlot, type IntakeLogEntry, type Medicine, type ScheduleSlot } from './types';
+import {
+  SCHEDULE_SLOTS,
+  SLOT_DEFAULT_TIME,
+  timeToSlot,
+  type IntakeLogEntry,
+  type Medicine,
+  type ScheduleSlot,
+} from './types';
+import { syncDoseReminders } from './reminders';
 
 type Props = StackScreenProps<RootStackParamList, 'Medicine'>;
 
 // Default time per slot, used when a medicine has no custom time saved for that slot
 // yet (docs/DECISIONS.md D-035 — backend just wants `scheduleTimes: "HH:MM"[]`, so a
 // user-picked time per slot is sent as-is).
-const SLOT_TIME: Record<ScheduleSlot, string> = {
-  morning: '08:00',
-  afternoon: '13:00',
-  evening: '18:00',
-  night: '21:00',
-};
+// Re-exported from `types.ts` so the reminder scheduler and this screen cannot
+// drift apart — a dose reminder must fire at the time the screen displays.
+const SLOT_TIME = SLOT_DEFAULT_TIME;
 
 function SlotIcon({ slot, size = 14, color = '#000000' }: { slot: ScheduleSlot; size?: number; color?: string }) {
   switch (slot) {
@@ -409,6 +414,22 @@ export default function MedicineScreen({ navigation, route }: Props) {
       unsubscribe();
     };
   }, [loadData]);
+
+  // Schedules a repeating device-local reminder for every dose.
+  //
+  // Keyed on the whole `medicines` list rather than hooked into each mutation,
+  // because this screen writes to it from a dozen places (load, refresh, add,
+  // edit, delete, stock change, remote merge) and any one of them missed would
+  // leave a stale or absent reminder. `syncDoseReminders` replaces the group and
+  // reuses stable per-medicine-per-slot ids, so running it on every change
+  // converges rather than stacking duplicates.
+  //
+  // This is what makes an added medicine actually notify: `DOSAGE_REMINDER` was
+  // previously only a payload the *backend* could send, and nothing in the app
+  // ever scheduled one.
+  useEffect(() => {
+    void syncDoseReminders(medicines);
+  }, [medicines]);
 
   const openAddProfileSheet = useCallback(() => {
     // No family yet — there's no member list to choose from, and this flow is

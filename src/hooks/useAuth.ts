@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useEffect, useCallback, useSyncExternalStore } from 'react';
 import { getItem, setItem, removeItem } from '../utils/storage';
 import { authService, type TokenPair } from '../features/auth/auth';
 import { MEDICINE_STORAGE_KEY, INTAKE_LOG_STORAGE_KEY } from '../features/medicine/medicineStore';
@@ -104,35 +104,92 @@ async function getValidSession(current: Session | null): Promise<Session | null>
   return refreshInFlight;
 }
 
-// A plain hook, not a Context — each caller gets its own local copy of `session`/
-// `pending`. That's fine here: nothing needs `signedIn` to update reactively mid-session
-// across components, since navigation only ever moves forward through explicit
-// `navigate()` calls (Phone -> Otp -> Profile -> Dashboard). `_layout.tsx` only reads it
-// once, at boot, to pick the initial route. The module-level refresh dedup above is what
-// keeps this safe despite every screen holding its own copy of `session`.
+// ---------------------------------------------------------------------------
+// One session, shared by every caller
+// ---------------------------------------------------------------------------
+//
+// This used to be a plain hook whose state was per-call-site, on the documented
+// assumption that "nothing needs `signedIn` to update reactively mid-session across
+// components, since navigation only ever moves forward through explicit navigate()
+// calls".
+//
+// That assumption was broken by `usePushRegistration` (mounted once in `_layout.tsx`),
+// which gates on `signedIn` and therefore *does* need to react to a sign-in happening
+// elsewhere. With per-instance state it never could: on a fresh install its own copy
+// hydrated to `null`, the user then signed in through the Otp screen's *separate*
+// `useAuth()` instance, and the push copy stayed `false` for the rest of the run - so
+// the notification permission prompt was never even attempted. It appeared on the next
+// launch, when the stored session was read at mount, which is exactly why the bug looked
+// like "works on relaunch, never on a fresh sign-in" (docs/DECISIONS.md D-062).
+//
+// So the session is now a module-level store read through `useSyncExternalStore` - the
+// same shape `features/notifications/inbox.ts` uses, and for the same reason: one
+// mutable value outside React plus a subscribe function. The hook's public API is
+// unchanged, so no call site needed touching.
+
+/** Snapshot identity must stay stable between changes or `useSyncExternalStore` loops. */
+interface AuthState {
+  session: Session | null;
+  pending: boolean;
+}
+
+let authState: AuthState = { session: null, pending: true };
+const authListeners = new Set<() => void>();
+
+function setAuthState(next: AuthState): void {
+  authState = next;
+  authListeners.forEach((listener) => listener());
+}
+
+function subscribeToAuth(listener: () => void): () => void {
+  authListeners.add(listener);
+  return () => {
+    authListeners.delete(listener);
+  };
+}
+
+function getAuthSnapshot(): AuthState {
+  return authState;
+}
+
+/**
+ * Reads the stored session once per app run; concurrent callers share the work.
+ *
+ * Resolved through `getValidSession`, not a bare storage read: a session sitting long
+ * enough for even its refresh token to die used to read as `signedIn: true`
+ * (docs/DECISIONS.md D-029), parking the app on Dashboard with a token that failed every
+ * request.
+ */
+let authHydration: Promise<void> | null = null;
+
+function ensureAuthHydrated(): Promise<void> {
+  if (authHydration === null) {
+    authHydration = getItem<Session | null>(SESSION_KEY, null)
+      .then((stored) => getValidSession(stored))
+      .then((valid) => {
+        setAuthState({ session: valid, pending: false });
+      })
+      .catch(() => {
+        // A storage failure must still release the boot gate, or the splash screen
+        // never ends.
+        setAuthState({ session: null, pending: false });
+      });
+  }
+  return authHydration;
+}
+
+/** Test seam - clears the shared session between cases. */
+export function resetAuthStateForTests(): void {
+  authState = { session: null, pending: true };
+  authHydration = null;
+  authListeners.clear();
+}
+
 export default function useAuth() {
-  const [session, setSession] = useState<Session | null>(null);
-  const [pending, setPending] = useState(true);
+  const { session, pending } = useSyncExternalStore(subscribeToAuth, getAuthSnapshot);
 
   useEffect(() => {
-    let cancelled = false;
-    // Resolve through getValidSession, not a bare storage read: a session that's been
-    // sitting long enough for even its refresh token to die was still reading as
-    // `signedIn: true` here before (docs/DECISIONS.md D-029) — the boot guard only ever
-    // checked "does a session object exist," never whether it (or a refresh of it) still
-    // actually works. That left the app parked on Dashboard with a token that would fail
-    // every request, showing screens like Profile as silently empty instead of routing
-    // back to sign-in.
-    getItem<Session | null>(SESSION_KEY, null).then(async (stored) => {
-      const valid = await getValidSession(stored);
-      if (!cancelled) {
-        setSession(valid);
-        setPending(false);
-      }
-    });
-    return () => {
-      cancelled = true;
-    };
+    void ensureAuthHydrated();
   }, []);
 
   const login = useCallback(async (phone: string) => {
@@ -159,11 +216,13 @@ export default function useAuth() {
 
     const next: Session = { ...tokens, issuedAt: Date.now(), phone };
     await setItem(SESSION_KEY, next);
-    setSession(next);
+    // Published to the shared store, so every mounted `useAuth()` - including the push
+    // registration in `_layout.tsx` - sees this sign-in immediately.
+    setAuthState({ session: next, pending: false });
   }, []);
 
   const logout = useCallback(async () => {
-    const current = session ?? (await getItem<Session | null>(SESSION_KEY, null));
+    const current = authState.session ?? (await getItem<Session | null>(SESSION_KEY, null));
     if (current) {
       // Best-effort: blacklists both tokens server-side (docs/DECISIONS.md) so they
       // can't be replayed before their natural expiry. A failure here (offline, backend
@@ -173,21 +232,24 @@ export default function useAuth() {
     }
     await removeItem(SESSION_KEY);
     await clearAccountData();
-    setSession(null);
-  }, [session]);
+    setAuthState({ session: null, pending: false });
+  }, []);
 
   // Read-through-state-then-storage, then silently refresh if what's found has expired
   // (or is about to). Updates this hook instance's own `session` state whenever the
   // resolved session differs from what was read, so `signedIn` stays accurate too if a
   // refresh fails and clears the session.
+  // Reads the shared store rather than a closed-over `session`, which makes this - and
+  // `getAccessToken` below - referentially stable. Previously every silent refresh
+  // produced a new `getAccessToken` identity and re-ran any effect depending on it.
   const resolveSession = useCallback(async () => {
-    const current = session ?? (await getItem<Session | null>(SESSION_KEY, null));
+    const current = authState.session ?? (await getItem<Session | null>(SESSION_KEY, null));
     const valid = await getValidSession(current);
-    if (valid !== current) {
-      setSession(valid);
+    if (valid !== authState.session) {
+      setAuthState({ session: valid, pending: false });
     }
     return valid;
-  }, [session]);
+  }, []);
 
   const getAccessToken = useCallback(async () => (await resolveSession())?.accessToken ?? null, [resolveSession]);
 

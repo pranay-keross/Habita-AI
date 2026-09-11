@@ -5,6 +5,13 @@
          `PushMessaging.requestPermission()` is what asks for it. Older versions
          grant it at install time. -->
     <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <!-- Lets notifee restore scheduled dose/expiry reminders after a device
+         restart. Android discards pending alarms on reboot; without this the
+         next reminder after a restart simply never arrives. A normal (install-
+         time) permission - it shows no runtime prompt. The app also re-syncs
+         reminders on every launch, so this is belt-and-braces, not a
+         single point of failure. -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
 

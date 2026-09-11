@@ -1,6 +1,7 @@
 import React from 'react';
 import { NavigationContainer, createNavigationContainerRef } from '@react-navigation/native';
 import { usePushRegistration } from '../hooks/usePushNotifications';
+import { resyncDoseRemindersFromCache } from '../features/medicine/reminders';
 import type { PushRoute } from '../features/notifications/parse';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
@@ -139,9 +140,23 @@ const AppLayout = () => {
       case 'Resources':
         navigationRef.navigate('Resources', route.params);
         break;
+      case 'ExpirationAlerts':
+        navigationRef.navigate('ExpirationAlerts');
+        break;
+      case 'Staff':
+        navigationRef.navigate('Staff');
+        break;
     }
   }, []);
   usePushRegistration(openFromNotification);
+
+  // Re-arm medicine dose reminders once per launch. Android drops scheduled
+  // alarms on reboot, and a user with a stable daily prescription has no reason
+  // to open the Medicine screen — which is otherwise the only thing that
+  // schedules them. Cheap and idempotent: stable ids, whole-group replace.
+  React.useEffect(() => {
+    void resyncDoseRemindersFromCache();
+  }, []);
 
   // Show luxury animated splash screen on app start / restore from killed state
   if (pending || !splashFinished) {
