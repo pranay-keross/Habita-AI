@@ -74,15 +74,30 @@ export default function PantryScreen({ navigation }: Props) {
     <View style={styles.root}>
       {/* Header Bar */}
       <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.backBtn}>
+        <Pressable
+          onPress={() => navigation.goBack()}
+          style={styles.backBtn}
+          hitSlop={8}
+          accessibilityRole="button"
+          accessibilityLabel={t('common.back', { defaultValue: 'Back' })}>
           <ArrowLeft size={18} color={styles.backIcon.color} strokeWidth={1.5} />
         </Pressable>
-        <View style={{ flex: 1, marginLeft: 10 }}>
-          <Text style={styles.headerTitle}>{t('smart_pantry.header_title')}</Text>
-          <Text style={styles.headerSub}>{t('smart_pantry.header_sub')}</Text>
+        <View style={styles.headerTitleBlock}>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {t('smart_pantry.header_title')}
+          </Text>
+          <Text style={styles.headerSub} numberOfLines={1}>
+            {t('smart_pantry.header_sub')}
+          </Text>
         </View>
-        <Pressable onPress={() => setActiveTab('add')} style={styles.headerAddBtn}>
-          <Text style={styles.headerAddBtnText}>{t('smart_pantry.add_scan_btn')}</Text>
+        <Pressable
+          onPress={() => setActiveTab('add')}
+          style={styles.headerAddBtn}
+          hitSlop={8}
+          accessibilityRole="button">
+          <Text style={styles.headerAddBtnText} numberOfLines={1}>
+            {t('smart_pantry.add_scan_btn')}
+          </Text>
         </Pressable>
       </View>
 
@@ -257,9 +272,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       alignItems: 'center',
       paddingHorizontal: spacing.md,
       paddingBottom: spacing.sm,
-      backgroundColor: colors.background,
+      backgroundColor: colors.navBackground || colors.background,
       borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      borderBottomColor: colors.navBorder || colors.border,
+      ...shadow.soft,
     },
     backBtn: {
       width: 38,
@@ -268,9 +284,13 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       backgroundColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      flexShrink: 0,
       ...shadow.soft,
     },
-    backIcon: { fontSize: 18, color: colors.textPrimary },
+    backIcon: { color: colors.textPrimary },
+    // minWidth 0 lets the title block actually shrink instead of pushing the
+    // Add & Scan button off the row on long translations.
+    headerTitleBlock: { flex: 1, minWidth: 0, marginLeft: 10, marginRight: 10 },
     headerTitle: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.textPrimary },
     headerSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted },
     headerAddBtn: {
@@ -278,6 +298,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingHorizontal: 12,
       paddingVertical: 7,
       borderRadius: radius.pill,
+      flexShrink: 0,
     },
     headerAddBtnText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimary },
     topTabBar: {

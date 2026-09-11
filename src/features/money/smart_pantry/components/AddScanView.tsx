@@ -13,6 +13,7 @@ import {
   PermissionsAndroid,
   Linking,
 } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import {
   AddMode,
   AllergenTag,
@@ -121,6 +122,7 @@ export const AddScanView: React.FC<Props> = ({
 }) => {
   const { theme } = useTheme();
   const styles = useThemedStyles(makeStyles);
+  const insets = useSafeAreaInsets();
 
   const [addMode, setAddMode] = useState<AddMode>('barcode');
   const [name, setName] = useState('');
@@ -1284,9 +1286,9 @@ export const AddScanView: React.FC<Props> = ({
         onRequestClose={() => setShowReceiptReviewModal(false)}>
         <View style={styles.reviewModalContainer}>
           {/* Header */}
-          <View style={styles.reviewModalHeader}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.reviewModalTitle}>
+          <View style={[styles.reviewModalHeader, { paddingTop: insets.top + 12 }]}>
+            <View style={styles.reviewModalTitleBlock}>
+              <Text style={styles.reviewModalTitle} numberOfLines={1}>
                 {reviewSource === 'basket'
                   ? t('smart_pantry.basket_review_title', { defaultValue: 'Scan Result' })
                   : t('smart_pantry.receipt_review_title', { defaultValue: 'Review Scanned Items' })}
@@ -1305,7 +1307,10 @@ export const AddScanView: React.FC<Props> = ({
             </View>
             <Pressable
               style={styles.modalCloseBtn}
-              onPress={() => setShowReceiptReviewModal(false)}>
+              onPress={() => setShowReceiptReviewModal(false)}
+              hitSlop={10}
+              accessibilityRole="button"
+              accessibilityLabel={t('common.close', { defaultValue: 'Close' })}>
               <X size={22} color={styles.modalCloseIcon.color} strokeWidth={2} />
             </Pressable>
           </View>
@@ -1528,7 +1533,11 @@ export const AddScanView: React.FC<Props> = ({
           </ScrollView>
 
           {/* Modal Footer Actions */}
-          <View style={styles.reviewModalFooter}>
+          <View
+            style={[
+              styles.reviewModalFooter,
+              { paddingBottom: theme.spacing.md + insets.bottom },
+            ]}>
             <Pressable
               style={styles.discardBtn}
               onPress={() => setShowReceiptReviewModal(false)}
@@ -1879,16 +1888,20 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     reviewModalContainer: {
       flex: 1,
       backgroundColor: colors.background,
-      paddingTop: Platform.OS === 'ios' ? 44 : 16,
     },
     reviewModalHeader: {
       flexDirection: 'row',
       alignItems: 'flex-start',
       paddingHorizontal: spacing.md,
       paddingBottom: 12,
+      backgroundColor: colors.navBackground || colors.background,
       borderBottomWidth: 1,
-      borderBottomColor: colors.border,
+      borderBottomColor: colors.navBorder || colors.border,
+      ...shadow.soft,
     },
+    // minWidth 0 keeps the long review subtitle from shoving the close button
+    // off the row.
+    reviewModalTitleBlock: { flex: 1, minWidth: 0, marginRight: 8 },
     reviewModalTitle: {
       fontFamily: fonts.serif,
       fontSize: 18,
@@ -1902,6 +1915,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     modalCloseBtn: {
       padding: 4,
+      flexShrink: 0,
     },
     modalCloseIcon: {
       color: colors.textMuted,
