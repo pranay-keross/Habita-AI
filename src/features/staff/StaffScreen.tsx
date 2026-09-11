@@ -13,10 +13,13 @@ import UsersRound from 'lucide-react-native/icons/users-round';
 import Plus from 'lucide-react-native/icons/plus';
 import CalendarClock from 'lucide-react-native/icons/calendar-clock';
 import ChevronDown from 'lucide-react-native/icons/chevron-down';
+import Timer from 'lucide-react-native/icons/timer';
 import type { RootStackParamList } from '../../app/_layout';
+import AlertsCard from '../../components/AlertsCard';
 import BottomSheet from '../../components/BottomSheet';
 import Button from '../../components/Button';
 import useAuth from '../../hooks/useAuth';
+import usePushNotifications from '../../hooks/usePushNotifications';
 import useThemedStyles from '../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../i18n';
 import type { ThemeTokens } from '../../theme';
@@ -35,12 +38,44 @@ import {
 import {
   loadAttendanceEntries,
   loadCaregiverTransactions,
+  loadPayrollSettings,
+  loadSalaryPayments,
   saveAttendanceEntries,
   saveCaregiverTransactions,
+  saveSalaryPayments,
 } from './staffStore';
-import type { AttendanceEntry, AttendanceStatus, Caregiver, CaregiverTransaction } from './types';
+import { buildPayrollRun, monthKey } from './payroll';
+import { syncSalaryReminders } from './reminders';
+import type {
+  AttendanceEntry,
+  AttendanceStatus,
+  Caregiver,
+  CaregiverTransaction,
+  PaymentMethod,
+  PayrollSettings,
+  Payslip,
+  SalaryPayment,
+} from './types';
+import { DEFAULT_PAYROLL_SETTINGS, PAYMENT_METHODS } from './types';
 
 const CUSTOM_SERVICE_NAME = 'Custom';
+
+/**
+ * Payslip status -> i18n key. A `Record` rather than a template string built from
+ * the status, so a new status is a compile error here instead of a missing
+ * translation discovered by a user (agent.md rule 2).
+ */
+const PAYSLIP_STATUS_KEY: Record<Payslip['status'], string> = {
+  UNPAID: 'staff.payslip_status_unpaid',
+  PARTIALLY_PAID: 'staff.payslip_status_partially_paid',
+  PAID: 'staff.payslip_status_paid',
+};
+
+const PAYMENT_METHOD_KEY: Record<PaymentMethod, string> = {
+  UPI: 'staff.payment_method_upi',
+  CASH: 'staff.payment_method_cash',
+  BANK_TRANSFER: 'staff.payment_method_bank',
+};
 
 // Maps the live backend shape to this screen's local `Caregiver` model — `notes` has no
 // backend equivalent yet (stays blank for remote-sourced rows).
@@ -123,6 +158,20 @@ export default function StaffScreen({ navigation }: Props) {
   const [attendanceSummary, setAttendanceSummary] = useState<AttendanceSummary[]>([]);
   const [hasFamily, setHasFamily] = useState(false);
   const [familyChecked, setFamilyChecked] = useState(false);
+  const [payments, setPayments] = useState<SalaryPayment[]>([]);
+  const [payrollSettings, setPayrollSettings] = useState<PayrollSettings>(DEFAULT_PAYROLL_SETTINGS);
+  const [paySheetCaregiverId, setPaySheetCaregiverId] = useState<string | null>(null);
+  const [payAmount, setPayAmount] = useState('');
+  const [payMethod, setPayMethod] = useState<PaymentMethod>('UPI');
+  const [payReference, setPayReference] = useState('');
+  const [overtimeCaregiverId, setOvertimeCaregiverId] = useState<string | null>(null);
+  const [overtimeHours, setOvertimeHours] = useState('');
+  const { staff: staffAlerts, markAsRead, markSectionAsRead } = usePushNotifications();
+
+  // The payroll month is the *current* one and is read once per render rather than
+  // held in state: derived from the clock, it would go stale at midnight on the
+  // last day of a month — exactly when a salary falls due.
+  const currentMonth = monthKey(new Date());
 
   const loadStaffList = React.useCallback(async () => {
     setLoading(true);
@@ -150,12 +199,17 @@ export default function StaffScreen({ navigation }: Props) {
   }, [getAccessToken]);
 
   useEffect(() => {
-    Promise.all([loadCaregiverTransactions(), loadAttendanceEntries()]).then(
-      ([savedTransactions, savedAttendance]) => {
-        setTransactions(savedTransactions);
-        setAttendance(savedAttendance);
-      },
-    );
+    Promise.all([
+      loadCaregiverTransactions(),
+      loadAttendanceEntries(),
+      loadSalaryPayments(),
+      loadPayrollSettings(),
+    ]).then(([savedTransactions, savedAttendance, savedPayments, savedSettings]) => {
+      setTransactions(savedTransactions);
+      setAttendance(savedAttendance);
+      setPayments(savedPayments);
+      setPayrollSettings(savedSettings);
+    });
     loadStaffList();
     const unsubscribe = subscribeToLanguageChanges(() => setLocaleVersion((version) => version + 1));
     return () => { unsubscribe(); };
@@ -187,6 +241,9 @@ export default function StaffScreen({ navigation }: Props) {
 
   const todaysStatus = (caregiverId: string): AttendanceStatus | null =>
     attendance.find((e) => e.caregiverId === caregiverId && e.date === todayKey())?.status ?? null;
+
+  const todaysOvertime = (caregiverId: string): number =>
+    attendance.find((e) => e.caregiverId === caregiverId && e.date === todayKey())?.overtimeHours ?? 0;
 
   const markAttendance = async (caregiverId: string, status: AttendanceStatus) => {
     const date = todayKey();
@@ -316,8 +373,154 @@ export default function StaffScreen({ navigation }: Props) {
       : [{ id: String(Date.now()), caregiverId: extraCaregiverId, amount, reason: extraReason.trim(), createdAt: Date.now() }, ...transactions];
     setTransactions(next); await saveCaregiverTransactions(next); setExtraSheetVisible(false);
   };
-  const extraFor = (caregiverId: string) => transactions.filter((entry) => entry.caregiverId === caregiverId).reduce((sum, entry) => sum + entry.amount, 0);
+  // `extraFor` used to sum a caregiver's ad-hoc extras for the card's total. That
+  // total is now `payslip.adjustments`, computed alongside every other line of the
+  // payslip, so the standalone helper is gone rather than left to drift out of step
+  // with the engine. `latestExtraFor` survives — the card still shows the most
+  // recent extra's reason as the adjustment row's label.
   const latestExtraFor = (caregiverId: string) => transactions.find((entry) => entry.caregiverId === caregiverId);
+
+  // ---------------------------------------------------------------------------
+  // Payroll
+  // ---------------------------------------------------------------------------
+  //
+  // This replaces the old `caregiver.rate + extraFor(id)` figure, which ignored
+  // absences, leave, half-days, overtime and the hourly rate type entirely — see
+  // docs/AWH_FEATURE_GAP_ANALYSIS.md §1.3 gap 3.3. All the arithmetic lives in the
+  // pure `payroll.ts`; this screen only renders it.
+
+  const payslips = React.useMemo(
+    () =>
+      buildPayrollRun(
+        caregivers,
+        currentMonth,
+        attendance,
+        transactions,
+        payments,
+        payrollSettings,
+      ),
+    [caregivers, currentMonth, attendance, transactions, payments, payrollSettings],
+  );
+
+  const payslipFor = (caregiverId: string): Payslip | undefined =>
+    payslips.find((slip) => slip.caregiverId === caregiverId);
+
+  // Reschedules salary reminders whenever a payslip moves — a day marked, a
+  // payment recorded, an extra added. `syncSalaryReminders` replaces the group
+  // and reuses stable ids, so repeated runs converge instead of stacking
+  // duplicates, and paying someone cancels their own reminder.
+  useEffect(() => {
+    if (payslips.length === 0) {
+      return;
+    }
+    void syncSalaryReminders(payslips, payrollSettings);
+  }, [payslips, payrollSettings]);
+
+  const openOvertime = (caregiverId: string) => {
+    const entry = attendance.find((e) => e.caregiverId === caregiverId && e.date === todayKey());
+    setOvertimeCaregiverId(caregiverId);
+    setOvertimeHours(entry?.overtimeHours ? String(entry.overtimeHours) : '');
+  };
+
+  /**
+   * Records overtime against *today's* attendance row, creating one marked
+   * `present` if the day has not been marked yet — logging overtime for a day
+   * you have not said someone worked is almost always a forgotten tap, not a
+   * claim that they did overtime while absent.
+   */
+  const saveOvertime = async () => {
+    if (!overtimeCaregiverId) {
+      return;
+    }
+    const raw = overtimeHours.trim();
+    const hours = raw === '' ? 0 : Number(raw);
+    if (!Number.isFinite(hours) || hours < 0) {
+      Alert.alert(t('staff.incomplete_title'), t('staff.overtime_invalid'));
+      return;
+    }
+    const date = todayKey();
+    const existing = attendance.find((e) => e.caregiverId === overtimeCaregiverId && e.date === date);
+    const next = existing
+      ? attendance.map((e) =>
+          e.id === existing.id ? { ...e, overtimeHours: hours, markedAt: Date.now() } : e,
+        )
+      : [
+          ...attendance,
+          {
+            id: `${overtimeCaregiverId}-${date}`,
+            caregiverId: overtimeCaregiverId,
+            date,
+            status: 'present' as AttendanceStatus,
+            markedAt: Date.now(),
+            overtimeHours: hours,
+          },
+        ];
+    await persistAttendance(next);
+    setOvertimeCaregiverId(null);
+
+    const token = await getAccessToken().catch(() => null);
+    if (!token) {
+      return;
+    }
+    try {
+      await markStaffAttendance(
+        overtimeCaregiverId,
+        { date, status: STATUS_TO_REMOTE[existing?.status ?? 'present'], overtimeHours: hours },
+        token,
+      );
+    } catch (err) {
+      // Local payroll is already correct; the backend contract for overtime does
+      // not exist yet (§3.2 B2), so a rejection here is expected, not a failure
+      // the user needs to see.
+      console.warn('[staff] failed to sync overtime', err);
+    }
+  };
+
+  const openPaymentSheet = (caregiverId: string) => {
+    const slip = payslipFor(caregiverId);
+    setPaySheetCaregiverId(caregiverId);
+    // Prefilled with what is actually outstanding, not the base salary: the
+    // common case is paying exactly what is owed, and the partly-paid case is
+    // precisely where a base-salary default would overpay.
+    setPayAmount(slip ? String(slip.outstanding) : '');
+    setPayMethod('UPI');
+    setPayReference('');
+  };
+
+  const savePayment = async () => {
+    if (!paySheetCaregiverId) {
+      return;
+    }
+    const slip = payslipFor(paySheetCaregiverId);
+    const amount = Number(payAmount);
+    if (!Number.isFinite(amount) || amount <= 0) {
+      Alert.alert(t('staff.incomplete_title'), t('staff.payment_invalid'));
+      return;
+    }
+    if (slip && amount > slip.outstanding) {
+      Alert.alert(
+        t('staff.incomplete_title'),
+        t('staff.payment_exceeds', { amount: slip.outstanding.toLocaleString() }),
+      );
+      return;
+    }
+
+    const payment: SalaryPayment = {
+      id: `pay_${Date.now()}`,
+      caregiverId: paySheetCaregiverId,
+      month: currentMonth,
+      amount,
+      method: payMethod,
+      paidOn: todayKey(),
+      reference: payReference.trim(),
+      createdAt: Date.now(),
+    };
+    const next = [payment, ...payments];
+    setPayments(next);
+    await saveSalaryPayments(next);
+    setPaySheetCaregiverId(null);
+  };
+
   const noFamily = familyChecked && !hasFamily;
 
   if (loading) {
@@ -395,6 +598,15 @@ export default function StaffScreen({ navigation }: Props) {
             );
           })}
         </View>
+
+        {/* Salary reminders that have already fired, kept where the action is.
+            Renders nothing when there are none. */}
+        <AlertsCard
+          section="staff"
+          items={staffAlerts}
+          onDismiss={markAsRead}
+          onMarkAllRead={() => markSectionAsRead('staff')}
+        />
 
         {activeTab === 'attendance' && caregivers.length > 0 ? (
           <>
@@ -492,6 +704,39 @@ export default function StaffScreen({ navigation }: Props) {
                           {t('staff.attendance_leave')}
                         </Text>
                       </Pressable>
+                      {/* Overtime is a quantity, not a status, so it sits beside
+                          the status buttons rather than among them — a member can
+                          work overtime on a half day, which a fifth mutually
+                          exclusive button could not express. */}
+                      <Pressable
+                        onPress={() => openOvertime(caregiver.id)}
+                        style={[
+                          styles.attendanceLeaveBtn,
+                          styles.overtimeBtn,
+                          todaysOvertime(caregiver.id) > 0 && styles.overtimeBtnActive,
+                        ]}
+                        accessibilityRole="button"
+                        accessibilityLabel={t('staff.overtime_label')}>
+                        <Timer
+                          size={11}
+                          color={
+                            todaysOvertime(caregiver.id) > 0
+                              ? styles.overtimeTextActive.color
+                              : styles.overtimeText.color
+                          }
+                          strokeWidth={2}
+                        />
+                        <Text
+                          style={[
+                            styles.attendanceLeaveText,
+                            styles.overtimeText,
+                            todaysOvertime(caregiver.id) > 0 && styles.overtimeTextActive,
+                          ]}>
+                          {todaysOvertime(caregiver.id) > 0
+                            ? t('staff.overtime_short', { count: todaysOvertime(caregiver.id) })
+                            : t('staff.overtime_add')}
+                        </Text>
+                      </Pressable>
                     </View>
                   </View>
                 );
@@ -555,17 +800,117 @@ export default function StaffScreen({ navigation }: Props) {
                   {t(caregiver.rateType === 'hourly' ? 'staff.hourly_rate' : 'staff.monthly_rate', { rate: caregiver.rate.toLocaleString() })}
                 </Text>
               </View>
-              {extraFor(caregiver.id) > 0 ? (
-                <View style={styles.paymentSummary}>
-                  <Text style={styles.extraTotal}>{t('staff.extra_total', { amount: extraFor(caregiver.id).toLocaleString() })}</Text>
-                  {latestExtraFor(caregiver.id)?.reason ? (
-                    <Text style={styles.extraReason}>{latestExtraFor(caregiver.id)?.reason}</Text>
-                  ) : null}
-                  <Text style={styles.totalPayable}>
-                    {t('staff.total_payable', { amount: (caregiver.rate + extraFor(caregiver.id)).toLocaleString() })}
-                  </Text>
-                </View>
-              ) : null}
+              {(() => {
+                const slip = payslipFor(caregiver.id);
+                if (!slip) {
+                  return null;
+                }
+                return (
+                  <View style={styles.paymentSummary}>
+                    <View style={styles.payslipHeadRow}>
+                      <Text style={styles.payslipMonth}>
+                        {t('staff.payslip_month', { month: slip.month })}
+                      </Text>
+                      <View style={styles.payslipBadge}>
+                        <Text
+                          style={[
+                            styles.payslipBadgeText,
+                            slip.status === 'PAID'
+                              ? styles.payslipBadgePaid
+                              : slip.status === 'PARTIALLY_PAID'
+                                ? styles.payslipBadgePartial
+                                : styles.payslipBadgeUnpaid,
+                          ]}>
+                          {t(PAYSLIP_STATUS_KEY[slip.status])}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <Text style={styles.payslipDays}>
+                      {t('staff.payslip_days', {
+                        present: slip.presentDays,
+                        total: slip.payableDays,
+                      })}
+                      {slip.halfDays > 0
+                        ? ` · ${t('staff.payslip_half_days', { count: slip.halfDays })}`
+                        : ''}
+                      {slip.leaveDays > 0
+                        ? ` · ${t('staff.payslip_leave', {
+                            paid: slip.paidLeaveUsed,
+                            unpaid: slip.unpaidLeaveDays,
+                          })}`
+                        : ''}
+                      {slip.absentDays > 0
+                        ? ` · ${t('staff.payslip_absent', { count: slip.absentDays })}`
+                        : ''}
+                    </Text>
+
+                    {/* Stated rather than silently treated as present days: a month
+                        with most days unmarked produces a payslip nobody should
+                        trust, and the only honest thing to do is say so. */}
+                    {slip.unmarkedDays > 0 ? (
+                      <Text style={styles.payslipWarning}>
+                        {t('staff.payslip_unmarked', { count: slip.unmarkedDays })}
+                      </Text>
+                    ) : null}
+
+                    <View style={styles.payslipRow}>
+                      <Text style={styles.payslipLabel}>{t('staff.payslip_gross')}</Text>
+                      <Text style={styles.payslipValue}>₹{slip.grossPay.toLocaleString()}</Text>
+                    </View>
+                    {slip.deductions > 0 ? (
+                      <View style={styles.payslipRow}>
+                        <Text style={styles.payslipLabel}>{t('staff.payslip_deductions')}</Text>
+                        <Text style={styles.payslipValueNegative}>
+                          −₹{slip.deductions.toLocaleString()}
+                        </Text>
+                      </View>
+                    ) : null}
+                    {slip.overtimeHours > 0 ? (
+                      <View style={styles.payslipRow}>
+                        <Text style={styles.payslipLabel}>
+                          {t('staff.payslip_overtime', { count: slip.overtimeHours })}
+                        </Text>
+                        <Text style={styles.payslipValue}>+₹{slip.overtimePay.toLocaleString()}</Text>
+                      </View>
+                    ) : null}
+                    {slip.adjustments !== 0 ? (
+                      <View style={styles.payslipRow}>
+                        <Text style={styles.payslipLabel}>
+                          {latestExtraFor(caregiver.id)?.reason || t('staff.payslip_adjustments')}
+                        </Text>
+                        <Text style={slip.adjustments < 0 ? styles.payslipValueNegative : styles.payslipValue}>
+                          {slip.adjustments < 0 ? '−' : '+'}₹{Math.abs(slip.adjustments).toLocaleString()}
+                        </Text>
+                      </View>
+                    ) : null}
+
+                    <View style={[styles.payslipRow, styles.payslipTotalRow]}>
+                      <Text style={styles.payslipTotalLabel}>{t('staff.payslip_net')}</Text>
+                      <Text style={styles.payslipTotalValue}>₹{slip.netPayable.toLocaleString()}</Text>
+                    </View>
+                    {slip.paidAmount > 0 ? (
+                      <View style={styles.payslipRow}>
+                        <Text style={styles.payslipLabel}>{t('staff.payslip_paid')}</Text>
+                        <Text style={styles.payslipValue}>₹{slip.paidAmount.toLocaleString()}</Text>
+                      </View>
+                    ) : null}
+
+                    {slip.outstanding > 0 ? (
+                      <Pressable
+                        style={styles.payButton}
+                        onPress={() => openPaymentSheet(caregiver.id)}
+                        accessibilityRole="button">
+                        <Text style={styles.payButtonText}>
+                          {t('staff.payslip_record_payment', {
+                            amount: slip.outstanding.toLocaleString(),
+                          })}
+                        </Text>
+                      </Pressable>
+                    ) : null}
+                  </View>
+                );
+              })()}
             </Pressable>
           ))
         )}
@@ -690,6 +1035,80 @@ export default function StaffScreen({ navigation }: Props) {
             </View>
           ))
         )}
+      </BottomSheet>
+
+      <BottomSheet
+        visible={paySheetCaregiverId !== null}
+        onClose={() => setPaySheetCaregiverId(null)}
+        title={t('staff.payment_title', {
+          name: caregivers.find((c) => c.id === paySheetCaregiverId)?.name ?? '',
+        })}
+      >
+        {paySheetCaregiverId
+          ? (() => {
+              const slip = payslipFor(paySheetCaregiverId);
+              return slip ? (
+                <Text style={styles.extraHelp}>
+                  {t('staff.payment_help', {
+                    amount: slip.outstanding.toLocaleString(),
+                    month: slip.month,
+                  })}
+                </Text>
+              ) : null;
+            })()
+          : null}
+        <Text style={styles.label}>{t('staff.payment_amount')}</Text>
+        <TextInput
+          value={payAmount}
+          onChangeText={setPayAmount}
+          keyboardType="decimal-pad"
+          placeholder={t('staff.extra_amount_placeholder')}
+          placeholderTextColor={styles.placeholder.color}
+          style={styles.input}
+        />
+        <Text style={styles.label}>{t('staff.payment_method')}</Text>
+        <View style={styles.reasonRow}>
+          {PAYMENT_METHODS.map((method) => (
+            <Pressable
+              key={method}
+              onPress={() => setPayMethod(method)}
+              style={[styles.reasonChip, payMethod === method && styles.reasonChipActive]}>
+              <Text
+                style={[styles.reasonText, payMethod === method && styles.reasonTextActive]}>
+                {t(PAYMENT_METHOD_KEY[method])}
+              </Text>
+            </Pressable>
+          ))}
+        </View>
+        <Text style={styles.label}>{t('staff.payment_reference')}</Text>
+        <TextInput
+          value={payReference}
+          onChangeText={setPayReference}
+          placeholder={t('staff.payment_reference_placeholder')}
+          placeholderTextColor={styles.placeholder.color}
+          style={styles.input}
+        />
+        <Button title={t('staff.payment_save')} onPress={savePayment} style={styles.saveButton} />
+      </BottomSheet>
+
+      <BottomSheet
+        visible={overtimeCaregiverId !== null}
+        onClose={() => setOvertimeCaregiverId(null)}
+        title={t('staff.overtime_title', {
+          name: caregivers.find((c) => c.id === overtimeCaregiverId)?.name ?? '',
+        })}
+      >
+        <Text style={styles.extraHelp}>{t('staff.overtime_help')}</Text>
+        <Text style={styles.label}>{t('staff.overtime_label')}</Text>
+        <TextInput
+          value={overtimeHours}
+          onChangeText={setOvertimeHours}
+          keyboardType="decimal-pad"
+          placeholder={t('staff.overtime_placeholder')}
+          placeholderTextColor={styles.placeholder.color}
+          style={styles.input}
+        />
+        <Button title={t('staff.overtime_save')} onPress={saveOvertime} style={styles.saveButton} />
       </BottomSheet>
     </View>
   );
@@ -934,6 +1353,69 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) => 
   extraTotal: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.forest },
   extraReason: { marginTop: 2, fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary },
   totalPayable: { marginTop: 3, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary },
+  payslipHeadRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.xs,
+  },
+  payslipMonth: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary },
+  payslipBadge: {
+    paddingHorizontal: spacing.sm,
+    paddingVertical: 2,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surfaceElevated,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  payslipBadgeText: { fontFamily: fonts.sansBold, fontSize: 10 },
+  payslipBadgeUnpaid: { color: colors.turmeric },
+  payslipBadgePartial: { color: colors.accentCyan },
+  payslipBadgePaid: { color: colors.forest },
+  payslipDays: {
+    fontFamily: fonts.sans,
+    fontSize: 11,
+    lineHeight: 16,
+    color: colors.textMuted,
+    marginBottom: spacing.xs,
+  },
+  payslipWarning: {
+    fontFamily: fonts.sansMedium,
+    fontSize: 11,
+    color: colors.turmeric,
+    marginBottom: spacing.xs,
+  },
+  payslipRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingVertical: 2,
+  },
+  payslipLabel: { flex: 1, fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary },
+  payslipValue: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textPrimary },
+  payslipValueNegative: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.danger },
+  payslipTotalRow: {
+    marginTop: spacing.xs,
+    paddingTop: spacing.xs,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  payslipTotalLabel: { flex: 1, fontFamily: fonts.sansBold, fontSize: 13, color: colors.textPrimary },
+  payslipTotalValue: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.primary },
+  payButton: {
+    marginTop: spacing.sm,
+    paddingVertical: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+  },
+  payButtonText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimary },
+  overtimeBtn: { flexDirection: 'row', gap: 3, backgroundColor: colors.surfaceElevated },
+  overtimeBtnActive: { backgroundColor: colors.turmeric, borderColor: colors.turmeric },
+  overtimeText: { color: colors.textSecondary },
+  overtimeTextActive: { color: colors.textOnPrimary },
+  reasonChipActive: { backgroundColor: colors.primary },
+  reasonTextActive: { color: colors.textOnPrimary },
   phoneIcon: { color: colors.textMuted },
   phone: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary },
   label: {

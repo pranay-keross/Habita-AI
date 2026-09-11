@@ -19,12 +19,22 @@ import AlertTriangle from 'lucide-react-native/icons/triangle-alert';
 import Clock from 'lucide-react-native/icons/clock';
 import FileText from 'lucide-react-native/icons/file-text';
 import CheckCircle2 from 'lucide-react-native/icons/circle-check';
+import BellRing from 'lucide-react-native/icons/bell-ring';
+import BellOff from 'lucide-react-native/icons/bell-off';
+import AlertsCard from '../../../../components/AlertsCard';
 import BottomSheet from '../../../../components/BottomSheet';
 import Button from '../../../../components/Button';
 import { loadDocuments, getDocStatus, updateDocument } from '../docStore';
+import {
+  loadDocReminderSettings,
+  setDocRemindersEnabled,
+  syncDocumentReminders,
+  type DocReminderSettings,
+} from '../reminders';
 import type { DocHubEntry } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../../i18n';
 import useAuth from '../../../../hooks/useAuth';
+import usePushNotifications from '../../../../hooks/usePushNotifications';
 import { showNetworkUnavailableAlert } from '../../../../utils/networkStatus';
 import { extractVaultErrorMessage } from '../api';
 
@@ -41,6 +51,13 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
   const [selectedDoc, setSelectedDoc] = useState<DocHubEntry | null>(null);
   const [newExpiry, setNewExpiry] = useState('');
   const [updating, setUpdating] = useState(false);
+  const [reminders, setReminders] = useState<DocReminderSettings | null>(null);
+  const [scheduledCount, setScheduledCount] = useState(0);
+  const {
+    documents: documentAlerts,
+    markAsRead,
+    markSectionAsRead,
+  } = usePushNotifications();
 
   const fetchAlerts = async () => {
     setLoading(true);
@@ -48,6 +65,21 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
     const list = await loadDocuments(token);
     setDocs(list);
     setLoading(false);
+
+    // Reschedule from the freshly-loaded vault. Done here rather than only when a
+    // document changes, because the schedule also goes stale simply by time
+    // passing — a 30-day reminder that was in the future last month is not now.
+    // `syncDocumentReminders` replaces the whole group with stable ids, so
+    // repeating it on every visit converges instead of stacking duplicates.
+    const settings = await loadDocReminderSettings();
+    setReminders(settings);
+    setScheduledCount(await syncDocumentReminders(list, settings));
+  };
+
+  const toggleReminders = async () => {
+    const next = await setDocRemindersEnabled(!(reminders?.enabled ?? true), docs);
+    setReminders(next);
+    setScheduledCount(next.enabled ? await syncDocumentReminders(docs, next) : 0);
   };
 
   useEffect(() => {
@@ -136,6 +168,50 @@ export default function ExpirationAlertsScreen({ navigation }: Props) {
             </View>
           </View>
         </View>
+
+        {/* Expiry reminders — the gap this screen used to leave open: it showed
+            what was expiring, but only to whoever remembered to open it. See
+            docs/AWH_FEATURE_GAP_ANALYSIS.md §1.1 gap 1.5. */}
+        <Pressable
+          style={styles.reminderRow}
+          onPress={toggleReminders}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: reminders?.enabled ?? false }}>
+          <View style={styles.reminderIcon}>
+            {reminders?.enabled ? (
+              <BellRing size={18} color={styles.primaryIcon.color} />
+            ) : (
+              <BellOff size={18} color={styles.mutedIcon.color} />
+            )}
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.reminderTitle}>{t('doc_hub.reminders_title')}</Text>
+            <Text style={styles.reminderSub}>
+              {reminders?.enabled
+                ? scheduledCount > 0
+                  ? t('doc_hub.reminders_scheduled', { count: scheduledCount })
+                  : t('doc_hub.reminders_none_scheduled')
+                : t('doc_hub.reminders_desc')}
+            </Text>
+          </View>
+          <View style={[styles.reminderPill, reminders?.enabled && styles.reminderPillOn]}>
+            <Text
+              style={[
+                styles.reminderPillText,
+                reminders?.enabled && styles.reminderPillTextOn,
+              ]}>
+              {reminders?.enabled ? t('doc_hub.reminders_on') : t('doc_hub.reminders_off')}
+            </Text>
+          </View>
+        </Pressable>
+
+        {/* Reminders that already fired, so a swiped-away notification is not lost. */}
+        <AlertsCard
+          section="documents"
+          items={documentAlerts}
+          onDismiss={markAsRead}
+          onMarkAllRead={() => markSectionAsRead('documents')}
+        />
 
         {loading ? (
           <ActivityIndicator color={styles.primaryIcon.color} style={{ marginTop: 24 }} />
@@ -290,6 +366,59 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     primaryIcon: {
       color: colors.primary,
+    },
+    mutedIcon: {
+      color: colors.textMuted,
+    },
+    reminderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: colors.surface,
+      borderRadius: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      marginBottom: spacing.md,
+    },
+    reminderIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surfaceElevated,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    reminderTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    reminderSub: {
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    reminderPill: {
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+      backgroundColor: colors.surfaceElevated,
+    },
+    reminderPillOn: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    reminderPillText: {
+      fontFamily: fonts.sansBold,
+      fontSize: 11,
+      color: colors.textMuted,
+    },
+    reminderPillTextOn: {
+      color: colors.textOnPrimary,
     },
     dangerText: {
       color: colors.danger,

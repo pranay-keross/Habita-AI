@@ -63,8 +63,24 @@ export function notificationId(payload: PushPayload, receivedAt: number): string
       return `${payload.type}:${payload.medicineName}:${day}:${new Date(receivedAt).getUTCHours()}`;
     case 'LOW_STOCK':
       return `${payload.type}:${payload.medicineName}:${payload.remainingQuantity}:${day}`;
-    default:
+    case 'UTILITY_DUE_SOON':
+    case 'UTILITY_DUE_TODAY':
       return `${payload.type}:${payload.provider}:${payload.utilityType}:${payload.dueDate}`;
+    // Keyed on the document and its expiry date, *not* on `daysLeft` and not on
+    // the day of arrival: the backend fires one alert per lead-day threshold
+    // (60/30/14/7/1), and each of those is a genuinely different alert that must
+    // survive dedupe. Two deliveries of the same threshold collapse because
+    // `daysLeft` is the same on both.
+    case 'DOCUMENT_EXPIRING_SOON':
+      return `${payload.type}:${payload.documentId}:${payload.expiryDate}:${payload.daysLeft ?? 'na'}`;
+    case 'DOCUMENT_EXPIRED':
+      return `${payload.type}:${payload.documentId}:${payload.expiryDate}`;
+    // Per staff member per payroll month — a salary reminder resent on a later
+    // day of the same unpaid month is the same reminder, so the day is not part
+    // of the identity here the way it is for a bill.
+    case 'STAFF_SALARY_DUE':
+    case 'STAFF_SALARY_OVERDUE':
+      return `${payload.type}:${payload.staffId}:${payload.month}`;
   }
 }
 

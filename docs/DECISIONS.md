@@ -1674,6 +1674,325 @@ stack in `__DEV__`.
 
 ---
 
+## D-061 — Document-expiry and staff-salary reminders: scheduled on the device, shaped like the backend's
+
+**Date:** 2026-09-09
+
+**Context.** A gap analysis against A Wise Home (`docs/AWH_FEATURE_GAP_ANALYSIS.md`)
+found two capabilities where Habita AI held all the data but did nothing with it:
+
+- The vault computed expiry (`getDocStatus`) and rendered it on `ExpirationAlertsScreen`,
+  but only to whoever remembered to open that screen. AWH "auto creates reminders for due
+  dates/expiry dates in the document" (§1.1 gap 1.5).
+- `StaffScreen` showed payable as `caregiver.rate + extras`. Absences, leave, half-days,
+  overtime and the `hourly` rate type changed nothing — a member who worked four days and
+  one who worked thirty produced the same figure. AWH ships "monthly payment calculation
+  with unpaid leaves factored" and reminders for staff payments (§1.3 gaps 3.2–3.4).
+
+**Decision.** Ship both now, scheduled locally, with payloads identical to the ones the
+backend will eventually send.
+
+Four push types were added — `DOCUMENT_EXPIRING_SOON`, `DOCUMENT_EXPIRED`,
+`STAFF_SALARY_DUE`, `STAFF_SALARY_OVERDUE` — plus two click actions and two inbox
+sections (`documents`, `staff`). `features/notifications/localScheduler.ts` fires them
+from notifee trigger notifications, and `parse.ts` gained `toPushData`, the exact inverse
+of `parsePushPayload`.
+
+**Why local scheduling rather than waiting for M8.** The alternative was to specify the
+backend job and ship nothing, i.e. a reminders feature that reminds no one. Because a
+locally-fired notification carries byte-identical `data` to a server push, it parses,
+dedupes, files into the inbox and routes on tap through the same code — so the migration
+when `/vault/documents/expiring` and `/staff/{id}/payroll` exist is deleting the `sync*`
+call sites. Nothing in `parse.ts`, `routeFor`, `AlertsCard` or the inbox changes.
+`__tests__/expiryAndSalaryAlerts.test.ts` pins `parsePushPayload(toPushData(p)) === p` for
+every payload type so that stays true.
+
+**Payroll rules are written once and implemented twice.** `features/staff/payroll.ts` is
+pure and exhaustively tested (26 cases); §3.2 of the gap analysis states the same rules
+for the server. Both must move together, or the number moves under the user when the
+backend lands. The rules that were genuinely undecided before:
+
+- Paid leave (2 days/month, configurable) is consumed before leave becomes unpaid. An
+  absence is never covered by it — otherwise `leave` and `absent` would be the same status.
+- Hourly members are paid for hours worked and deducted nothing for absence. Deducting as
+  well would charge them twice for one missed day.
+- **Unmarked days are not treated as present or absent.** A monthly member is paid in full
+  (nothing is *known* to have been missed) and `unmarkedDays` is shown on the payslip.
+  Deducting would accuse someone of not turning up because the household forgot to tap.
+- `netPayable` is floored at zero, and every money figure is rounded at each boundary —
+  12000/31 is a repeating decimal, and an unrounded chain owes ₹11,612.903225806451.
+
+**A defect this surfaced.** `readClickAction` validated that a `click_action` was *known*
+but not that it belonged to the message's `type`. With two sections that was harmless;
+with four it meant a `DOCUMENT_EXPIRING_SOON` carrying `OPEN_DOSAGE_SCREEN` parsed cleanly
+and opened the Medicine screen from a notification about a passport. `parse.ts` now checks
+the pairing against an `ALLOWED_ACTIONS` map. The two medicine actions stay interchangeable
+across the two medicine types, because `types.ts` records that choice as the server's.
+
+**Also changed, and unrelated to the feature.** `jest.setup.js` now mocks
+`react-native-pdf` and `react-native-blob-util`. `DocViewerScreen` imports the former,
+which constructs a `NativeEventEmitter` over a null native module at import time, so
+`App.test.tsx` and `themedScreens.test.tsx` had both been failing to run at all. With the
+mocks in place `App.test.tsx` passes and `themedScreens.test.tsx` reaches its assertions —
+where it reports a **real, pre-existing rule-3 violation**: `DocViewerScreen.tsx` builds a
+module-scope `StyleSheet.create` with hardcoded `#000000`/`#FFFFFF` instead of a
+`useThemedStyles` factory. That looks deliberate (a fullscreen black media viewer), so it
+is left alone and tracked as `M5-T13` rather than quietly restyled here.
+
+---
+
+## D-062 - Dose reminders are scheduled on the device, and permission is asked once
+
+**Date:** 2026-09-09
+
+**Symptom reported.** "I added a medicine and no notification arrived at the scheduled
+time", plus "the app asks for notification permission every single time I open it".
+
+### Cause 1 - nothing ever scheduled a dose reminder
+
+`DOSAGE_REMINDER` was only ever a payload the **backend** sends (`notifications/types.ts`
+says so explicitly: "the four payloads below are what the backend sends today"). The client
+could parse, dedupe, display and route one - but no code path in `features/medicine/`
+created one. Adding a medicine with an 08:00 slot therefore scheduled nothing, and no
+amount of Firebase configuration would have changed that: there was nothing to deliver.
+
+This was hard to diagnose precisely because the client half is correct.
+`node scripts/check-push-setup.js` passes **all twelve** static checks on this repo -
+dependencies, `google-services.json`, matching `applicationId`, the `habita_alerts` channel
+id in `firebase.json`, `POST_NOTIFICATIONS`, the background handler in `index.js`, Play
+Services on the device. The gap is architectural, not configuration.
+
+**Decision: schedule dose reminders locally**, the same way document expiry and salary
+reminders already are (D-061). `features/medicine/reminders.ts` builds one notifee trigger
+per medicine per slot, repeating daily.
+
+Why local rather than waiting for a backend job:
+
+- A notifee trigger is held by the OS, not the app process - which is what makes it fire
+  in the **foreground, background and killed** states. All three were required, and none of
+  them actually needs a server round trip for a time the device already knows.
+- `repeatFrequency: DAILY` on the trigger, rather than scheduling N days of one-shots, so
+  the reminder keeps working even if the app is never opened again.
+- `alarmManager: { allowWhileIdle: true }` so Doze does not hold an 08:00 dose until the
+  phone next wakes. Deliberately **not** exact: `SCHEDULE_EXACT_ALARM` is refusable and
+  Play-restricted to alarm/calendar apps. A dose reminder a few minutes late is fine; one
+  that needs a permission grant to exist at all is not.
+- The payload emitted is byte-identical to what the backend will send, so when a server
+  scheduler does arrive both paths share one parse/route/inbox code path.
+
+Scheduling is driven by a single `useEffect` on the `medicines` array rather than hooked
+into each mutation - the screen writes to that list from about a dozen places, and any one
+missed would leave a stale or absent reminder. `scheduleGroup` replaces the whole group
+using stable per-medicine-per-slot ids, so running it on every change converges instead of
+stacking duplicates, and deleting a medicine cancels its reminders with no separate
+teardown path.
+
+**Reboot.** Android discards pending alarms on restart. `RECEIVE_BOOT_COMPLETED` was added
+to the manifest (a normal, install-time permission - no runtime prompt) so notifee can
+restore them, and `resyncDoseRemindersFromCache()` runs once per launch from `_layout.tsx`
+as the belt-and-braces path. A reboot therefore costs at most the doses between the restart
+and the next time the app is opened, rather than ending reminders silently and forever.
+
+**Known limitation, not fixed here.** Aggressive OEM battery managers (Xiaomi, Oppo, Vivo,
+OnePlus) kill scheduled alarms for apps not whitelisted by the user. No app-side code can
+override that; it needs an in-app prompt directing the user to the OEM battery settings.
+Worth a backlog row if reports come from those devices.
+
+### Cause 2 - the permission prompt re-fired on every session refresh
+
+Two compounding bugs in `usePushRegistration`:
+
+1. The registration effect depended on `getAccessToken`, which is **not referentially
+   stable** - `useAuth` derives it from `resolveSession`, which closes over the `session`
+   state and calls `setSession` on every silent refresh. So the effect re-ran on every
+   token refresh.
+2. That effect called `pushMessaging.requestPermission()` unconditionally, and the old
+   comment on that method claimed it was "safe to call more than once - the OS only prompts
+   the first time". That is **not true on Android 13+**, which re-shows the
+   `POST_NOTIFICATIONS` dialog after a dismissal.
+
+Together: a user who had refused notifications was re-prompted roughly every time they
+opened the app.
+
+**Decision: check before asking.** `PushMessaging` gained `getPermissionStatus()`, which
+reads `notifee.getNotificationSettings()` **without showing UI**. `getAccessToken` moved
+into a ref so the effect depends on `signedIn` alone.
+
+### Cause 2b - the first fix for Cause 2 was wrong, and stopped the prompt entirely
+
+The initial version gated the prompt on a new `undetermined` status: prompt only when the
+OS says it has never asked. **That guard is never true on Android.** Notifee's own typing
+marks `NOT_DETERMINED` as `@platform ios`; on Android a missing `POST_NOTIFICATIONS` grant
+reports as `DENIED`, and there is no API that distinguishes "never asked" from "refused".
+So the app went from prompting on every launch to never prompting at all - a worse bug,
+and a silent one, because a permission never requested looks exactly like one refused.
+
+Confirmed on the reporting device: Android 16 (API 36),
+`dumpsys package com.sahelicli` showing
+`android.permission.POST_NOTIFICATIONS: granted=false` with no `USER_FIXED` flag - i.e.
+the OS would still have shown the dialog, and the app simply never asked.
+
+**Decision: the app keeps its own record of having asked.** `PERMISSION_ASKED_KEY`
+(`habita.push_permission_asked`) plus a pure `shouldPromptForPermission(status,
+askedBefore)`:
+
+- `granted` -> never prompt.
+- `unavailable` -> never prompt (no transport; the dialog would do nothing) **and do not
+  record the attempt**, so a later build that does contain the native module still asks.
+  Recording it here would burn the single prompt on a transient startup condition -
+  notifee's `requestPermission` also returns early when it cannot reach a foreground
+  Activity.
+- `undetermined` -> prompt (iOS, authoritative).
+- `denied` -> prompt **only if `askedBefore` is false**. This is the Android first-run
+  case, and the one the previous fix broke.
+
+The flag is written only once the OS actually answered (`granted` or `denied`), never on
+`unavailable`. Pinned by `__tests__/pushPermission.test.ts`, including the two launch-loop
+sequences that reproduce both historical bugs.
+
+**Diagnostics.** When the prompt is skipped, a `__DEV__`-only log now says which of the two
+reasons applied - no transport (suggesting a native rebuild) or an existing refusal - since
+the two are otherwise indistinguishable from the outside.
+
+### Cause 2c - two permission dialogs raced, and Android silently dropped one
+
+Even with 2b fixed, the prompt still never appeared **on a clean install** - while
+appearing perfectly on a device where location was already granted. That difference is
+the whole diagnosis.
+
+Android shows one permission dialog at a time. A `requestPermissions` call made while
+another dialog is open is **discarded by the framework**: the callback fires with
+`PERMISSION_DENIED` and no UI is ever shown, and the caller cannot tell that apart from a
+real refusal.
+
+Right after sign-in, two requests fire at almost the same moment:
+
+- `ACCESS_FINE_LOCATION` from `app/onboarding/profile.tsx` (prefills the location field)
+- `POST_NOTIFICATIONS` from `usePushRegistration`, which unblocks as `signedIn` flips
+
+Location won. Notifications was dropped, reported as denied, and - before 2b - recorded as
+"already asked". On a device where location was **already** granted, its request returns
+instantly with no dialog, nothing collides, and the notification prompt appears normally.
+That is why the bug looked intermittent and why it survived two previous fixes.
+
+**Evidence.** `dumpsys package com.sahelicli` showed
+`POST_NOTIFICATIONS: granted=false` with no `USER_SET` flag, beside
+`ACCESS_FINE_LOCATION: granted=true, flags=[USER_SET|...]`. `USER_SET` marks a dialog the
+user actually answered - present for location, absent for notifications. A screenshot taken
+on a device with location already granted showed the notification dialog rendering
+correctly, confirming the code path itself was fine.
+
+**Decision: serialize every runtime permission request app-wide.**
+`src/utils/permissionQueue.ts` exposes `requestPermissionExclusively(task)`, a promise
+chain ensuring one request is in flight at a time, in call order. Both call sites -
+notifications and location - go through it. A rejected task does not stall the chain
+(`.then(task, task)`), because one failed request stranding every later permission would be
+a worse version of this bug.
+
+`__tests__/permissionQueue.test.ts` models the Android controller (one dialog at a time,
+overlapping requests answered `denied` with no UI) and asserts both halves: unqueued, the
+second dialog is dropped and only location is shown; queued, both appear.
+
+**Note for anyone adding a permission later:** call it through the queue. A direct
+`PermissionsAndroid.request` reintroduces this exact failure, and it will not reproduce on
+any device where the other permissions are already granted.
+
+### Cause 2d - THE ACTUAL ROOT CAUSE: `signedIn` never became true for the push hook
+
+2b and 2c were both real defects, and neither was the reason the prompt did not appear on
+a fresh sign-in. Three fixes in a row targeted the dialog; the gate in front of it was
+never opening.
+
+`useAuth` kept its session in per-call-site `useState`. The hook said so explicitly:
+
+> A plain hook, not a Context - each caller gets its own local copy of `session`/`pending`.
+> That's fine here: nothing needs `signedIn` to update reactively mid-session across
+> components, since navigation only ever moves forward through explicit `navigate()` calls.
+
+`usePushRegistration` broke that assumption the moment it was written. It is mounted once
+in `_layout.tsx` and gates on `signedIn` - so it *does* need to react to a sign-in that
+happens somewhere else. With per-instance state it never could:
+
+1. Fresh install: the push hook's own `useAuth()` hydrates from empty storage -> `signedIn`
+   is `false` -> `if (!signedIn) return;` bails.
+2. The user signs in on the **Otp screen**, which holds a *different* `useAuth()` instance.
+   `verify()` writes storage and calls that instance's `setSession`.
+3. The push hook's copy is never told. `signedIn` stays `false` for the rest of the run.
+   The permission request is never even attempted - no dialog, no `_v2` flag, nothing to
+   find in a log.
+4. Next launch: the stored session is read at mount, `signedIn` is `true`, and the prompt
+   appears normally.
+
+That is the whole "works on relaunch, never on a fresh sign-in" shape, and it also explains
+why the earlier investigation kept finding a *working* dialog on a device that already had
+a session on disk. Location was never affected because its request lives in the Profile
+screen's own render path and is not gated on `signedIn` at all.
+
+**Decision: one shared session store.** `useAuth` now holds `{session, pending}` in a
+module-level value read through `useSyncExternalStore`, with hydration deduped behind a
+single promise. This is the same shape `features/notifications/inbox.ts` already uses, for
+the same stated reason - one mutable value outside React plus a subscribe function - and
+the pattern the theme singleton (D-004) and the i18n language store follow too.
+
+The public API is unchanged, so **none of the 22 call sites needed touching**. Two
+incidental improvements fall out:
+
+- `resolveSession` and therefore `getAccessToken` are now referentially stable (they read
+  the module value instead of closing over `session`). That is the underlying cause of the
+  effect churn 2's ref workaround was papering over.
+- The stored session is read once per app run rather than once per mounted consumer.
+
+`__tests__/authSharedSession.test.tsx` pins it, and was confirmed to **fail against the
+previous implementation** before being kept: a sign-in on one component's `useAuth()` must
+be visible to another instance mounted before it, sign-out must propagate the same way, and
+a stored session must hydrate once rather than per caller.
+
+**What to take from this.** Three fixes were spent on the permission dialog because the
+symptom was "no dialog". The gate was never instrumented. When a code path produces no
+output at all - no log, no storage write, no OS state change - suspect that it never ran
+before suspecting that it ran and failed.
+
+### Cause 3 - scheduled reminders never reached the OS: an exact alarm without the permission
+
+Once the prompt worked (2d), a new symptom appeared: alerts showed while the app was open,
+but nothing arrived in the status bar once it was backgrounded or killed.
+
+**Evidence.** `adb shell dumpsys alarm | grep -c sahelicli` returned **0**. Not a delivery
+problem - nothing had ever been scheduled.
+
+**Cause.** `localScheduler.ts` passed `alarmManager: { allowWhileIdle: true }`. That field
+is deprecated in notifee ("use `type` instead") and maps to
+`setExactAndAllowWhileIdle` - an **exact** alarm. On Android 12+ exact alarms require
+`SCHEDULE_EXACT_ALARM`, which this app does not hold: notifee declares it in its merged
+manifest, but `dumpsys package` shows no `granted=` line for it, and Play restricts it to
+alarm and calendar apps. Every `createTriggerNotification` call therefore threw a
+SecurityException.
+
+Two things then hid it completely:
+
+1. `scheduleGroup`'s `catch` swallowed the error and returned 0, by design, so the feature
+   "degraded gracefully" into doing nothing at all.
+2. Foreground alerts kept working, because those go through `displayNotification` and need
+   no alarm. So the feature looked half-working rather than broken, which pointed the
+   investigation at delivery instead of at scheduling.
+
+**Decision: `alarmManager: { type: AlarmType.SET_AND_ALLOW_WHILE_IDLE }`.** Inexact, fires
+through Doze, and needs **no special permission**. Correct for this use: a dose reminder
+landing within a few minutes of 08:00 is fine; one that requires the user to grant a
+Play-restricted permission before it can exist is not. `USE_EXACT_ALARM` was rejected for
+the same reason - Habita AI is not an alarm clock, and shipping that permission invites a
+policy rejection.
+
+**And the catch now talks.** A `__DEV__` warning names the group, the count and the cause
+whenever scheduling fails. Silently swallowing that exception is what let a device sit with
+zero alarms while the code reported success.
+
+`__tests__/localScheduler.test.ts` pins the trigger shape: the alarm type must be `1`
+(`SET_AND_ALLOW_WHILE_IDLE`) and `allowWhileIdle` must be absent - anything in `{2, 3, 4}`
+is an exact alarm and reintroduces this exact failure.
+
+---
+
 ## Open decisions
 
 Tracked in `docs/BACKLOG.md` → Open questions. Move each here once answered.

@@ -2,6 +2,26 @@ export type ScheduleSlot = 'morning' | 'afternoon' | 'evening' | 'night';
 
 export const SCHEDULE_SLOTS: ScheduleSlot[] = ['morning', 'afternoon', 'evening', 'night'];
 
+/**
+ * The representative time a slot means when the user hasn't set a custom one.
+ *
+ * Lives here rather than in `MedicineScreen.tsx` because the reminder scheduler
+ * (`features/medicine/reminders.ts`) needs the identical values: a dose reminder
+ * that fires at a different time from the one the screen displays is worse than
+ * no reminder at all.
+ */
+export const SLOT_DEFAULT_TIME: Record<ScheduleSlot, string> = {
+  morning: '08:00',
+  afternoon: '13:00',
+  evening: '18:00',
+  night: '21:00',
+};
+
+/** The time a medicine is actually due in a slot — custom if set, else the default. */
+export function slotTime(medicine: Pick<Medicine, 'scheduleTimes'>, slot: ScheduleSlot): string {
+  return medicine.scheduleTimes?.[slot] ?? SLOT_DEFAULT_TIME[slot];
+}
+
 export function timeToSlot(time: string): ScheduleSlot {
   const hour = parseInt(time.split(':')[0], 10);
   if (hour >= 5 && hour < 12) return 'morning';

@@ -140,6 +140,8 @@ Goal: the first modules built on the hardened foundation, covering SRS Module Gr
 
 ## M5 — Household Ledger & Assets [READY]
 
+**Competitive context (2026-09-09).** `docs/AWH_FEATURE_GAP_ANALYSIS.md` compares every module here against A Wise Home and lists the API contracts the unbuilt half needs. Its §2 is the prioritised gap list; the P1/P2 items there — Tasks, shared Calendar, Autobudget, Vendors, receipt/document OCR, location & geofencing, data export — are not yet backlog rows because each is a milestone-sized module, not a task. Pick one and split it before starting.
+
 Goal: covers SRS Module Group 3 in full — Household Document Hub (`dochub`), Caregiver & Home Services Hub (`staff`), Resource & Utility Logistics (`resources`), Shared Family Events & Budgeting (`events`), and Property Asset Vault & Vehicle Upkeep (`vehicles`).
 **Prompt:** `prompts/new-feature-module.md`
 
@@ -151,15 +153,18 @@ Goal: covers SRS Module Group 3 in full — Household Document Hub (`dochub`), C
 | M5-T1 | `src/features/documents/` scaffold + dashboard tile wiring (Document Hub) | Tile navigates | [READY] |
 | M5-T2 | Document capture via `react-native-image-picker` (already a dependency) and local file references | Documents persist with title, category, date, URI | [BLOCKED] needs M5-T1 |
 | M5-T3 | Categories, tags, and search over stored documents | Filtering works offline | [BLOCKED] needs M5-T2 |
-| M5-T4 | Expiry reminders for documents with an expiry date (insurance, licence, passport, visa) | Due items surface as dashboard "Due" count | [BLOCKED] needs M5-T2 |
+| M5-T4 | Expiry reminders for documents with an expiry date (insurance, licence, passport, visa) | Reminders fire as real notifications at 60/30/14/7/1 days and on the lapse day, in all 6 locales; toggle + snooze persist | [DONE] 2026-09-09 (D-061) — device-scheduled via notifee, payloads identical to the `/vault/documents/expiring` contract in `docs/AWH_FEATURE_GAP_ANALYSIS.md` §3.1 |
 | M5-T5 | Define the OCR hook-point: an interface the AI provider will implement, with a manual-entry fallback | Interface exists and is called; no provider required to ship | [BLOCKED] needs M8-T1 for the real implementation |
 | M5-T6 | `src/features/staff/` scaffold: caregiver/domestic-staff profiles (SRS Caregiver & Home Services Hub) | Tile navigates; CRUD persists to `habita.caregivers` | [DONE] 2026-08-17 |
-| M5-T7 | Attendance logging and hourly/monthly rate capture per caregiver | Attendance entries persist and are attributable to a caregiver | [BLOCKED] needs M5-T6 |
-| M5-T8 | Local wage ledger — advances, tips, and a formatted summary view (no real money movement until `M8`) | Ledger totals compute correctly; summary matches entries | [BLOCKED] needs M5-T7 |
+| M5-T7 | Attendance logging and hourly/monthly rate capture per caregiver | Attendance entries persist per caregiver per day, including half days, hours worked and overtime hours | [DONE] 2026-09-09 (D-061) — overtime is a quantity on the entry, not a fifth status |
+| M5-T8 | Local wage ledger — advances, tips, and a formatted summary view (no real money movement until `M8`) | Itemised payslip per member per month: gross, absence/leave/half-day deductions, overtime, adjustments, net, paid, outstanding; salary payments recorded with history | [DONE] 2026-09-09 (D-061) — `features/staff/payroll.ts`, pure and covered by 26 tests |
 | M5-T9 | `src/features/resources/` scaffold: recurring-delivery quick-tap counters (SRS Resource & Utility Logistics) | Tile navigates; taps persist to `habita.resource_log` | [DONE] 2026-08-17 |
 | M5-T10 | Utility bill capture routed through the OCR hook-point from M5-T5 | Capture → prefilled resource entry | [BLOCKED] needs M5-T5, M5-T9 |
 | M5-T11 | `src/features/events/` scaffold: event folders and budget line items, feeding the dashboard "Pending" count | Dashboard pending count derived from real events | [READY] |
 | M5-T12 | `src/features/vehicles/` scaffold: vehicle records plus a general property asset vault (appliance warranties, manuals, maintenance tasks) | The "Add fuel" quick action (currently goes nowhere) routes to a real screen; asset entries persist | [READY] |
+| M5-T13 | `DocViewerScreen.tsx` builds a module-scope `StyleSheet.create` with hardcoded `#000000`/`#FFFFFF`, violating rule 3 | Screen uses a `useThemedStyles` factory, or the always-black viewer is documented as a deliberate exemption and the sweep excludes it | [READY] — surfaced 2026-09-09 once `themedScreens.test.tsx` could run again (D-061); looks intentional, needs a product call |
+| M5-T14 | Staff payroll against the real backend — `GET /staff/{id}/payroll`, `POST /staff/{id}/payments`, `PUT`/`DELETE /families/{fid}/staff/{id}`, `POST /staff/{id}/adjustments` | Client swaps the local engine for the server payslip with no change to the screen; figures match `payroll.ts` exactly | [BLOCKED] needs the backend in `docs/AWH_FEATURE_GAP_ANALYSIS.md` §3.2 (B3–B10); client calls already written in `features/staff/api.ts` |
+| M5-T15 | Vendors as a first-class entity alongside staff (AWH "Staff & Vendors") | Vendor roster with its own payment reminders, distinct from employed staff | [READY] — gap 3.6 |
 
 ---
 

@@ -17,7 +17,27 @@ import type { PushPayload } from './types';
  * this interface.
  */
 
-export type PermissionStatus = 'granted' | 'denied' | 'unavailable';
+/**
+ * `undetermined` means the OS reports it has never been asked.
+ *
+ * **iOS only.** Notifee's own typing marks `NOT_DETERMINED` as `@platform ios`;
+ * on Android a missing `POST_NOTIFICATIONS` grant reports as `DENIED`, with no
+ * way to tell "never asked" from "said no". Anything deciding whether to prompt
+ * must therefore keep its own record of having asked rather than relying on this
+ * — see `shouldPromptForPermission` in `hooks/usePushNotifications.ts`.
+ */
+export type PermissionStatus =
+  | 'granted'
+  | 'denied'
+  | 'unavailable'
+  | 'undetermined'
+  /**
+   * Android's `never_ask_again`. The OS will not show the dialog again no
+   * matter what the app does, so prompting is pointless — only Settings can
+   * change it. Kept distinct from `denied`, which is a dismissal the user may
+   * still reconsider.
+   */
+  | 'blocked';
 
 /** Unsubscribe, returned by every listener registration. */
 export type Unsubscribe = () => void;
@@ -27,9 +47,23 @@ export interface PushMessaging {
   readonly isAvailable: boolean;
 
   /**
-   * Asks the OS for notification permission. Android 13+ needs the runtime
-   * `POST_NOTIFICATIONS` grant; older Android is granted by default; iOS always
-   * prompts. Safe to call more than once — the OS only prompts the first time.
+   * The current permission state, **without prompting**.
+   *
+   * The distinction that matters: `requestPermission()` shows UI, and calling it
+   * on every mount is how an app ends up nagging. Read this first.
+   *
+   * On Android this cannot distinguish "never asked" from "refused" — both report
+   * `denied` — so the caller keeps its own record of having asked. See
+   * `shouldPromptForPermission` in `hooks/usePushNotifications.ts`.
+   */
+  getPermissionStatus(): Promise<PermissionStatus>;
+
+  /**
+   * Asks the OS for notification permission — **shows UI**. Call only when
+   * `shouldPromptForPermission()` says so.
+   *
+   * Returns `blocked` when Android reports `never_ask_again`: the dialog will not
+   * appear again for any caller, and only Settings can change it.
    */
   requestPermission(): Promise<PermissionStatus>;
 
@@ -61,6 +95,10 @@ export interface PushMessaging {
  */
 export class NoopPushMessaging implements PushMessaging {
   readonly isAvailable = false;
+
+  async getPermissionStatus(): Promise<PermissionStatus> {
+    return 'unavailable';
+  }
 
   async requestPermission(): Promise<PermissionStatus> {
     return 'unavailable';

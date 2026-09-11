@@ -48,6 +48,23 @@ jest.mock('@react-native-documents/picker', () => ({
   types: { pdf: 'application/pdf', doc: 'application/msword', docx: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', images: 'image/*' },
 }));
 
+// `DocViewerScreen` imports react-native-pdf, which pulls in react-native-blob-util,
+// which constructs a `NativeEventEmitter` over a null native module at import time —
+// so merely *reaching* the screen throws, taking the App smoke test and the
+// themed-styles sweep down with it. Neither suite exercises PDF rendering; they only
+// need the module to import. Mocked rather than transformed (adding both to
+// `transformIgnorePatterns` gets past the ESM syntax error and straight into the
+// NativeEventEmitter one).
+jest.mock('react-native-pdf', () => ({ __esModule: true, default: () => null }));
+
+jest.mock('react-native-blob-util', () => ({
+  __esModule: true,
+  default: {
+    fs: { dirs: {}, exists: jest.fn(async () => false), unlink: jest.fn(async () => undefined) },
+    config: jest.fn(() => ({ fetch: jest.fn(async () => ({ path: () => '' })) })),
+  },
+}));
+
 // @react-native-firebase and @notifee both reach for native binaries at import
 // time. Mocked here rather than left to fail, so `firebaseMessaging.ts` — the
 // newest and least build-verified code in the app — can actually be exercised
@@ -72,6 +89,10 @@ jest.mock('@react-native-firebase/messaging', () => {
   };
 });
 
+// The trigger-notification half is what `features/notifications/localScheduler.ts`
+// drives for document-expiry and staff-salary reminders. `getTriggerNotificationIds`
+// returns a real (mutable) array rather than `[]` so a test can assert that a
+// reschedule cancels the group's stale ids and leaves other groups alone.
 jest.mock('@notifee/react-native', () => ({
   __esModule: true,
   default: {
@@ -79,7 +100,26 @@ jest.mock('@notifee/react-native', () => ({
     displayNotification: jest.fn(async () => 'notif-id'),
     requestPermission: jest.fn(async () => ({ authorizationStatus: 1 })),
     onForegroundEvent: jest.fn(() => jest.fn()),
+    createTriggerNotification: jest.fn(async () => 'trigger-id'),
+    cancelTriggerNotification: jest.fn(async () => undefined),
+    getTriggerNotificationIds: jest.fn(async () => []),
+    cancelAllNotifications: jest.fn(async () => undefined),
+    // Defaults to AUTHORIZED so tests exercise the granted path. A test that
+    // cares about the prompt-once behaviour overrides it per case.
+    getNotificationSettings: jest.fn(async () => ({ authorizationStatus: 1 })),
   },
   AndroidImportance: { HIGH: 4, DEFAULT: 3 },
+  AuthorizationStatus: { NOT_DETERMINED: -1, DENIED: 0, AUTHORIZED: 1, PROVISIONAL: 2 },
   EventType: { PRESS: 1, DISMISSED: 0, DELIVERED: 3 },
+  TriggerType: { TIMESTAMP: 0, INTERVAL: 1 },
+  // Exact values matter: SET_AND_ALLOW_WHILE_IDLE (1) needs no permission, while
+  // the SET_EXACT* variants require SCHEDULE_EXACT_ALARM on Android 12+.
+  AlarmType: {
+    SET: 0,
+    SET_AND_ALLOW_WHILE_IDLE: 1,
+    SET_EXACT: 2,
+    SET_EXACT_AND_ALLOW_WHILE_IDLE: 3,
+    SET_ALARM_CLOCK: 4,
+  },
+  RepeatFrequency: { HOURLY: 0, DAILY: 1, WEEKLY: 2 },
 }));

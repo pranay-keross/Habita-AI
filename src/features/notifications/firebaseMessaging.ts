@@ -1,4 +1,4 @@
-import { Platform } from 'react-native';
+import { PermissionsAndroid, Platform } from 'react-native';
 import {
   AuthorizationStatus,
   getInitialNotification,
@@ -11,11 +11,16 @@ import {
   type RemoteMessage,
 } from '@react-native-firebase/messaging';
 import { getApp } from '@react-native-firebase/app';
-import notifee, { AndroidImportance, EventType } from '@notifee/react-native';
+import notifee, {
+  AndroidImportance,
+  AuthorizationStatus as NotifeeAuthorizationStatus,
+  EventType,
+} from '@notifee/react-native';
 import { parsePushPayload, pushCopy } from './parse';
 import { t } from '../../i18n';
 import type { PushPayload } from './types';
 import type { PermissionStatus, PushMessaging, Unsubscribe } from './messaging';
+import { requestPermissionExclusively } from '../../utils/permissionQueue';
 
 /**
  * The real FCM transport (`docs/DECISIONS.md` D-059).
@@ -32,6 +37,19 @@ import type { PermissionStatus, PushMessaging, Unsubscribe } from './messaging';
  * data message is dropped without a trace on Android 8+.
  */
 export const ANDROID_CHANNEL_ID = 'habita_alerts';
+
+/**
+ * True where `POST_NOTIFICATIONS` is a runtime permission — Android 13 (API 33,
+ * TIRAMISU) and above. Below that, notifications are granted at install time and
+ * there is no dialog to show.
+ *
+ * A function rather than a module-level constant: as a constant it captured
+ * `Platform` at import time, which makes the branch untestable and quietly
+ * dependent on module load order.
+ */
+export function androidNeedsRuntimePermission(): boolean {
+  return Platform.OS === 'android' && Number(Platform.Version) >= 33;
+}
 
 async function ensureChannel(): Promise<void> {
   if (Platform.OS !== 'android') {
@@ -79,14 +97,79 @@ function toPayload(message: RemoteMessage | null | undefined): PushPayload | nul
 export class FirebasePushMessaging implements PushMessaging {
   readonly isAvailable = true;
 
+  /**
+   * Reads the current setting without showing anything.
+   *
+   * `notifee.getNotificationSettings()` covers both platforms here: on Android it
+   * reports the `POST_NOTIFICATIONS` grant, on iOS the UNUserNotificationCenter
+   * authorization. `NOT_DETERMINED` (-1) is the only value that justifies a prompt.
+   */
+  async getPermissionStatus(): Promise<PermissionStatus> {
+    try {
+      // Android 13+ owns this as a real runtime permission, so ask the platform
+      // directly rather than going through notifee's notification-settings view
+      // of it. `check()` never shows UI.
+      if (Platform.OS === 'android' && androidNeedsRuntimePermission()) {
+        const granted = await PermissionsAndroid.check(
+          PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        );
+        // A false here is "not granted" — Android cannot say whether that is a
+        // refusal or a first run, which is why the caller keeps its own record.
+        return granted ? 'granted' : 'denied';
+      }
+
+      const settings = await notifee.getNotificationSettings();
+      switch (settings.authorizationStatus) {
+        case NotifeeAuthorizationStatus.AUTHORIZED:
+        case NotifeeAuthorizationStatus.PROVISIONAL:
+          return 'granted';
+        case NotifeeAuthorizationStatus.DENIED:
+          return 'denied';
+        default:
+          return 'undetermined';
+      }
+    } catch {
+      return 'unavailable';
+    }
+  }
+
   async requestPermission(): Promise<PermissionStatus> {
     try {
-      // Notifee owns the Android 13+ POST_NOTIFICATIONS runtime prompt; the
-      // Firebase call covers iOS. Both are no-ops once already answered.
-      const settings = await notifee.requestPermission();
       if (Platform.OS === 'android') {
+        // The channel must exist before the grant, or the first notification
+        // after it has nowhere to post.
         await ensureChannel();
-        return settings.authorizationStatus >= 1 ? 'granted' : 'denied';
+
+        if (!androidNeedsRuntimePermission()) {
+          // Android 12 and below grant notifications at install time; there is
+          // no dialog to show, so report what the OS already thinks.
+          const settings = await notifee.getNotificationSettings();
+          return settings.authorizationStatus >= 1 ? 'granted' : 'denied';
+        }
+
+        // `PermissionsAndroid` rather than `notifee.requestPermission()`.
+        //
+        // Notifee's implementation resolves as denied *without showing anything*
+        // when it cannot cast `getCurrentActivity()` to a PermissionAwareActivity
+        // — which happens during early startup. The caller cannot tell that
+        // apart from a real refusal, records "already asked", and then never
+        // prompts again: the OS reported `POST_NOTIFICATIONS granted=false` with
+        // no `USER_SET` flag, i.e. a dialog the user was never actually shown.
+        //
+        // This is the same API the location prompt in `onboarding/profile.tsx`
+        // already uses successfully in this app, and it returns a genuine
+        // tri-state, so "dismissed" and "don't ask again" stay distinguishable.
+        // Queued: the Profile screen asks for location at almost the same moment
+        // after sign-in, and Android silently discards whichever request arrives
+        // while the other's dialog is open. That is why this prompt never
+        // appeared on a clean install while location's always did.
+        const result = await requestPermissionExclusively(() =>
+          PermissionsAndroid.request(PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS),
+        );
+        if (result === PermissionsAndroid.RESULTS.GRANTED) {
+          return 'granted';
+        }
+        return result === PermissionsAndroid.RESULTS.NEVER_ASK_AGAIN ? 'blocked' : 'denied';
       }
       const status = await requestFcmPermission(getMessaging());
       const granted =

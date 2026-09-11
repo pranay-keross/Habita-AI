@@ -46,6 +46,7 @@ Each document has one job. Do not duplicate content between them — cross-refer
 | `docs/ARCHITECTURE.md` | Structure, contracts, known gaps | Task planning |
 | `docs/BACKEND_CONTEXT.md` | Confirmed backend contract, known backend bugs, target API surface — for continuing the separate Spring Boot backend | Client application code or status |
 | `docs/BACKLOG.md` | Milestones, tasks, status, open questions | Prose status updates |
+| `docs/AWH_FEATURE_GAP_ANALYSIS.md` | Competitive gap analysis vs A Wise Home, and the API contracts the unbuilt half needs | Task status — that's `docs/BACKLOG.md`'s job |
 | `docs/DECISIONS.md` | Append-only decision log | Rewritten history — supersede instead |
 | `agent.md` | This working agreement | Product or architecture content |
 | `prompts/` | Repeatable session rituals | One-off instructions |
@@ -83,7 +84,7 @@ Full detail in `docs/BACKLOG.md`; this table is the summary.
 | Design system — 3 palettes, tokens, 4 shared components, `lucide-react-native` icons | ✅ Built (live switching + picker in Profile → Appearance; fonts still not bundled) |
 | Localization — 6 locales, live switching | ✅ Built — Family and Medicine both fully covered now |
 | Documentation & prompt library | ✅ M0 complete, 2026-07-30; rebranded to Habita AI 2026-08-07 |
-| Push notifications — 4 backend alert payloads (dosage, low stock, bill due soon/today) | ✅ Built, Android (D-059) — `@react-native-firebase/messaging` + `@notifee/react-native`, foreground/background/cold-start taps, dedupe inbox, 6 locales, `AlertsCard` in Medicine + Resources, and live-tested `POST /devices/register`. **Native changes are not build-verified** (no Android toolchain in this environment). iOS is on the no-op transport — needs a `GoogleService-Info.plist` and an APNs key |
+| Push notifications — 8 alert payloads — 4 from the backend (dosage, low stock, bill due soon/today) and 4 scheduled on-device (document expiring/expired, salary due/overdue, D-061) | ✅ Built, Android (D-059) — `@react-native-firebase/messaging` + `@notifee/react-native`, foreground/background/cold-start taps, dedupe inbox, 6 locales, `AlertsCard` in Medicine + Resources, and live-tested `POST /devices/register`. **Native changes are not build-verified** (no Android toolchain in this environment). iOS is on the no-op transport — needs a `GoogleService-Info.plist` and an APNs key |
 | Session lifecycle (idle/absolute expiry, re-auth banner) | ❌ Not built — M2-T3's remaining half, M2-T5 |
 | Managed Members (dependents) | ❌ Not built — M2-T9, new since the SRS adoption |
 | Mind & Mood — check-in CRUD, CBT chat assistant, AI uplift, smart recommendation, backend exercise library + session completion, server-computed summary | ✅ Built on the real `/api/wellness/**` backend (`M4-T6`/`M4-T7`, D-030, D-058) — all 14 routes verified live (16/16). `LocalCbtCoach` kept as the offline fallback. Account-scoped, still not family-shared |
@@ -91,6 +92,9 @@ Full detail in `docs/BACKLOG.md`; this table is the summary.
 | Responsive layout — `useResponsive()` hook, window-derived scales/columns/max-width | ✅ Built (D-030) — used by the Wellness and Cycle screens only; every earlier screen is still fixed-width |
 | Documents, Staff, Resources, Events, Vehicles (M5) · Expenses, Payments (M6) · Pantry, Wardrobe, Voice (M7) | ❌ Not built — see `NEXT_STEPS.md` for build order |
 | Backend beyond auth/profile, real invites, AI/OCR | ❌ Not built — M8, decisions open |
+| Document Hub — vault CRUD, multipart upload, PDF/image viewer, **expiry reminders** | ✅ Built — reminders fire at 60/30/14/7/1 days and on the lapse day (`M5-T4`, D-061), scheduled locally until `docs/AWH_FEATURE_GAP_ANALYSIS.md` §3.1's backend job exists |
+| Staff — roster, attendance (incl. half days, hours, overtime), **payroll** | ✅ Built (`M5-T7`/`M5-T8`, D-061) — itemised payslip, salary payments, salary-due reminders. Payslip is computed locally; §3.2's `/staff/{id}/payroll` is `M5-T14` |
+| Tasks · Shared calendar · Autobudget · Vendors · Location & geofencing | ❌ Not built — the four whole modules A Wise Home has and this app does not. Specced with API contracts in `docs/AWH_FEATURE_GAP_ANALYSIS.md` §2–§3.6 |
 
 ---
 
