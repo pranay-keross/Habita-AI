@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import useAuth from '../../../../hooks/useAuth';
-import { AllergenTag, PantryItem, StorageLocation, ZeroWasteRecipe } from '../types';
+import { AllergenTag, BasketScanItem, PantryItem, StorageLocation, ZeroWasteRecipe } from '../types';
 import { MOCK_ZERO_WASTE_RECIPES } from '../data/mockPantryData';
 import {
   cookPantryRecipe,
@@ -9,11 +9,14 @@ import {
   modifyPantryQuantity,
   removePantryItem,
   savePantryItem,
+  savePantryItemsBulk,
 } from '../services/pantryStorage';
 import {
   getZeroWasteRecipesRemote,
   lookupBarcodeRemote,
   notifyExpiringPantryItemsRemote,
+  pantryErrorMessage,
+  scanBasketRemote,
   scanReceiptRemote,
 } from '../api';
 
@@ -184,6 +187,46 @@ export function useSmartPantry() {
     return [];
   };
 
+  /**
+   * Detects fruits & vegetables in a basket photo. Returns an empty list when the
+   * image genuinely contains no produce, and throws a user-facing message on
+   * failure so the caller can tell the two cases apart.
+   */
+  const scanBasket = async (
+    file: { uri: string; name?: string; type?: string },
+  ): Promise<BasketScanItem[]> => {
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {}
+
+    if (!token) {
+      throw new Error('Please sign in to scan items into your pantry.');
+    }
+
+    try {
+      const resp = await scanBasketRemote(file, token);
+      return resp?.items ?? [];
+    } catch (err) {
+      console.warn('Basket remote scan failed:', err);
+      throw new Error(pantryErrorMessage(err));
+    }
+  };
+
+  const addItemsBulk = async (newItems: PantryItem[]) => {
+    let token: string | null = null;
+    try {
+      token = await getAccessToken();
+    } catch {}
+
+    const savedList = await savePantryItemsBulk(newItems, token);
+    const createdIds = new Set(savedList.map((i) => i.id));
+    setItems((prev) => [...savedList, ...prev.filter((i) => !createdIds.has(i.id))]);
+    if (savedList.length > 0) {
+      setSelectedItem(savedList[0]);
+    }
+  };
+
   const triggerSpoilageAlerts = async () => {
     let token: string | null = null;
     try {
@@ -239,11 +282,13 @@ export function useSmartPantry() {
     selectedItem,
     setSelectedItem,
     addItem,
+    addItemsBulk,
     updateQuantity,
     deleteItem,
     cookRecipe,
     lookupBarcode,
     scanReceipt,
+    scanBasket,
     triggerSpoilageAlerts,
     refresh: fetchItems,
     totalItemsCount,

@@ -5,12 +5,27 @@ import {
   adjustPantryQuantityRemote,
   cookRecipeRemote,
   createPantryItemRemote,
+  createPantryItemsBulkRemote,
   deletePantryItemRemote,
   listPantryItemsRemote,
 } from '../api';
 
 const STORAGE_KEY = '@sahel_smart_pantry_v4';
 
+// Ids of the signed-out demo catalogue. Used to evict demo rows that an earlier failed
+// or signed-out session cached, so a signed-in pantry never shows items the server
+// has no record of.
+const DEMO_ITEM_IDS = new Set(INITIAL_PANTRY_ITEMS.map((item) => item.id));
+
+/**
+ * Loads pantry stock.
+ *
+ * When signed in the backend is the single source of truth, and demo data is never
+ * substituted: seeding `INITIAL_PANTRY_ITEMS` here made the Inventory tab disagree with
+ * every server-side feature (meal planning, recipes, expiry radar), which read the real
+ * — empty — pantry. On a remote failure we fall back only to previously cached *real*
+ * rows, so the list degrades to stale-but-true rather than fictional.
+ */
 export async function loadPantryItems(token?: string | null): Promise<PantryItem[]> {
   if (token) {
     try {
@@ -26,10 +41,21 @@ export async function loadPantryItems(token?: string | null): Promise<PantryItem
         return itemsList;
       }
     } catch (err) {
-      console.warn('Pantry remote load failed, falling back to local storage:', err);
+      console.warn('Pantry remote load failed, using last synced items:', err);
+    }
+
+    try {
+      const raw = await AsyncStorage.getItem(STORAGE_KEY);
+      const cached: PantryItem[] = raw ? JSON.parse(raw) : [];
+      // Purge demo rows seeded by an earlier signed-out/failed session.
+      return cached.filter((item) => !DEMO_ITEM_IDS.has(item.id));
+    } catch (e) {
+      console.error('Failed to read cached pantry items:', e);
+      return [];
     }
   }
 
+  // Signed out: the local demo catalogue is the only stock there is.
   try {
     const raw = await AsyncStorage.getItem(STORAGE_KEY);
     if (!raw) {
@@ -40,6 +66,28 @@ export async function loadPantryItems(token?: string | null): Promise<PantryItem
   } catch (e) {
     console.error('Failed to load pantry items:', e);
     return INITIAL_PANTRY_ITEMS;
+  }
+}
+
+/** Strips the client-side placeholder id; the server assigns the real one on create. */
+function toCreatePayload(item: PantryItem): Omit<PantryItem, 'id'> {
+  const { id, ...rest } = item;
+  void id;
+  return rest;
+}
+
+/**
+ * Raw cached rows with no demo seeding. Mutators must use this rather than
+ * `loadPantryItems()`: calling that without a token takes the signed-out branch and
+ * re-seeds the demo catalogue, which then gets written back into the cache.
+ */
+async function readCachedItems(): Promise<PantryItem[]> {
+  try {
+    const raw = await AsyncStorage.getItem(STORAGE_KEY);
+    return raw ? JSON.parse(raw) : [];
+  } catch (e) {
+    console.error('Failed to read cached pantry items:', e);
+    return [];
   }
 }
 
@@ -60,17 +108,40 @@ export async function savePantryItem(
   let created = item;
   if (token) {
     try {
-      const { id, ...itemInput } = item;
-      created = await createPantryItemRemote(itemInput, token);
+      created = await createPantryItemRemote(toCreatePayload(item), token);
     } catch (err) {
       console.warn('Remote create pantry item failed, saving locally:', err);
     }
   }
 
-  const existing = await loadPantryItems();
+  const existing = await readCachedItems();
   const updated = [created, ...existing.filter((i) => i.id !== created.id)];
   await savePantryItems(updated);
   return created;
+}
+
+export async function savePantryItemsBulk(
+  items: PantryItem[],
+  token?: string | null,
+): Promise<PantryItem[]> {
+  let createdList = items;
+  if (token) {
+    try {
+      const payloads = items.map(toCreatePayload);
+      const remoteCreated = await createPantryItemsBulkRemote(payloads, token);
+      if (remoteCreated && remoteCreated.length > 0) {
+        createdList = remoteCreated;
+      }
+    } catch (err) {
+      console.warn('Remote bulk create pantry items failed, saving locally:', err);
+    }
+  }
+
+  const existing = await readCachedItems();
+  const createdIds = new Set(createdList.map((i) => i.id));
+  const updated = [...createdList, ...existing.filter((i) => !createdIds.has(i.id))];
+  await savePantryItems(updated);
+  return createdList;
 }
 
 export async function removePantryItem(
@@ -85,7 +156,7 @@ export async function removePantryItem(
     }
   }
 
-  const existing = await loadPantryItems();
+  const existing = await readCachedItems();
   const updated = existing.filter((i) => i.id !== id);
   await savePantryItems(updated);
 }
@@ -95,31 +166,36 @@ export async function modifyPantryQuantity(
   delta: number,
   token?: string | null,
 ): Promise<number> {
-  let newQty = 0;
+  // The server's post-adjustment quantity is authoritative when we have it; recomputing
+  // locally from a possibly stale cached value is how the UI drifts away from real stock.
+  let serverQty: number | null = null;
   if (token) {
     try {
       const resp = await adjustPantryQuantityRemote(id, delta, token);
-      newQty = resp.newQuantity;
+      serverQty = resp.newQuantity;
     } catch (err) {
       console.warn('Remote adjust pantry quantity failed:', err);
     }
   }
 
-  const existing = await loadPantryItems();
+  const existing = await readCachedItems();
   const target = existing.find((i) => i.id === id);
-  if (!target) return 0;
+  if (!target && serverQty === null) return 0;
 
-  const computedQty = Math.max(0, target.quantity + delta);
-  if (computedQty === 0) {
+  const newQty = serverQty !== null
+    ? Math.max(0, serverQty)
+    : Math.max(0, (target?.quantity ?? 0) + delta);
+
+  if (newQty === 0) {
     await removePantryItem(id, token);
     return 0;
   }
 
   const updated = existing.map((i) =>
-    i.id === id ? { ...i, quantity: computedQty, isLowStock: computedQty <= 1 } : i,
+    i.id === id ? { ...i, quantity: newQty, isLowStock: newQty <= 1 } : i,
   );
   await savePantryItems(updated);
-  return computedQty;
+  return newQty;
 }
 
 export async function cookPantryRecipe(

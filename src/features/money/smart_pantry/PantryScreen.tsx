@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
@@ -17,6 +17,8 @@ import { AddScanView } from './components/AddScanView';
 import { ItemDetailsView } from './components/ItemDetailsView';
 import { ExpiryRadarView } from './components/ExpiryRadarView';
 import { ZeroWasteRecipesView } from './components/ZeroWasteRecipesView';
+import { DailyMealsView } from './components/DailyMealsView';
+import { useDailyMeals } from './hooks/useDailyMeals';
 
 type Props = StackScreenProps<RootStackParamList, 'Pantry'>;
 
@@ -49,18 +51,24 @@ export default function PantryScreen({ navigation }: Props) {
     selectedItem,
     setSelectedItem,
     addItem,
+    addItemsBulk,
     updateQuantity,
     deleteItem,
     cookRecipe,
     lookupBarcode,
     scanReceipt,
+    scanBasket,
     recipeDietaryFilter,
     setRecipeDietaryFilter,
     triggerSpoilageAlerts,
     totalItemsCount,
     expiringSoonItems,
     lowStockItems,
+    refresh,
   } = useSmartPantry();
+
+  // Cooking a recommended meal deducts stock, so the pantry list reloads after it.
+  const dailyMeals = useDailyMeals({ onStockChanged: refresh });
 
   return (
     <View style={styles.root}>
@@ -123,6 +131,13 @@ export default function PantryScreen({ navigation }: Props) {
               {t('smart_pantry.tab_recipes')}
             </Text>
           </Pressable>
+          <Pressable
+            style={[styles.tabChip, activeTab === 'meals' && styles.tabChipActive]}
+            onPress={() => setActiveTab('meals')}>
+            <Text style={[styles.tabChipText, activeTab === 'meals' && styles.tabChipTextActive]}>
+              {t('smart_pantry.tab_meals', { defaultValue: "Today's Meals" })}
+            </Text>
+          </Pressable>
         </ScrollView>
       </View>
 
@@ -174,8 +189,10 @@ export default function PantryScreen({ navigation }: Props) {
             {activeTab === 'add' && (
               <AddScanView
                 onAddItem={addItem}
+                onAddItemsBulk={addItemsBulk}
                 onLookupBarcode={lookupBarcode}
                 onScanReceipt={scanReceipt}
+                onScanBasket={scanBasket}
                 onNavigateDetails={() => setActiveTab('details')}
               />
             )}
@@ -204,6 +221,25 @@ export default function PantryScreen({ navigation }: Props) {
                 onCookRecipe={cookRecipe}
                 activeDietaryFilter={recipeDietaryFilter}
                 onSelectDietaryFilter={setRecipeDietaryFilter}
+              />
+            )}
+
+            {activeTab === 'meals' && (
+              <DailyMealsView
+                meals={dailyMeals.meals}
+                loading={dailyMeals.loading}
+                refreshing={dailyMeals.refreshing}
+                cookingMealId={dailyMeals.cookingMealId}
+                error={dailyMeals.error}
+                stale={dailyMeals.stale}
+                pantryEmpty={dailyMeals.pantryEmpty}
+                refreshesLeft={dailyMeals.refreshesLeft}
+                nutritionDisclaimer={dailyMeals.nutritionDisclaimer}
+                onRefresh={dailyMeals.refresh}
+                onReload={dailyMeals.reload}
+                onMarkCooked={dailyMeals.markCooked}
+                onLoadMealDetail={dailyMeals.loadMealDetail}
+                onNavigateAdd={() => setActiveTab('add')}
               />
             )}
           </>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+﻿import React, { useState } from 'react';
 import {
   View,
   Text,
@@ -16,6 +16,7 @@ import {
 import {
   AddMode,
   AllergenTag,
+  BasketScanItem,
   CategoryType,
   ExtractedReceiptItem,
   PantryItem,
@@ -31,7 +32,6 @@ import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
 import useTheme from '../../../../hooks/useTheme';
-import Receipt from 'lucide-react-native/icons/receipt';
 import Camera from 'lucide-react-native/icons/camera';
 import Search from 'lucide-react-native/icons/search';
 import ScanBarcode from 'lucide-react-native/icons/scan-barcode';
@@ -58,6 +58,14 @@ interface Props {
     name?: string;
     type?: string;
   }) => Promise<ExtractedReceiptItem[] | PantryItem[]>;
+  /** Detects multiple fruits & vegetables in one basket/container photo. */
+  onScanBasket?: (file: {
+    uri: string;
+    name?: string;
+    type?: string;
+  }) => Promise<BasketScanItem[]>;
+  /** Saves the whole reviewed scan result in one request. */
+  onAddItemsBulk?: (items: PantryItem[]) => Promise<void>;
 }
 
 export interface PendingReceiptItem {
@@ -84,6 +92,16 @@ const CATEGORIES: { key: CategoryType; labelKey: string; label: string }[] = [
 
 const LOCATIONS: StorageLocation[] = ['Fridge', 'Freezer', 'Pantry Shelf'];
 
+// Gallery/camera originals are routinely 10-25 MB, which the backend's 10 MB
+// multipart limit rejects before the scan endpoint is even reached. Re-encoding to
+// at most 1600px keeps every basket upload well under the limit without costing
+// the vision model any detail it can actually use.
+const BASKET_IMAGE_OPTIONS = {
+  quality: 0.8,
+  maxWidth: 1600,
+  maxHeight: 1600,
+} as const;
+
 function getDefaultExpiryDate(offsetDays: number = 7): string {
   const d = new Date();
   d.setDate(d.getDate() + offsetDays);
@@ -98,6 +116,8 @@ export const AddScanView: React.FC<Props> = ({
   onNavigateDetails,
   onLookupBarcode,
   onScanReceipt,
+  onScanBasket,
+  onAddItemsBulk,
 }) => {
   const { theme } = useTheme();
   const styles = useThemedStyles(makeStyles);
@@ -122,10 +142,12 @@ export const AddScanView: React.FC<Props> = ({
   const [showReceiptReviewModal, setShowReceiptReviewModal] = useState(false);
   const [pendingReceiptItems, setPendingReceiptItems] = useState<PendingReceiptItem[]>([]);
   const [savingReceiptItems, setSavingReceiptItems] = useState(false);
+  // Which scan produced the items currently under review; drives copy and save path.
+  const [reviewSource, setReviewSource] = useState<'receipt' | 'basket'>('receipt');
 
   // AI Animation Modal State
   const [showAiModal, setShowAiModal] = useState(false);
-  const [aiModalMode, setAiModalMode] = useState<'receipt' | 'barcode'>('receipt');
+  const [aiModalMode, setAiModalMode] = useState<'receipt' | 'barcode' | 'basket'>('receipt');
   const [aiPreviewUri, setAiPreviewUri] = useState<string | null>(null);
 
   const getLocName = (loc: string) => {
@@ -473,6 +495,7 @@ export const AddScanView: React.FC<Props> = ({
       }));
 
       setPendingReceiptItems(pending);
+      setReviewSource('receipt');
       setShowAiModal(false);
       setShowReceiptReviewModal(true);
     } catch (err) {
@@ -486,6 +509,191 @@ export const AddScanView: React.FC<Props> = ({
       );
     } finally {
       setIsScanning(false);
+    }
+  };
+
+  // ---------------------------------------------------------------------
+  // BASKET SCAN: multiple fruits & vegetables detected from one photo
+  // ---------------------------------------------------------------------
+
+  /**
+   * Sends a basket/container photo to the backend AI vision scanner and opens the
+   * shared review form pre-filled with every detected fruit and vegetable.
+   */
+  const processBasketFile = async (file: { uri: string; name?: string; type?: string }) => {
+    // Prevent duplicate scan requests while one is already processing.
+    if (isScanning) {
+      return;
+    }
+
+    if (!onScanBasket) {
+      Alert.alert(
+        t('smart_pantry.basket_unavailable_title', { defaultValue: 'Scanner Unavailable' }),
+        t('smart_pantry.basket_unavailable_msg', {
+          defaultValue: 'Basket scanning is not available right now. Please add items manually.',
+        }),
+      );
+      return;
+    }
+
+    setAiModalMode('basket');
+    setAiPreviewUri(file.uri);
+    setShowAiModal(true);
+    setIsScanning(true);
+
+    const minAnimationDuration = new Promise((resolve) => setTimeout(resolve, 1800));
+
+    try {
+      const [detected] = await Promise.all([onScanBasket(file), minAnimationDuration]);
+      setShowAiModal(false);
+
+      if (!detected || detected.length === 0) {
+        Alert.alert(
+          t('smart_pantry.basket_none_title', { defaultValue: 'Nothing Detected' }),
+          t('smart_pantry.basket_none_msg', {
+            defaultValue:
+              'No fruits or vegetables could be confidently detected. Please try another image with better lighting.',
+          }),
+        );
+        return;
+      }
+
+      const pending: PendingReceiptItem[] = detected.map((item, idx) => ({
+        id: `basket_${Date.now()}_${idx}`,
+        selected: true,
+        name: item.name || `Produce #${idx + 1}`,
+        category: ((item.category as CategoryType) || 'produce') as CategoryType,
+        quantity: String(item.quantity ?? 1),
+        unit: item.unit || 'pcs',
+        expiryDate: getDefaultExpiryDate(item.estimatedShelfLifeDays ?? 7),
+        storageLocation: (item.storageLocation || 'Fridge') as StorageLocation,
+        allergens: item.allergens || ['gluten-free', 'vegan', 'nut-free', 'dairy-free'],
+        confidence: item.confidence,
+      }));
+
+      setPendingReceiptItems(pending);
+      setReviewSource('basket');
+      setShowReceiptReviewModal(true);
+    } catch (err) {
+      console.warn('Basket scan error:', err);
+      setShowAiModal(false);
+      Alert.alert(
+        t('smart_pantry.basket_failed_title', { defaultValue: 'Scan Failed' }),
+        // The hook already maps backend failures to user-friendly copy.
+        err instanceof Error && err.message
+          ? err.message
+          : t('smart_pantry.basket_failed_msg', {
+              defaultValue: 'Unable to analyse this image. Please try again.',
+            }),
+      );
+    } finally {
+      setIsScanning(false);
+    }
+  };
+
+  const handleCaptureBasketWithCamera = async () => {
+    const hasPerm = await requestCameraPermission();
+    if (!hasPerm) {
+      Alert.alert(
+        t('smart_pantry.camera_perm_denied_title', { defaultValue: 'Camera Permission Required' }),
+        t('smart_pantry.camera_perm_denied_basket_msg', {
+          defaultValue: 'Please enable camera permission to scan your basket of fruits & vegetables.',
+        }),
+        [
+          { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+          {
+            text: t('smart_pantry.open_settings', { defaultValue: 'Open Settings' }),
+            onPress: () => Linking.openSettings().catch(() => {}),
+          },
+        ],
+      );
+      return;
+    }
+
+    try {
+      const res = await launchCamera({
+        mediaType: 'photo',
+        cameraType: 'back',
+        saveToPhotos: false,
+        // Downscale on-device: full-resolution photos exceed the backend's 10 MB
+        // multipart limit, and the vision model gains nothing above ~1600px.
+        ...BASKET_IMAGE_OPTIONS,
+      });
+
+      if (res.errorCode === 'permission') {
+        Alert.alert(
+          t('smart_pantry.camera_perm_denied_title', { defaultValue: 'Camera Permission Required' }),
+          t('smart_pantry.camera_perm_denied_basket_msg', {
+            defaultValue: 'Please enable camera permission in device settings to scan your basket.',
+          }),
+          [
+            { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+            {
+              text: t('smart_pantry.open_settings', { defaultValue: 'Open Settings' }),
+              onPress: () => Linking.openSettings().catch(() => {}),
+            },
+          ],
+        );
+        return;
+      }
+
+      if (res.errorCode === 'camera_unavailable') {
+        Alert.alert('Camera Unavailable', 'No camera hardware found on this device or emulator.');
+        return;
+      }
+
+      if (res.didCancel || !res.assets || !res.assets[0]?.uri) {
+        return;
+      }
+
+      await processBasketFile({
+        uri: res.assets[0].uri,
+        name: res.assets[0].fileName || 'basket_camera.jpg',
+        type: res.assets[0].type || 'image/jpeg',
+      });
+    } catch (err) {
+      console.warn('Basket camera error:', err);
+      Alert.alert('Camera Error', 'Could not open camera to scan your basket.');
+    }
+  };
+
+  const handleUploadBasketFromGallery = async () => {
+    try {
+      const pickerRes = await launchImageLibrary({
+        mediaType: 'photo',
+        selectionLimit: 1,
+        ...BASKET_IMAGE_OPTIONS,
+      });
+
+      if (pickerRes.errorCode === 'permission') {
+        Alert.alert(
+          t('smart_pantry.gallery_perm_denied_title', { defaultValue: 'Gallery Permission Required' }),
+          t('smart_pantry.gallery_perm_denied_msg', {
+            defaultValue: 'Please allow photo access to choose a basket image from your gallery.',
+          }),
+          [
+            { text: t('common.cancel', { defaultValue: 'Cancel' }), style: 'cancel' },
+            {
+              text: t('smart_pantry.open_settings', { defaultValue: 'Open Settings' }),
+              onPress: () => Linking.openSettings().catch(() => {}),
+            },
+          ],
+        );
+        return;
+      }
+
+      if (pickerRes.didCancel || !pickerRes.assets || !pickerRes.assets[0]?.uri) {
+        return;
+      }
+
+      await processBasketFile({
+        uri: pickerRes.assets[0].uri,
+        name: pickerRes.assets[0].fileName || 'basket_gallery.jpg',
+        type: pickerRes.assets[0].type || 'image/jpeg',
+      });
+    } catch (err) {
+      console.warn('Basket gallery picker error:', err);
+      Alert.alert('Gallery Error', 'Could not select photo from gallery.');
     }
   };
 
@@ -589,19 +797,29 @@ export const AddScanView: React.FC<Props> = ({
 
     setSavingReceiptItems(true);
     try {
-      for (const item of selected) {
-        const pItem: PantryItem = {
-          id: `p_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
+      const pantryItems: PantryItem[] = selected.map((item) => {
+        // parseFloat, not parseInt: scanned produce can be fractional (e.g. 1.5 kg).
+        const qty = Math.max(0.01, parseFloat(item.quantity) || 1);
+        return {
+          id: `p_${Date.now()}_${Math.floor(Math.random() * 100000)}`,
           name: item.name.trim(),
           category: item.category,
-          quantity: Math.max(1, parseInt(item.quantity, 10) || 1),
+          quantity: qty,
           unit: item.unit.trim() || 'pcs',
           expiryDate: item.expiryDate || getDefaultExpiryDate(),
           storageLocation: item.storageLocation,
           allergens: item.allergens,
-          isLowStock: (parseInt(item.quantity, 10) || 1) <= 1,
+          isLowStock: qty <= 1,
         };
-        await onAddItem(pItem);
+      });
+
+      if (onAddItemsBulk) {
+        // One request for the whole reviewed scan result.
+        await onAddItemsBulk(pantryItems);
+      } else {
+        for (const pItem of pantryItems) {
+          await onAddItem(pItem);
+        }
       }
 
       setShowReceiptReviewModal(false);
@@ -615,11 +833,23 @@ export const AddScanView: React.FC<Props> = ({
       );
       onNavigateDetails();
     } catch (err) {
-      console.warn('Error saving receipt items:', err);
-      Alert.alert('Error', 'Failed to save some items. Please check connection.');
+      console.warn('Error saving scanned items:', err);
+      Alert.alert(
+        t('smart_pantry.save_failed_title', { defaultValue: 'Could Not Save' }),
+        t('smart_pantry.save_failed_msg', {
+          defaultValue: 'Failed to save some items. Please check your connection and try again.',
+        }),
+      );
     } finally {
       setSavingReceiptItems(false);
     }
+  };
+
+  /** Discards the current review result and reopens the basket camera. */
+  const handleScanAgain = () => {
+    setShowReceiptReviewModal(false);
+    setPendingReceiptItems([]);
+    handleCaptureBasketWithCamera();
   };
 
   const handleToggleSelectItem = (id: string) => {
@@ -668,6 +898,13 @@ export const AddScanView: React.FC<Props> = ({
 
       {/* Mode Toggle Row */}
       <View style={styles.modeToggleRow}>
+        <Pressable
+          style={[styles.modeBtn, addMode === 'basket' && styles.modeBtnActive]}
+          onPress={() => setAddMode('basket')}>
+          <Text style={[styles.modeBtnText, addMode === 'basket' && styles.modeBtnTextActive]}>
+            {t('smart_pantry.mode_basket', { defaultValue: 'Fruits & Veg' })}
+          </Text>
+        </Pressable>
         <Pressable
           style={[styles.modeBtn, addMode === 'barcode' && styles.modeBtnActive]}
           onPress={() => setAddMode('barcode')}>
@@ -767,6 +1004,73 @@ export const AddScanView: React.FC<Props> = ({
               </Pressable>
             </View>
           </View>
+        </View>
+      )}
+
+      {/* MODE: SCAN FRUITS & VEGETABLES (BASKET) */}
+      {addMode === 'basket' && (
+        <View style={styles.scannerBox}>
+          <Text style={styles.scannerTitle}>
+            {t('smart_pantry.basket_title', { defaultValue: 'Scan Fruits & Vegetables' })}
+          </Text>
+          <Text style={styles.scannerSub}>
+            {t('smart_pantry.basket_sub', {
+              defaultValue:
+                'Photograph a whole basket, bag or box. AI identifies every fruit and vegetable it can see, with quantities you can review and edit before saving.',
+            })}
+          </Text>
+
+          {isScanning ? (
+            <View style={styles.scanningLoadingCard}>
+              <ActivityIndicator size="large" color={theme.colors.primary} />
+              <Text style={styles.scanningLoadingText}>
+                {t('smart_pantry.processing_basket', {
+                  defaultValue: 'Scanning your basket and identifying fruits & vegetables...',
+                })}
+              </Text>
+            </View>
+          ) : (
+            <View style={styles.receiptActionGrid}>
+              <Pressable
+                style={({ pressed }) => [styles.receiptCardOption, pressed && styles.btnPressed]}
+                onPress={handleCaptureBasketWithCamera}>
+                <View style={styles.receiptOptionIconBox}>
+                  <Camera size={28} color={styles.receiptUploadTitle.color} strokeWidth={1.8} />
+                </View>
+                <Text style={styles.receiptUploadTitle}>
+                  {t('smart_pantry.scan_basket_camera', { defaultValue: 'Take Photo of Basket' })}
+                </Text>
+                <Text style={styles.receiptUploadSub}>
+                  {t('smart_pantry.scan_basket_camera_sub', {
+                    defaultValue: 'Capture all your produce in one shot',
+                  })}
+                </Text>
+              </Pressable>
+
+              <Pressable
+                style={({ pressed }) => [styles.receiptCardOption, pressed && styles.btnPressed]}
+                onPress={handleUploadBasketFromGallery}>
+                <View style={styles.receiptOptionIconBox}>
+                  <ImageUp size={28} color={styles.receiptUploadTitle.color} strokeWidth={1.8} />
+                </View>
+                <Text style={styles.receiptUploadTitle}>
+                  {t('smart_pantry.upload_basket_gallery', { defaultValue: 'Choose from Gallery' })}
+                </Text>
+                <Text style={styles.receiptUploadSub}>
+                  {t('smart_pantry.upload_basket_gallery_sub', {
+                    defaultValue: 'Upload a saved basket photo',
+                  })}
+                </Text>
+              </Pressable>
+
+              <Text style={styles.basketHint}>
+                {t('smart_pantry.basket_hint', {
+                  defaultValue:
+                    'Tip: spread items out in good light. Weights are estimated â€” always check quantities before saving.',
+                })}
+              </Text>
+            </View>
+          )}
         </View>
       )}
 
@@ -983,13 +1287,20 @@ export const AddScanView: React.FC<Props> = ({
           <View style={styles.reviewModalHeader}>
             <View style={{ flex: 1 }}>
               <Text style={styles.reviewModalTitle}>
-                {t('smart_pantry.receipt_review_title', { defaultValue: 'Review Scanned Items' })}
+                {reviewSource === 'basket'
+                  ? t('smart_pantry.basket_review_title', { defaultValue: 'Scan Result' })
+                  : t('smart_pantry.receipt_review_title', { defaultValue: 'Review Scanned Items' })}
               </Text>
               <Text style={styles.reviewModalSub}>
-                {t('smart_pantry.receipt_review_sub', {
-                  count: pendingReceiptItems.length,
-                  defaultValue: `${pendingReceiptItems.length} items extracted from receipt. Review details before adding to pantry.`,
-                })}
+                {reviewSource === 'basket'
+                  ? t('smart_pantry.basket_review_sub', {
+                      count: pendingReceiptItems.length,
+                      defaultValue: `Detected from scan â€” please review before saving. ${pendingReceiptItems.length} item(s) found; quantities and weights are estimates you can edit.`,
+                    })
+                  : t('smart_pantry.receipt_review_sub', {
+                      count: pendingReceiptItems.length,
+                      defaultValue: `${pendingReceiptItems.length} items extracted from receipt. Review details before adding to pantry.`,
+                    })}
               </Text>
             </View>
             <Pressable
@@ -1014,6 +1325,14 @@ export const AddScanView: React.FC<Props> = ({
                 {t('smart_pantry.add_item_line', { defaultValue: 'Add Item' })}
               </Text>
             </Pressable>
+            {reviewSource === 'basket' && (
+              <Pressable style={styles.modalSubActionBtn} onPress={handleScanAgain}>
+                <Camera size={14} color={styles.modalSubActionText.color} strokeWidth={2} style={{ marginRight: 4 }} />
+                <Text style={styles.modalSubActionText}>
+                  {t('smart_pantry.scan_again', { defaultValue: 'Scan Again' })}
+                </Text>
+              </Pressable>
+            )}
           </View>
 
           {/* Itemized Cards List */}
@@ -1267,7 +1586,14 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textPrimary,
       marginBottom: 8,
     },
-    modeToggleRow: { flexDirection: 'row', gap: 6, marginBottom: 12 },
+    modeToggleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6, marginBottom: 12 },
+    basketHint: {
+      fontFamily: fonts.sans,
+      fontSize: 11,
+      color: colors.textMuted,
+      textAlign: 'center',
+      marginTop: 4,
+    },
     modeBtn: {
       flex: 1,
       backgroundColor: colors.surface,

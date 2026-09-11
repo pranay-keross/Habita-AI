@@ -1,7 +1,11 @@
 import { apiFetch, ApiError, postMultipart } from '../../auth/api';
 import type {
   BarcodeCatalogItem,
+  BasketScanResponse,
+  CookMealResponse,
   CookRecipeResponse,
+  DailyMeal,
+  DailyMealPlan,
   PantryItem,
   PantryPageResponse,
   PantryRadar,
@@ -51,6 +55,21 @@ export async function createPantryItemRemote(
     body: item,
     token,
   });
+}
+
+export async function createPantryItemsBulkRemote(
+  items: Omit<PantryItem, 'id'>[],
+  token: string,
+): Promise<PantryItem[]> {
+  const res = await apiFetch<{ success: boolean; count: number; items: PantryItem[] }>(
+    '/pantry/items/bulk',
+    {
+      method: 'POST',
+      body: { items },
+      token,
+    },
+  );
+  return res.items || [];
 }
 
 export async function getPantryItemRemote(id: string, token: string): Promise<PantryItem> {
@@ -159,6 +178,20 @@ export async function scanReceiptRemote(
   return postMultipart<ReceiptScanResponse>('/pantry/receipt-scan', form, token, 'POST');
 }
 
+export async function scanBasketRemote(
+  file: { uri: string; name?: string; type?: string },
+  token: string,
+): Promise<BasketScanResponse> {
+  const form = new FormData();
+  form.append('file', {
+    uri: file.uri,
+    name: file.name || 'basket.jpg',
+    type: file.type || 'image/jpeg',
+  } as unknown as Blob);
+
+  return postMultipart<BasketScanResponse>('/pantry/scan-basket', form, token, 'POST');
+}
+
 export async function notifyExpiringPantryItemsRemote(
   token: string,
 ): Promise<{ itemsAlerted: number; message: string }> {
@@ -166,6 +199,50 @@ export async function notifyExpiringPantryItemsRemote(
     method: 'POST',
     token,
   });
+}
+
+function dietaryQuery(dietaryPreference?: string): string {
+  if (!dietaryPreference || dietaryPreference === 'all') {
+    return '';
+  }
+  return `?dietaryPreference=${encodeURIComponent(dietaryPreference)}`;
+}
+
+export async function getDailyMealsRemote(
+  token: string,
+  dietaryPreference?: string,
+): Promise<DailyMealPlan> {
+  return apiFetch<DailyMealPlan>(`/pantry/daily-meals${dietaryQuery(dietaryPreference)}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function refreshDailyMealsRemote(
+  token: string,
+  dietaryPreference?: string,
+): Promise<DailyMealPlan> {
+  return apiFetch<DailyMealPlan>(`/pantry/daily-meals/refresh${dietaryQuery(dietaryPreference)}`, {
+    method: 'POST',
+    token,
+  });
+}
+
+export async function getDailyMealRemote(mealId: string, token: string): Promise<DailyMeal> {
+  return apiFetch<DailyMeal>(`/pantry/daily-meals/${encodeURIComponent(mealId)}`, {
+    method: 'GET',
+    token,
+  });
+}
+
+export async function markMealCookedRemote(
+  mealId: string,
+  token: string,
+): Promise<CookMealResponse> {
+  return apiFetch<CookMealResponse>(
+    `/pantry/daily-meals/${encodeURIComponent(mealId)}/cooked`,
+    { method: 'POST', token },
+  );
 }
 
 export type PantryErrorKind =
@@ -177,6 +254,15 @@ export type PantryErrorKind =
   | 'invalid_category'
   | 'invalid_storage_location'
   | 'invalid_allergen'
+  | 'unauthorized'
+  | 'scan_unavailable'
+  | 'scan_invalid_image'
+  | 'scan_file_too_large'
+  | 'meal_not_found'
+  | 'meal_already_cooked'
+  | 'meal_ai_unavailable'
+  | 'no_meals_generated'
+  | 'refresh_limit'
   | 'unknown';
 
 export function parsePantryError(err: unknown): PantryErrorKind {
@@ -185,6 +271,9 @@ export function parsePantryError(err: unknown): PantryErrorKind {
   }
   if (err.status === 0) {
     return 'network';
+  }
+  if (err.status === 401 || err.status === 403) {
+    return 'unauthorized';
   }
   const body = err.body as { code?: string } | null;
   const code = body?.code;
@@ -203,7 +292,99 @@ export function parsePantryError(err: unknown): PantryErrorKind {
       return 'invalid_storage_location';
     case 'INVALID_ALLERGEN_TAG':
       return 'invalid_allergen';
+    case 'SCAN_AI_UNAVAILABLE':
+    case 'SCAN_AI_FAILED':
+      return 'scan_unavailable';
+    case 'NO_IMAGE_PROVIDED':
+    case 'UNSUPPORTED_IMAGE_TYPE':
+    case 'INVALID_SCAN_RESULT':
+    case 'INVALID_UPLOAD':
+    case 'MISSING_UPLOAD_PART':
+      return 'scan_invalid_image';
+    case 'FILE_TOO_LARGE':
+      return 'scan_file_too_large';
+    case 'MEAL_NOT_FOUND':
+      return 'meal_not_found';
+    case 'MEAL_ALREADY_COOKED':
+      return 'meal_already_cooked';
+    case 'MEAL_AI_UNAVAILABLE':
+    case 'MEAL_PLAN_STORAGE_FAILED':
+      return 'meal_ai_unavailable';
+    case 'NO_MEALS_GENERATED':
+      return 'no_meals_generated';
+    case 'REFRESH_LIMIT_REACHED':
+      return 'refresh_limit';
     default:
       return 'unknown';
+  }
+}
+
+/**
+ * The backend's own `ErrorResponse.message` when it is a curated, user-safe sentence.
+ * Stack traces and exception dumps are rejected so raw internals are never shown.
+ */
+function backendMessage(err: unknown): string | null {
+  if (!(err instanceof ApiError)) {
+    return null;
+  }
+  const body = err.body as { message?: unknown } | null;
+  const message = body?.message;
+  if (typeof message !== 'string') {
+    return null;
+  }
+  const trimmed = message.trim();
+  const looksInternal =
+    trimmed.length > 180 ||
+    trimmed.includes('\n') ||
+    /Exception|\bat [a-z]+\.[a-z]+\./i.test(trimmed);
+  return trimmed.length > 0 && !looksInternal ? trimmed : null;
+}
+
+/** Maps a pantry error to a user-facing message; raw backend errors are never surfaced. */
+export function pantryErrorMessage(err: unknown): string {
+  const kind = parsePantryError(err);
+
+  if (kind === 'unknown' && err instanceof ApiError) {
+    // An unmapped failure means we have no specific copy for it. Log the real status and
+    // body, then fall back to the backend's own message so the user sees something
+    // actionable instead of an opaque "something went wrong".
+    console.warn('[pantry] unmapped API error', { status: err.status, body: err.body });
+
+    const serverMessage = backendMessage(err);
+    const base = serverMessage ?? 'Something went wrong. Please try again.';
+    // Dev builds append the status/code so a failure can be diagnosed from the device
+    // alone, without needing the Metro or backend console.
+    if (typeof __DEV__ !== 'undefined' && __DEV__) {
+      const code = (err.body as { code?: string } | null)?.code ?? 'no-code';
+      return `${base}\n\n[dev] HTTP ${err.status} · ${code}`;
+    }
+    return base;
+  }
+
+  switch (kind) {
+    case 'network':
+      return 'No internet connection. Please check your network and try again.';
+    case 'unauthorized':
+      return 'Your session has expired. Please sign in again.';
+    case 'no_family':
+      return 'Create or join a household first to use your Smart Pantry.';
+    case 'scan_unavailable':
+      return 'Scanning is unavailable right now. Please try again in a moment or add items manually.';
+    case 'scan_invalid_image':
+      return 'That image could not be read. Please capture a clearer photo in JPEG or PNG format.';
+    case 'scan_file_too_large':
+      return 'That image is too large. Please use a photo under 10 MB.';
+    case 'meal_not_found':
+      return 'This meal suggestion is no longer available. Please refresh your suggestions.';
+    case 'meal_already_cooked':
+      return 'This meal has already been marked as cooked and stock was deducted.';
+    case 'meal_ai_unavailable':
+      return "We couldn't generate today's suggestions right now. Please try again.";
+    case 'no_meals_generated':
+      return "We couldn't build healthy meals from your current stock. Try adding a few more ingredients.";
+    case 'refresh_limit':
+      return "You've refreshed today's suggestions the maximum number of times. New meals arrive tomorrow.";
+    default:
+      return 'Something went wrong. Please try again.';
   }
 }

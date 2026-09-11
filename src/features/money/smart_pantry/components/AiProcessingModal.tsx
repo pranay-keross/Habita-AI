@@ -13,12 +13,13 @@ import Sparkles from 'lucide-react-native/icons/sparkles';
 import Cpu from 'lucide-react-native/icons/cpu';
 import Receipt from 'lucide-react-native/icons/receipt';
 import ScanBarcode from 'lucide-react-native/icons/scan-barcode';
+import Salad from 'lucide-react-native/icons/salad';
 import X from 'lucide-react-native/icons/x';
 import { t } from '../../../../i18n';
 
 interface Props {
   visible: boolean;
-  mode?: 'receipt' | 'barcode';
+  mode?: 'receipt' | 'barcode' | 'basket';
   previewUri?: string | null;
   onCancel?: () => void;
 }
@@ -56,6 +57,22 @@ const BARCODE_DEFAULT_TEXTS = [
   'Resolving allergens & dietary safety tags...',
   'Calculating optimal storage & shelf life...',
   'Populating product profile...',
+];
+
+const BASKET_STEPS = [
+  'smart_pantry.ai_step_basket_ingest',
+  'smart_pantry.ai_step_basket_detect',
+  'smart_pantry.ai_step_basket_count',
+  'smart_pantry.ai_step_basket_shelf_life',
+  'smart_pantry.ai_step_basket_finalize',
+];
+
+const BASKET_DEFAULT_TEXTS = [
+  'Scanning your basket...',
+  'Identifying fruits & vegetables...',
+  'Counting pieces & estimating weights...',
+  'Predicting freshness & storage zones...',
+  'Preparing your pantry items...',
 ];
 
 export const AiProcessingModal: React.FC<Props> = ({
@@ -141,7 +158,12 @@ export const AiProcessingModal: React.FC<Props> = ({
     shimmerLoop.start();
 
     // 4. Dynamic step transition timer
-    const totalSteps = mode === 'receipt' ? RECEIPT_STEPS.length : BARCODE_STEPS.length;
+    const totalSteps =
+      mode === 'receipt'
+        ? RECEIPT_STEPS.length
+        : mode === 'basket'
+          ? BASKET_STEPS.length
+          : BARCODE_STEPS.length;
     const interval = setInterval(() => {
       // Fade out text
       Animated.timing(textOpacityAnim, {
@@ -170,8 +192,14 @@ export const AiProcessingModal: React.FC<Props> = ({
 
   if (!visible) return null;
 
-  const stepsList = mode === 'receipt' ? RECEIPT_STEPS : BARCODE_STEPS;
-  const defaultTexts = mode === 'receipt' ? RECEIPT_DEFAULT_TEXTS : BARCODE_DEFAULT_TEXTS;
+  const stepsList =
+    mode === 'receipt' ? RECEIPT_STEPS : mode === 'basket' ? BASKET_STEPS : BARCODE_STEPS;
+  const defaultTexts =
+    mode === 'receipt'
+      ? RECEIPT_DEFAULT_TEXTS
+      : mode === 'basket'
+        ? BASKET_DEFAULT_TEXTS
+        : BARCODE_DEFAULT_TEXTS;
   const currentStepKey = stepsList[currentStepIndex];
   const currentStepText = t(currentStepKey, { defaultValue: defaultTexts[currentStepIndex] });
 
@@ -202,18 +230,28 @@ export const AiProcessingModal: React.FC<Props> = ({
               <Sparkles size={13} color="#00F0FF" strokeWidth={2.4} />
             </Animated.View>
             <Text style={styles.aiBadgeText}>
-              {mode === 'receipt' ? 'HABITA VISION AI' : 'NEURAL BARCODE AI'}
+              {mode === 'receipt'
+                ? 'HABITA VISION AI'
+                : mode === 'basket'
+                  ? 'PRODUCE VISION AI'
+                  : 'NEURAL BARCODE AI'}
             </Text>
             <View style={styles.liveDot} />
           </View>
 
           <Text style={styles.modalTitle}>
-            {mode === 'receipt' ? 'Analyzing Receipt' : 'Processing Barcode'}
+            {mode === 'receipt'
+              ? 'Analyzing Receipt'
+              : mode === 'basket'
+                ? 'Scanning Your Basket'
+                : 'Processing Barcode'}
           </Text>
           <Text style={styles.modalSubtitle}>
             {mode === 'receipt'
               ? 'Extracting grocery items & expiry predictions'
-              : 'Looking up product & allergen tags'}
+              : mode === 'basket'
+                ? 'Identifying fruits & vegetables and their quantities'
+                : 'Looking up product & allergen tags'}
           </Text>
 
           {/* Centerpiece Scanner Viewfinder */}
@@ -242,6 +280,8 @@ export const AiProcessingModal: React.FC<Props> = ({
                 <View style={styles.hologramIconBox}>
                   {mode === 'receipt' ? (
                     <Receipt size={52} color="#00F0FF" strokeWidth={1.3} />
+                  ) : mode === 'basket' ? (
+                    <Salad size={52} color="#00F0FF" strokeWidth={1.3} />
                   ) : (
                     <ScanBarcode size={52} color="#00F0FF" strokeWidth={1.3} />
                   )}

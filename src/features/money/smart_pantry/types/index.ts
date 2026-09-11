@@ -1,8 +1,16 @@
 export type AllergenTag = 'nut-free' | 'gluten-free' | 'dairy-free' | 'vegan' | 'halal' | 'kosher';
 export type CategoryType = 'produce' | 'dairy' | 'bakery' | 'beverages' | 'meat' | 'pantry';
 export type StorageLocation = 'Fridge' | 'Freezer' | 'Pantry Shelf';
-export type ScreenTab = 'dashboard' | 'inventory' | 'add' | 'details' | 'radar' | 'recipes';
-export type AddMode = 'barcode' | 'receipt' | 'manual';
+export type ScreenTab =
+  | 'dashboard'
+  | 'inventory'
+  | 'add'
+  | 'details'
+  | 'radar'
+  | 'recipes'
+  | 'meals';
+export type MealTypeKey = 'breakfast' | 'lunch' | 'dinner' | 'snack';
+export type AddMode = 'barcode' | 'receipt' | 'basket' | 'manual';
 
 export interface PantryItem {
   id: string;
@@ -113,6 +121,23 @@ export interface ReceiptScanResponse {
   extractedItems: ExtractedReceiptItem[];
 }
 
+export interface BasketScanItem {
+  name: string;
+  category: CategoryType | string;
+  quantity: number;
+  unit: string;
+  confidence?: number;
+  storageLocation?: StorageLocation;
+  estimatedShelfLifeDays?: number;
+  allergens?: AllergenTag[];
+}
+
+export interface BasketScanResponse {
+  success: boolean;
+  message: string;
+  items: BasketScanItem[];
+}
+
 export interface DeductedCookItem {
   pantryItemId: string;
   name: string;
@@ -125,6 +150,88 @@ export interface CookRecipeResponse {
   success: boolean;
   recipeId: string;
   deductedItems: DeductedCookItem[];
+  message: string;
+}
+
+export interface MealIngredient {
+  name: string;
+  quantity: number;
+  unit: string;
+  /** True when the pantry holds at least the required quantity. */
+  available: boolean;
+  pantryItemId?: string | null;
+  availableQuantity?: number | null;
+  availableUnit?: string | null;
+}
+
+export interface MealNutrition {
+  calories?: number | null;
+  protein?: number | null;
+  carbohydrates?: number | null;
+  fat?: number | null;
+  fiber?: number | null;
+}
+
+export interface DailyMeal {
+  id: string;
+  mealType: MealTypeKey | string;
+  name: string;
+  description?: string | null;
+  recommendationReason?: string | null;
+  ingredients: MealIngredient[];
+  missingIngredients: MealIngredient[];
+  nutrition: MealNutrition;
+  /** Nutrition figures are AI estimates, never measured values. */
+  nutritionEstimated: boolean;
+  healthBenefits: string[];
+  instructions: string[];
+  dietaryTags: string[];
+  difficulty: string;
+  prepTime: number;
+  cookTime: number;
+  estimatedTime: number;
+  pantryMatchPercentage: number;
+  recommendationScore: number;
+  cooked: boolean;
+  cookedAt?: string | null;
+}
+
+export interface DailyMealPlan {
+  success: boolean;
+  date: string;
+  recommendations: DailyMeal[];
+  /** Pantry stock changed after the plan was generated; offer "Refresh Suggestions". */
+  stale: boolean;
+  pantryEmpty: boolean;
+  generatedAt?: string | null;
+  refreshesLeft: number;
+  message: string;
+  nutritionDisclaimer: string;
+}
+
+export interface DeductedMealIngredient {
+  pantryItemId: string;
+  name: string;
+  deducted: number;
+  remainingQuantity: number;
+  unit: string;
+  removedFromPantry: boolean;
+}
+
+export interface InsufficientMealIngredient {
+  name: string;
+  required: number;
+  available: number;
+  unit: string;
+  reason: string;
+}
+
+export interface CookMealResponse {
+  success: boolean;
+  mealId: string;
+  mealName: string;
+  deductedItems: DeductedMealIngredient[];
+  insufficientItems: InsufficientMealIngredient[];
   message: string;
 }
 
