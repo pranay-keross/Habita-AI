@@ -23,7 +23,7 @@ import Plus from 'lucide-react-native/icons/plus';
 import Users from 'lucide-react-native/icons/users';
 import Wallet from 'lucide-react-native/icons/wallet';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
-import Trash2 from 'lucide-react-native/icons/trash-2';
+import Trash2 from 'lucide-react-native/icons/trash';
 import X from 'lucide-react-native/icons/x';
 import Check from 'lucide-react-native/icons/check';
 import UserPlus from 'lucide-react-native/icons/user-plus';

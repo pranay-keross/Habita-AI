@@ -1,0 +1,426 @@
+import React, { useEffect, useState, useCallback } from 'react';
+import {
+  View,
+  Text,
+  ScrollView,
+  StyleSheet,
+  Pressable,
+  TextInput,
+  RefreshControl,
+} from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import type { StackScreenProps } from '@react-navigation/stack';
+import type { RootStackParamList } from '../../../app/_layout';
+import type { ThemeTokens } from '../../../theme';
+import useThemedStyles from '../../../hooks/useThemedStyles';
+import useAuth from '../../../hooks/useAuth';
+import ArrowLeft from 'lucide-react-native/icons/arrow-left';
+import Search from 'lucide-react-native/icons/search';
+import Plus from 'lucide-react-native/icons/plus';
+import Shirt from 'lucide-react-native/icons/shirt';
+import GlassCard from '../../../components/GlassCard';
+import { SkeletonCircle, SkeletonText } from '../../../components/Skeleton';
+import { loadClothingItems, loadCollections } from '../stylePantryStore';
+import { CATEGORY_ICON_KEYS, getClothingIconComponent } from '../clothingIcons';
+import type { ClothingCategory, ClothingItem } from '../types';
+import { subscribeToLanguageChanges, t } from '../../../i18n';
+
+type Props = StackScreenProps<RootStackParamList, 'ClosetItems'>;
+
+const CATEGORIES: { key: ClothingCategory | 'all'; labelKey: string; iconKey: string }[] = [
+  { key: 'all', labelKey: 'style_pantry.cat_all', iconKey: 'shirt' },
+  { key: 'tops', labelKey: 'style_pantry.cat_tops', iconKey: CATEGORY_ICON_KEYS.tops },
+  { key: 'bottoms', labelKey: 'style_pantry.cat_bottoms', iconKey: CATEGORY_ICON_KEYS.bottoms },
+  { key: 'shoes', labelKey: 'style_pantry.cat_shoes', iconKey: CATEGORY_ICON_KEYS.shoes },
+  { key: 'jackets', labelKey: 'style_pantry.cat_jackets', iconKey: CATEGORY_ICON_KEYS.jackets },
+  { key: 'accessories', labelKey: 'style_pantry.cat_accessories', iconKey: CATEGORY_ICON_KEYS.accessories },
+];
+
+export default function ClosetItemsScreen({ navigation, route }: Props) {
+  const styles = useThemedStyles(makeStyles);
+  const insets = useSafeAreaInsets();
+  const { getAccessToken } = useAuth();
+  const [, setLocaleVersion] = useState(0);
+  const { title, collectionId, seasonFilter, wishlistOnly } = route.params || {};
+
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [items, setItems] = useState<ClothingItem[]>([]);
+  const [collectionItemIds, setCollectionItemIds] = useState<string[] | null>(
+    null,
+  );
+  const [selectedCat, setSelectedCat] = useState<ClothingCategory | 'all'>('all');
+  const [searchQuery, setSearchQuery] = useState('');
+
+  const fetchItems = useCallback(async () => {
+    const token = await getAccessToken();
+    const [list, collections] = await Promise.all([
+      loadClothingItems(token),
+      collectionId ? loadCollections(token) : Promise.resolve(null),
+    ]);
+    setItems(list);
+    if (collectionId && collections) {
+      const found = collections.find(c => c.id === collectionId);
+      setCollectionItemIds(found ? found.itemIds : []);
+    }
+  }, [getAccessToken, collectionId]);
+
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    await fetchItems();
+    setRefreshing(false);
+  }, [fetchItems]);
+
+  useEffect(() => {
+    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
+    const unsubFocus = navigation.addListener('focus', () => {
+      setLoading(true);
+      fetchItems().finally(() => setLoading(false));
+    });
+    return () => {
+      unsubLang();
+      unsubFocus();
+    };
+  }, [navigation, fetchItems]);
+
+  const filteredItems = items.filter((item) => {
+    if (collectionId && collectionItemIds && !collectionItemIds.includes(item.id)) {
+      return false;
+    }
+    if (seasonFilter && item.season !== seasonFilter) return false;
+    if (wishlistOnly && !item.isWishlist) return false;
+    if (!wishlistOnly && !collectionId && !seasonFilter && item.isWishlist) {
+      return false;
+    }
+    const matchesCat = selectedCat === 'all' || item.category === selectedCat;
+    const matchesSearch =
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      (item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
+      (item.color && item.color.toLowerCase().includes(searchQuery.toLowerCase()));
+    return matchesCat && matchesSearch;
+  });
+
+  return (
+    <View style={styles.root}>
+      {/* Header Bar */}
+      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
+        <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
+          <ArrowLeft size={20} color={styles.headerIcon.color} />
+        </Pressable>
+        <Text style={styles.headerTitle} numberOfLines={1}>
+          {title || t('style_pantry.dash_title')}
+        </Text>
+        <Pressable
+          onPress={() => navigation.navigate('AddEditClothing', {})}
+          style={styles.addNavBtn}>
+          <Plus size={20} color={styles.headerIconOnPrimary.color} />
+        </Pressable>
+      </View>
+
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={styles.headerIcon.color} colors={[styles.headerIcon.color]} />
+        }>
+        {/* Search Bar */}
+        <View style={styles.searchBarRow}>
+          <Search size={18} color={styles.placeholder.color} style={{ marginRight: 8 }} />
+          <TextInput
+            style={styles.searchInput}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            placeholder={t('style_pantry.search_placeholder')}
+            placeholderTextColor={styles.placeholder.color}
+          />
+        </View>
+
+        {/* Category Horizontal Filter Chips */}
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesContainer}>
+          {CATEGORIES.map((cat) => {
+            const CatIcon = getClothingIconComponent(cat.iconKey);
+            return (
+            <Pressable
+              key={cat.key}
+              style={[
+                styles.categoryChip,
+                selectedCat === cat.key && styles.categoryChipActive,
+              ]}
+              onPress={() => setSelectedCat(cat.key)}>
+              <CatIcon
+                size={14}
+                color={selectedCat === cat.key ? styles.headerIconOnPrimary.color : styles.chipText.color}
+                style={styles.chipIcon}
+              />
+              <Text
+                style={[
+                  styles.chipText,
+                  selectedCat === cat.key && styles.chipTextActive,
+                ]}>
+                {t(cat.labelKey)}
+              </Text>
+            </Pressable>
+            );
+          })}
+        </ScrollView>
+
+        {/* Items List Header */}
+        <View style={styles.listHeaderRow}>
+          <Text style={styles.sectionTitle}>
+            {t('style_pantry.all_items', { count: filteredItems.length })}
+          </Text>
+          <Pressable
+            onPress={() => navigation.navigate('AddEditClothing', {})}
+            style={styles.inlineAddBtn}>
+            <Text style={styles.inlineAddBtnText}>{t('style_pantry.add_item_btn')}</Text>
+          </Pressable>
+        </View>
+
+        {loading ? (
+          <View style={styles.gridWrap}>
+            {[0, 1, 2, 3].map((i) => (
+              <View key={i} style={styles.clothingCard}>
+                <SkeletonCircle size={56} style={{ alignSelf: 'center', marginBottom: 12 }} />
+                <SkeletonText width="70%" style={{ alignSelf: 'center', marginBottom: 6 }} />
+                <SkeletonText width="50%" height={11} style={{ alignSelf: 'center' }} />
+              </View>
+            ))}
+          </View>
+        ) : filteredItems.length === 0 ? (
+          <View style={styles.emptyCard}>
+            <Shirt size={36} color={styles.placeholder.color} />
+            <Text style={styles.emptyTitle}>{t('style_pantry.no_items_found')}</Text>
+            <Text style={styles.emptySub}>
+              {searchQuery ? t('style_pantry.try_search_again') : t('style_pantry.add_first_item')}
+            </Text>
+          </View>
+        ) : (
+          <View style={styles.gridWrap}>
+            {filteredItems.map((item) => {
+              const ItemIcon = getClothingIconComponent(item.emoji);
+              return (
+              <GlassCard
+                key={item.id}
+                variant="default"
+                style={styles.clothingCard}
+                onPress={() => navigation.navigate('ClothingDetails', { itemId: item.id })}>
+                <View style={styles.cardEmojiBadge}>
+                  <ItemIcon size={28} color={styles.iconTint.color} />
+                </View>
+                <Text style={styles.cardItemName} numberOfLines={1}>
+                  {item.name}
+                </Text>
+                <Text style={styles.cardSubText}>
+                  {item.color} {item.brand ? `· ${item.brand}` : ''}
+                </Text>
+                <View style={styles.cardFooter}>
+                  <Text style={styles.wearCountText}>
+                    {t('style_pantry.item_worn_times', { count: item.wearCount })}
+                  </Text>
+                </View>
+              </GlassCard>
+              );
+            })}
+          </View>
+        )}
+      </ScrollView>
+    </View>
+  );
+}
+
+const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
+  StyleSheet.create({
+    root: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.sm,
+      backgroundColor: colors.background,
+    },
+    headerBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      ...shadow.soft,
+    },
+    headerIcon: {
+      color: colors.textPrimary,
+    },
+    headerIconOnPrimary: {
+      color: colors.textOnPrimary,
+    },
+    iconTint: {
+      color: colors.primary,
+    },
+    headerTitle: {
+      flex: 1,
+      textAlign: 'center',
+      fontFamily: fonts.sansBold,
+      fontSize: 18,
+      color: colors.textPrimary,
+      marginHorizontal: spacing.sm,
+    },
+    addNavBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      ...shadow.soft,
+    },
+    content: {
+      paddingHorizontal: spacing.lg,
+      paddingBottom: spacing.xxl,
+    },
+    searchBarRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginBottom: spacing.md,
+    },
+    searchInput: {
+      flex: 1,
+      fontFamily: fonts.sans,
+      fontSize: 14,
+      color: colors.textPrimary,
+      padding: 0,
+    },
+    placeholder: {
+      color: colors.textSecondary,
+    },
+    categoriesContainer: {
+      paddingVertical: spacing.xs,
+      gap: spacing.xs,
+      marginBottom: spacing.md,
+    },
+    categoryChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.xs + 2,
+      borderRadius: radius.pill,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginRight: 6,
+    },
+    categoryChipActive: {
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
+    },
+    chipIcon: {
+      marginRight: 6,
+    },
+    chipText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.textSecondary,
+    },
+    chipTextActive: {
+      color: colors.textOnPrimary,
+    },
+    listHeaderRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginBottom: spacing.md,
+    },
+    sectionTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 16,
+      color: colors.textPrimary,
+    },
+    inlineAddBtn: {
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+    },
+    inlineAddBtnText: {
+      fontFamily: fonts.sansBold,
+      fontSize: 13,
+      color: colors.primary,
+    },
+    emptyCard: {
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      padding: spacing.xl,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
+      marginTop: spacing.md,
+    },
+    emptyTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 15,
+      color: colors.textPrimary,
+      marginTop: spacing.md,
+    },
+    emptySub: {
+      fontFamily: fonts.sans,
+      fontSize: 13,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginTop: spacing.xs,
+    },
+    gridWrap: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      justifyContent: 'space-between',
+    },
+    clothingCard: {
+      width: '48%',
+      marginBottom: spacing.md,
+      padding: spacing.md,
+    },
+    cardEmojiBadge: {
+      width: 56,
+      height: 56,
+      borderRadius: radius.md,
+      backgroundColor: colors.surfaceElevated,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm,
+      alignSelf: 'center',
+    },
+    cardItemName: {
+      fontFamily: fonts.sansBold,
+      fontSize: 14,
+      color: colors.textPrimary,
+    },
+    cardSubText: {
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      color: colors.textSecondary,
+      marginTop: 2,
+    },
+    cardFooter: {
+      marginTop: spacing.sm,
+      paddingTop: spacing.xs,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    wearCountText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 11,
+      color: colors.primary,
+    },
+  });

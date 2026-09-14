@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   Image,
+  Switch,
   KeyboardAvoidingView,
   Platform,
 } from 'react-native';
@@ -110,6 +111,8 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
   const [season, setSeason] = useState<ClothingSeason>('all-year');
   const [material, setMaterial] = useState('');
   const [tagsStr, setTagsStr] = useState('office, formal');
+  const [purchasePriceStr, setPurchasePriceStr] = useState('');
+  const [isWishlist, setIsWishlist] = useState(false);
   const [existingImageUri, setExistingImageUri] = useState<string | undefined>(
     undefined,
   );
@@ -135,6 +138,10 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
           setSeason(found.season);
           setMaterial(found.material || '');
           setTagsStr(found.tags.join(', '));
+          setPurchasePriceStr(
+            found.purchasePrice != null ? String(found.purchasePrice) : '',
+          );
+          setIsWishlist(!!found.isWishlist);
           setExistingImageUri(found.imageUri);
           setExistingWearCount(found.wearCount);
           setExistingLastWorn(found.lastWornDate);
@@ -201,6 +208,8 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
 
     const chosenCat =
       CATEGORY_OPTIONS.find(c => c.key === category) || CATEGORY_OPTIONS[0];
+    const parsedPrice = parseFloat(purchasePriceStr);
+    const purchasePrice = Number.isFinite(parsedPrice) ? parsedPrice : undefined;
 
     if (itemId) {
       await updateClothingItem(
@@ -217,6 +226,8 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
           imageUri: pickedPhoto?.uri ?? existingImageUri,
           wearCount: existingWearCount,
           lastWornDate: existingLastWorn,
+          purchasePrice,
+          isWishlist,
         },
         pickedPhoto,
         token,
@@ -233,6 +244,8 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
           tags,
           emoji: chosenCat.iconKey,
           imageUri: pickedPhoto?.uri,
+          purchasePrice,
+          isWishlist,
         },
         pickedPhoto,
         token,
@@ -369,6 +382,18 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
               placeholder={t('style_pantry.brand_placeholder')}
               placeholderTextColor={styles.placeholder.color}
             />
+
+            <Text style={styles.inputLabel}>
+              {t('style_pantry.purchase_price_label')}
+            </Text>
+            <TextInput
+              style={styles.textInput}
+              value={purchasePriceStr}
+              onChangeText={setPurchasePriceStr}
+              placeholder={t('style_pantry.purchase_price_placeholder')}
+              placeholderTextColor={styles.placeholder.color}
+              keyboardType="decimal-pad"
+            />
           </View>
 
           {/* Specialized Details Card */}
@@ -422,6 +447,18 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
               placeholder={t('style_pantry.tags_placeholder')}
               placeholderTextColor={styles.placeholder.color}
             />
+
+            <View style={styles.wishlistRow}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.wishlistLabel}>
+                  {t('style_pantry.wishlist_toggle_label')}
+                </Text>
+                <Text style={styles.wishlistSub}>
+                  {t('style_pantry.wishlist_toggle_sub')}
+                </Text>
+              </View>
+              <Switch value={isWishlist} onValueChange={setIsWishlist} />
+            </View>
           </View>
 
           {/* Save Button */}
@@ -642,6 +679,25 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     saveBtn: {
       marginTop: spacing.md,
+    },
+    wishlistRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.sm,
+      paddingTop: spacing.sm,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    wishlistLabel: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.textPrimary,
+    },
+    wishlistSub: {
+      fontFamily: fonts.sans,
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 2,
     },
     photoOption: {
       flexDirection: 'row',

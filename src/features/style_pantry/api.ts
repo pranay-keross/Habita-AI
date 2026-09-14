@@ -3,10 +3,18 @@ import type {
   CalendarEvent,
   ClothingItem,
   ClothingItemInput,
+  CreateCollectionRequest,
   CreateOccasionRequest,
+  CreateTripChecklistItemRequest,
+  CreateTripOutfitRequest,
+  CreateTripRequest,
   Mood,
   OutfitRecommendation,
   PickedFile,
+  TripChecklistItem,
+  TripOutfitEntry,
+  WardrobeCollection,
+  WardrobeTrip,
   WeatherContext,
   WornOutfitEntry,
 } from './types';
@@ -182,10 +190,15 @@ export async function generateOutfitRecommendationRemote(
   occasionId: string,
   token: string,
   mood?: Mood,
+  refinementNote?: string,
 ): Promise<OutfitRecommendation> {
   return apiFetch<OutfitRecommendation>('/style/recommendations/generate', {
     method: 'POST',
-    body: mood ? { occasionId, mood } : { occasionId },
+    body: {
+      occasionId,
+      ...(mood ? { mood } : {}),
+      ...(refinementNote ? { refinementNote } : {}),
+    },
     token,
   });
 }
@@ -259,6 +272,186 @@ export async function deleteSavedOutfit(
   token: string,
 ): Promise<void> {
   await apiFetch<void>(`/style/outfits/saved/${outfitId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
+/**
+ * Lists the caller's custom closet folders (collections). "All Clothes" and season
+ * filters like "Winter items" are computed client-side and never hit this endpoint.
+ * GET /api/style/collections
+ */
+export async function listCollections(
+  token: string,
+): Promise<WardrobeCollection[]> {
+  return apiFetch<WardrobeCollection[]>('/style/collections', {
+    method: 'GET',
+    token,
+  });
+}
+
+/** POST /api/style/collections */
+export async function createCollection(
+  data: CreateCollectionRequest,
+  token: string,
+): Promise<WardrobeCollection> {
+  return apiFetch<WardrobeCollection>('/style/collections', {
+    method: 'POST',
+    body: data,
+    token,
+  });
+}
+
+/** PUT /api/style/collections/{collectionId} */
+export async function updateCollection(
+  collectionId: string,
+  data: CreateCollectionRequest,
+  token: string,
+): Promise<WardrobeCollection> {
+  return apiFetch<WardrobeCollection>(`/style/collections/${collectionId}`, {
+    method: 'PUT',
+    body: data,
+    token,
+  });
+}
+
+/** DELETE /api/style/collections/{collectionId} */
+export async function deleteCollection(
+  collectionId: string,
+  token: string,
+): Promise<void> {
+  await apiFetch<void>(`/style/collections/${collectionId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
+/**
+ * Lists the caller's trips (aCloset-style travel outfit planner).
+ * GET /api/style/trips
+ */
+export async function listTrips(token: string): Promise<WardrobeTrip[]> {
+  return apiFetch<WardrobeTrip[]>('/style/trips', { method: 'GET', token });
+}
+
+/** POST /api/style/trips */
+export async function createTrip(
+  data: CreateTripRequest,
+  token: string,
+): Promise<WardrobeTrip> {
+  return apiFetch<WardrobeTrip>('/style/trips', {
+    method: 'POST',
+    body: data,
+    token,
+  });
+}
+
+/** PUT /api/style/trips/{tripId} */
+export async function updateTrip(
+  tripId: string,
+  data: CreateTripRequest,
+  token: string,
+): Promise<WardrobeTrip> {
+  return apiFetch<WardrobeTrip>(`/style/trips/${tripId}`, {
+    method: 'PUT',
+    body: data,
+    token,
+  });
+}
+
+/** DELETE /api/style/trips/{tripId} */
+export async function deleteTrip(
+  tripId: string,
+  token: string,
+): Promise<void> {
+  await apiFetch<void>(`/style/trips/${tripId}`, { method: 'DELETE', token });
+}
+
+/** GET /api/style/trips/{tripId}/outfits */
+export async function listTripOutfits(
+  tripId: string,
+  token: string,
+): Promise<TripOutfitEntry[]> {
+  return apiFetch<TripOutfitEntry[]>(`/style/trips/${tripId}/outfits`, {
+    method: 'GET',
+    token,
+  });
+}
+
+/**
+ * Creates or replaces a trip's outfit entry for a given day — the client always sends
+ * the full day entry (upsert), so the caller doesn't need a separate update endpoint.
+ * POST /api/style/trips/{tripId}/outfits
+ */
+export async function upsertTripOutfit(
+  tripId: string,
+  data: CreateTripOutfitRequest,
+  token: string,
+): Promise<TripOutfitEntry> {
+  return apiFetch<TripOutfitEntry>(`/style/trips/${tripId}/outfits`, {
+    method: 'POST',
+    body: data,
+    token,
+  });
+}
+
+/** DELETE /api/style/trips/{tripId}/outfits/{outfitEntryId} */
+export async function deleteTripOutfit(
+  tripId: string,
+  outfitEntryId: string,
+  token: string,
+): Promise<void> {
+  await apiFetch<void>(`/style/trips/${tripId}/outfits/${outfitEntryId}`, {
+    method: 'DELETE',
+    token,
+  });
+}
+
+/** GET /api/style/trips/{tripId}/checklist */
+export async function listTripChecklist(
+  tripId: string,
+  token: string,
+): Promise<TripChecklistItem[]> {
+  return apiFetch<TripChecklistItem[]>(`/style/trips/${tripId}/checklist`, {
+    method: 'GET',
+    token,
+  });
+}
+
+/** POST /api/style/trips/{tripId}/checklist */
+export async function createTripChecklistItem(
+  tripId: string,
+  data: CreateTripChecklistItemRequest,
+  token: string,
+): Promise<TripChecklistItem> {
+  return apiFetch<TripChecklistItem>(`/style/trips/${tripId}/checklist`, {
+    method: 'POST',
+    body: data,
+    token,
+  });
+}
+
+/** PUT /api/style/trips/{tripId}/checklist/{itemId} */
+export async function updateTripChecklistItem(
+  tripId: string,
+  itemId: string,
+  data: CreateTripChecklistItemRequest,
+  token: string,
+): Promise<TripChecklistItem> {
+  return apiFetch<TripChecklistItem>(
+    `/style/trips/${tripId}/checklist/${itemId}`,
+    { method: 'PUT', body: data, token },
+  );
+}
+
+/** DELETE /api/style/trips/{tripId}/checklist/{itemId} */
+export async function deleteTripChecklistItem(
+  tripId: string,
+  itemId: string,
+  token: string,
+): Promise<void> {
+  await apiFetch<void>(`/style/trips/${tripId}/checklist/${itemId}`, {
     method: 'DELETE',
     token,
   });

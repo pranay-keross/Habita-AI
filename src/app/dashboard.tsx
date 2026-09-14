@@ -459,7 +459,7 @@ export default function DashboardScreen({ navigation, route }: Props) {
 
   const handleLifeOsPress = (id: LifeOsId) => {
     if (id === 'pantry') navigation.navigate('Pantry');
-    else if (id === 'style') navigation.navigate('Wardrobe');
+    else if (id === 'style') navigation.navigate('AiStylistHome');
   };
 
   const handleHomeOpPress = (id: HomeOpId) => {

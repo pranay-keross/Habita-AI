@@ -20,7 +20,7 @@ import Mic from 'lucide-react-native/icons/mic';
 import Volume2 from 'lucide-react-native/icons/volume-2';
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
-import Trash2 from 'lucide-react-native/icons/trash-2';
+import Trash2 from 'lucide-react-native/icons/trash';
 import Check from 'lucide-react-native/icons/check';
 import {
   loadVoiceSettings,

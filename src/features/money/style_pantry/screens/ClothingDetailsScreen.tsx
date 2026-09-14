@@ -15,7 +15,7 @@ import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Pencil from 'lucide-react-native/icons/pencil';
-import Trash2 from 'lucide-react-native/icons/trash-2';
+import Trash2 from 'lucide-react-native/icons/trash';
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import Tag from 'lucide-react-native/icons/tag';
 import Clock from 'lucide-react-native/icons/clock';

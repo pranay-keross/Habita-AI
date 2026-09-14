@@ -38,7 +38,7 @@ import Search from 'lucide-react-native/icons/search';
 import ScanBarcode from 'lucide-react-native/icons/scan-barcode';
 import Check from 'lucide-react-native/icons/check';
 import Plus from 'lucide-react-native/icons/plus';
-import Trash2 from 'lucide-react-native/icons/trash-2';
+import Trash2 from 'lucide-react-native/icons/trash';
 import X from 'lucide-react-native/icons/x';
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import ImageUp from 'lucide-react-native/icons/image-up';

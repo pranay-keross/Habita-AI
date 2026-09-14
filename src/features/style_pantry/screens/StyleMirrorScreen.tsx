@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   View,
   Text,
@@ -7,7 +7,8 @@ import {
   Pressable,
   TextInput,
   Alert,
-  RefreshControl,
+  KeyboardAvoidingView,
+  Platform,
 } from 'react-native';
 import DateTimePicker, {
   type DateTimePickerEvent,
@@ -21,8 +22,10 @@ import useAuth from '../../../hooks/useAuth';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Sparkles from 'lucide-react-native/icons/sparkles';
 import Calendar from 'lucide-react-native/icons/calendar';
-import RefreshCw from 'lucide-react-native/icons/refresh-cw';
-import CheckCircle2 from 'lucide-react-native/icons/circle-check';
+import ThumbsDown from 'lucide-react-native/icons/thumbs-down';
+import Bookmark from 'lucide-react-native/icons/bookmark';
+import PencilLine from 'lucide-react-native/icons/pencil-line';
+import Send from 'lucide-react-native/icons/send';
 import Plus from 'lucide-react-native/icons/plus';
 import ClockArrowLeft from 'lucide-react-native/icons/clock-arrow-left';
 import Button from '../../../components/Button';
@@ -35,6 +38,7 @@ import {
   loadOccasions,
   createOccasionEntry,
   generateOutfitRecommendation,
+  saveOutfit,
 } from '../stylePantryStore';
 import {
   getClothingIconComponent,
@@ -51,7 +55,11 @@ import type {
 } from '../types';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 
-type Props = StackScreenProps<RootStackParamList, 'StyleMirror'>;
+type Props = StackScreenProps<RootStackParamList, 'StyleMirror' | 'StyleChat'>;
+
+type ChatMessage =
+  | { id: string; role: 'user'; text: string }
+  | { id: string; role: 'ai'; outfit: OutfitRecommendation };
 
 const EVENT_TYPES: EventType[] = [
   'office',
@@ -62,7 +70,6 @@ const EVENT_TYPES: EventType[] = [
   'workout',
 ];
 
-// Label keys follow `style_pantry.mood_{mood}` — see MOODS in `../moods.ts`.
 function moodLabelKey(mood: Mood): string {
   return `style_pantry.mood_${mood}`;
 }
@@ -92,9 +99,10 @@ export default function StyleMirrorScreen({ navigation }: Props) {
   const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(
     null,
   );
-  const [recommendation, setRecommendation] =
-    useState<OutfitRecommendation | null>(null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [generating, setGenerating] = useState(false);
+  const [composerText, setComposerText] = useState('');
+  const scrollRef = useRef<ScrollView>(null);
 
   const [selectedMood, setSelectedMood] = useState<Mood>('confident');
 
@@ -115,6 +123,8 @@ export default function StyleMirrorScreen({ navigation }: Props) {
       w: WeatherContext,
       list: ClothingItem[],
       mood?: Mood,
+      refinementNote?: string,
+      appendUserMessage?: string,
     ) => {
       setGenerating(true);
       try {
@@ -125,15 +135,45 @@ export default function StyleMirrorScreen({ navigation }: Props) {
           list,
           token,
           mood,
+          refinementNote,
         );
-        setRecommendation(outfit);
+        setMessages(prev => {
+          const base = appendUserMessage
+            ? [
+                ...prev,
+                {
+                  id: `msg_${Date.now()}_u`,
+                  role: 'user' as const,
+                  text: appendUserMessage,
+                },
+              ]
+            : prev;
+          return [
+            ...base,
+            { id: `msg_${Date.now()}_a`, role: 'ai' as const, outfit },
+          ];
+        });
       } catch {
-        setRecommendation(null);
+        // leave the conversation as-is on failure
       } finally {
         setGenerating(false);
+        setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
       }
     },
     [getAccessToken],
+  );
+
+  const startFresh = useCallback(
+    async (
+      evt: CalendarEvent,
+      w: WeatherContext,
+      list: ClothingItem[],
+      mood?: Mood,
+    ) => {
+      setMessages([]);
+      await generateFor(evt, w, list, mood);
+    },
+    [generateFor],
   );
 
   const initData = useCallback(async () => {
@@ -149,14 +189,10 @@ export default function StyleMirrorScreen({ navigation }: Props) {
     const firstEvent = loadedEvents[0] || null;
     setSelectedEvent(firstEvent);
     if (firstEvent && loadedItems.length > 0) {
-      await generateFor(firstEvent, loadedWeather, loadedItems, selectedMood);
+      await startFresh(firstEvent, loadedWeather, loadedItems, selectedMood);
     }
-    // `selectedMood` deliberately excluded: this only drives the one-time initial
-    // generation on mount, using whatever mood is selected at that moment — later mood
-    // changes regenerate via `handleMoodSelect` instead, so this effect doesn't need to
-    // (and shouldn't) re-run and re-fetch weather/items/events on every mood tap.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [getAccessToken, generateFor]);
+  }, [getAccessToken, startFresh]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -178,21 +214,37 @@ export default function StyleMirrorScreen({ navigation }: Props) {
   const handleEventSelect = (evt: CalendarEvent) => {
     setSelectedEvent(evt);
     if (weather && items.length > 0) {
-      generateFor(evt, weather, items, selectedMood);
-    }
-  };
-
-  const handleGenerateAnother = () => {
-    if (selectedEvent && weather && items.length > 0) {
-      generateFor(selectedEvent, weather, items, selectedMood);
+      startFresh(evt, weather, items, selectedMood);
     }
   };
 
   const handleMoodSelect = (mood: Mood) => {
     setSelectedMood(mood);
     if (selectedEvent && weather && items.length > 0) {
-      generateFor(selectedEvent, weather, items, mood);
+      startFresh(selectedEvent, weather, items, mood);
     }
+  };
+
+  const handleThumbsDown = () => {
+    if (selectedEvent && weather && items.length > 0 && !generating) {
+      generateFor(selectedEvent, weather, items, selectedMood);
+    }
+  };
+
+  const handleSend = () => {
+    const note = composerText.trim();
+    if (!note || !selectedEvent || !weather || items.length === 0) return;
+    setComposerText('');
+    generateFor(selectedEvent, weather, items, selectedMood, note, note);
+  };
+
+  const handleSaveOutfit = async (outfit: OutfitRecommendation) => {
+    const token = await getAccessToken();
+    await saveOutfit(outfit, token);
+    Alert.alert(
+      t('style_pantry.outfit_saved_title'),
+      t('style_pantry.outfit_saved_msg'),
+    );
   };
 
   const resetAddForm = () => {
@@ -238,273 +290,315 @@ export default function StyleMirrorScreen({ navigation }: Props) {
     setEvents(prev => [occasion, ...prev]);
     setSelectedEvent(occasion);
     if (weather && items.length > 0) {
-      generateFor(occasion, weather, items, selectedMood);
+      startFresh(occasion, weather, items, selectedMood);
     }
   };
 
   return (
-    <View style={styles.root}>
-      {/* Header Bar */}
-      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <ArrowLeft size={20} color={styles.headerIcon.color} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('style_pantry.mirror_title')}</Text>
-        <Pressable
-          onPress={() => navigation.navigate('StyleLog')}
-          style={styles.headerBtn}
-        >
-          <ClockArrowLeft size={18} color={styles.headerIcon.color} />
-        </Pressable>
-      </View>
+    <KeyboardAvoidingView
+      style={{ flex: 1 }}
+      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+    >
+      <View style={styles.root}>
+        {/* Header Bar */}
+        <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
+          <Pressable
+            onPress={() => navigation.goBack()}
+            style={styles.headerBtn}
+          >
+            <ArrowLeft size={20} color={styles.headerIcon.color} />
+          </Pressable>
+          <Text style={styles.headerTitle}>{t('style_chat.title')}</Text>
+          <Pressable
+            onPress={() => navigation.navigate('StyleLog')}
+            style={styles.headerBtn}
+          >
+            <ClockArrowLeft size={18} color={styles.headerIcon.color} />
+          </Pressable>
+        </View>
 
-      <ScrollView
-        contentContainerStyle={styles.content}
-        showsVerticalScrollIndicator={false}
-        refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={styles.headerIcon.color}
-            colors={[styles.headerIcon.color]}
-          />
-        }
-      >
-        {/* Weather Context Banner */}
-        {loading || !weather ? (
-          <View style={styles.weatherHeroCard}>
-            <View style={styles.weatherHeroRow}>
-              <SkeletonBox
-                width={44}
-                height={44}
-                borderRadius={22}
-                style={{ marginRight: 12 }}
-              />
-              <View style={{ flex: 1 }}>
-                <SkeletonText width="40%" style={{ marginBottom: 6 }} />
-                <SkeletonText width="65%" height={12} />
-              </View>
-            </View>
-          </View>
-        ) : (
-          <GlassCard variant="elevated" style={styles.weatherHeroCard}>
-            <View style={styles.weatherHeroRow}>
-              <View style={styles.sunCircle}>
-                <WeatherIcon size={24} color={styles.weatherIconColor.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.weatherTitle}>
-                  {weather.city
-                    ? t('style_pantry.weather_location', { city: weather.city })
-                    : t('style_pantry.today_weather')}
-                </Text>
-                <Text style={styles.weatherSub}>{weather.description}</Text>
-              </View>
-            </View>
-          </GlassCard>
-        )}
-
-        {/* Mood Selector — feeds the outfit pick alongside weather + occasion */}
-        <Text style={styles.sectionTitle}>{t('style_pantry.mood_prompt')}</Text>
         <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.moodScroll}
+          ref={scrollRef}
+          contentContainerStyle={styles.content}
+          showsVerticalScrollIndicator={false}
         >
-          {MOODS.map(mood => {
-            const MoodIcon = getMoodIconComponent(mood);
-            const active = selectedMood === mood;
-            return (
+          {/* Weather Context Banner */}
+          {loading || !weather ? (
+            <View style={styles.weatherHeroCard}>
+              <View style={styles.weatherHeroRow}>
+                <SkeletonBox
+                  width={44}
+                  height={44}
+                  borderRadius={22}
+                  style={{ marginRight: 12 }}
+                />
+                <View style={{ flex: 1 }}>
+                  <SkeletonText width="40%" style={{ marginBottom: 6 }} />
+                  <SkeletonText width="65%" height={12} />
+                </View>
+              </View>
+            </View>
+          ) : (
+            <GlassCard variant="elevated" style={styles.weatherHeroCard}>
+              <View style={styles.weatherHeroRow}>
+                <View style={styles.sunCircle}>
+                  <WeatherIcon size={24} color={styles.weatherIconColor.color} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.weatherTitle}>
+                    {weather.city
+                      ? t('style_pantry.weather_location', { city: weather.city })
+                      : t('style_pantry.today_weather')}
+                  </Text>
+                  <Text style={styles.weatherSub}>{weather.description}</Text>
+                </View>
+              </View>
+            </GlassCard>
+          )}
+
+          {/* Mood Selector */}
+          <Text style={styles.sectionTitle}>{t('style_pantry.mood_prompt')}</Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.moodScroll}
+          >
+            {MOODS.map(mood => {
+              const MoodIcon = getMoodIconComponent(mood);
+              const active = selectedMood === mood;
+              return (
+                <Pressable
+                  key={mood}
+                  style={[styles.moodChip, active && styles.moodChipActive]}
+                  onPress={() => handleMoodSelect(mood)}
+                >
+                  {MoodIcon ? (
+                    <MoodIcon
+                      size={14}
+                      color={
+                        active
+                          ? styles.headerIconOnPrimary.color
+                          : styles.iconTint.color
+                      }
+                      style={styles.moodChipIcon}
+                    />
+                  ) : null}
+                  <Text
+                    style={[
+                      styles.moodChipText,
+                      active && styles.moodChipTextActive,
+                    ]}
+                  >
+                    {t(moodLabelKey(mood))}
+                  </Text>
+                </Pressable>
+              );
+            })}
+          </ScrollView>
+
+          {/* Calendar Events Selector */}
+          <Text style={styles.sectionTitle}>
+            {t('style_pantry.upcoming_events')}
+          </Text>
+          <ScrollView
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            contentContainerStyle={styles.eventsScroll}
+          >
+            {events.map(evt => (
               <Pressable
-                key={mood}
-                style={[styles.moodChip, active && styles.moodChipActive]}
-                onPress={() => handleMoodSelect(mood)}
+                key={evt.id}
+                style={[
+                  styles.eventCard,
+                  selectedEvent?.id === evt.id && styles.eventCardActive,
+                ]}
+                onPress={() => handleEventSelect(evt)}
               >
-                {MoodIcon ? (
-                  <MoodIcon
-                    size={14}
+                <View style={styles.eventTimeBadge}>
+                  <Calendar
+                    size={12}
                     color={
-                      active
+                      selectedEvent?.id === evt.id
                         ? styles.headerIconOnPrimary.color
                         : styles.iconTint.color
                     }
-                    style={styles.moodChipIcon}
                   />
-                ) : null}
+                  <Text
+                    style={[
+                      styles.eventTimeText,
+                      selectedEvent?.id === evt.id && styles.eventTimeTextActive,
+                    ]}
+                  >
+                    {evt.time}
+                  </Text>
+                </View>
                 <Text
                   style={[
-                    styles.moodChipText,
-                    active && styles.moodChipTextActive,
+                    styles.eventTitleText,
+                    selectedEvent?.id === evt.id && styles.eventTitleTextActive,
+                  ]}
+                  numberOfLines={1}
+                >
+                  {evt.title}
+                </Text>
+                <Text
+                  style={[
+                    styles.eventTypeTag,
+                    selectedEvent?.id === evt.id && styles.eventTypeTagActive,
                   ]}
                 >
-                  {t(moodLabelKey(mood))}
+                  {evt.eventType.toUpperCase()}
                 </Text>
               </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {/* Calendar Events Selector */}
-        <Text style={styles.sectionTitle}>
-          {t('style_pantry.upcoming_events')}
-        </Text>
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.eventsScroll}
-        >
-          {events.map(evt => (
+            ))}
             <Pressable
-              key={evt.id}
-              style={[
-                styles.eventCard,
-                selectedEvent?.id === evt.id && styles.eventCardActive,
-              ]}
-              onPress={() => handleEventSelect(evt)}
+              style={styles.addEventCard}
+              onPress={() => setShowAddSheet(true)}
             >
-              <View style={styles.eventTimeBadge}>
-                <Calendar
-                  size={12}
-                  color={
-                    selectedEvent?.id === evt.id
-                      ? styles.headerIconOnPrimary.color
-                      : styles.iconTint.color
-                  }
-                />
-                <Text
-                  style={[
-                    styles.eventTimeText,
-                    selectedEvent?.id === evt.id && styles.eventTimeTextActive,
-                  ]}
-                >
-                  {evt.time}
-                </Text>
-              </View>
-              <Text
-                style={[
-                  styles.eventTitleText,
-                  selectedEvent?.id === evt.id && styles.eventTitleTextActive,
-                ]}
-                numberOfLines={1}
-              >
-                {evt.title}
-              </Text>
-              <Text
-                style={[
-                  styles.eventTypeTag,
-                  selectedEvent?.id === evt.id && styles.eventTypeTagActive,
-                ]}
-              >
-                {evt.eventType.toUpperCase()}
+              <Plus size={18} color={styles.iconTint.color} />
+              <Text style={styles.addEventText}>
+                {t('style_pantry.add_occasion_short')}
               </Text>
             </Pressable>
-          ))}
-          <Pressable
-            style={styles.addEventCard}
-            onPress={() => setShowAddSheet(true)}
-          >
-            <Plus size={18} color={styles.iconTint.color} />
-            <Text style={styles.addEventText}>
-              {t('style_pantry.add_occasion_short')}
-            </Text>
-          </Pressable>
-        </ScrollView>
+          </ScrollView>
 
-        {/* AI Outfit Suggestion Card */}
-        <View style={styles.aiHeaderRow}>
-          <Sparkles size={20} color={styles.aiAccent.color} />
-          <Text style={styles.aiSectionTitle}>
-            {t('style_pantry.ai_recommendation')}
-          </Text>
-        </View>
-
-        {loading || generating ? (
-          <View style={styles.loadingBox}>
-            <SkeletonBox
-              width={40}
-              height={40}
-              borderRadius={20}
-              style={{ marginBottom: 12 }}
-            />
-            <Text style={styles.loadingText}>
-              {t('style_pantry.ai_styling_text')}
-            </Text>
+          {/* Chat conversation */}
+          <View style={styles.aiHeaderRow}>
+            <Sparkles size={20} color={styles.aiAccent.color} />
+            <Text style={styles.aiSectionTitle}>{t('style_chat.title')}</Text>
           </View>
-        ) : recommendation ? (
-          <GlassCard variant="glow">
-            {/* Badges Row */}
-            <View style={styles.badgesRow}>
-              <View style={styles.matchBadgePrimary}>
-                <CheckCircle2
-                  size={12}
-                  color={styles.aiAccent.color}
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={styles.matchBadgeTextPrimary}>
-                  {recommendation.occasionSuitability}
-                </Text>
-              </View>
-              <View style={styles.matchBadgeGreen}>
-                <CheckCircle2
-                  size={12}
-                  color={styles.successColor.color}
-                  style={{ marginRight: 4 }}
-                />
-                <Text style={styles.matchBadgeTextGreen}>
-                  {recommendation.weatherSuitability}
-                </Text>
-              </View>
-            </View>
 
-            {/* Selected Outfit Items Visual Grid */}
-            <Text style={styles.outfitTitle}>{recommendation.title}</Text>
-            <Text style={styles.stylistNote}>{recommendation.stylistNote}</Text>
-
-            <View style={styles.itemsPreviewRow}>
-              {recommendation.items.map(item => {
-                const ItemIcon = getClothingIconComponent(item.emoji);
-                return (
-                  <View key={item.id} style={styles.itemMiniCard}>
-                    <ItemIcon
-                      size={24}
-                      color={styles.iconTint.color}
-                      style={styles.itemMiniIcon}
-                    />
-                    <Text style={styles.itemMiniName} numberOfLines={1}>
-                      {item.name}
-                    </Text>
-                    <Text style={styles.itemMiniCat}>{item.category}</Text>
+          {messages.map((msg, idx) => {
+            if (msg.role === 'user') {
+              return (
+                <View key={msg.id} style={styles.userBubbleRow}>
+                  <View style={styles.userBubble}>
+                    <Text style={styles.userBubbleText}>{msg.text}</Text>
                   </View>
-                );
-              })}
-            </View>
+                </View>
+              );
+            }
+            const isLatest = idx === messages.length - 1;
+            const outfit = msg.outfit;
+            return (
+              <GlassCard key={msg.id} variant="glow" style={styles.aiCard}>
+                <View style={styles.badgesRow}>
+                  <View style={styles.matchBadgePrimary}>
+                    <Text style={styles.matchBadgeTextPrimary}>
+                      {outfit.occasionSuitability}
+                    </Text>
+                  </View>
+                  <View style={styles.matchBadgeGreen}>
+                    <Text style={styles.matchBadgeTextGreen}>
+                      {outfit.weatherSuitability}
+                    </Text>
+                  </View>
+                </View>
 
-            {/* Actions */}
-            <View style={styles.actionRow}>
-              <Pressable
-                style={styles.reGenerateBtn}
-                onPress={handleGenerateAnother}
-              >
-                <RefreshCw
-                  size={16}
-                  color={styles.aiAccent.color}
-                  style={{ marginRight: 6 }}
-                />
-                <Text style={styles.reGenerateText}>
-                  {t('style_pantry.generate_another')}
-                </Text>
-              </Pressable>
-            </View>
+                <Text style={styles.outfitTitle}>{outfit.title}</Text>
+                <Text style={styles.stylistNote}>{outfit.stylistNote}</Text>
 
+                <View style={styles.itemsPreviewRow}>
+                  {outfit.items.map(item => {
+                    const ItemIcon = getClothingIconComponent(item.emoji);
+                    return (
+                      <View key={item.id} style={styles.itemMiniCard}>
+                        <ItemIcon
+                          size={24}
+                          color={styles.iconTint.color}
+                          style={styles.itemMiniIcon}
+                        />
+                        <Text style={styles.itemMiniName} numberOfLines={1}>
+                          {item.name}
+                        </Text>
+                      </View>
+                    );
+                  })}
+                </View>
+
+                <View style={styles.chatActionRow}>
+                  {isLatest ? (
+                    <Pressable
+                      style={styles.chatActionBtn}
+                      onPress={handleThumbsDown}
+                      disabled={generating}
+                    >
+                      <ThumbsDown size={16} color={styles.iconTint.color} />
+                    </Pressable>
+                  ) : null}
+                  <Pressable
+                    style={styles.chatActionBtn}
+                    onPress={() =>
+                      navigation.navigate('OutfitDetails', { outfit })
+                    }
+                  >
+                    <PencilLine size={16} color={styles.iconTint.color} />
+                    <Text style={styles.chatActionText}>
+                      {t('style_chat.edit')}
+                    </Text>
+                  </Pressable>
+                  <Pressable
+                    style={[styles.chatActionBtn, styles.chatActionBtnPrimary]}
+                    onPress={() => handleSaveOutfit(outfit)}
+                  >
+                    <Bookmark size={16} color={styles.headerIconOnPrimary.color} />
+                    <Text style={styles.chatActionTextPrimary}>
+                      {t('style_pantry.save_outfit')}
+                    </Text>
+                  </Pressable>
+                </View>
+              </GlassCard>
+            );
+          })}
+
+          {generating ? (
+            <View style={styles.loadingBox}>
+              <SkeletonBox
+                width={40}
+                height={40}
+                borderRadius={20}
+                style={{ marginBottom: 12 }}
+              />
+              <Text style={styles.loadingText}>
+                {t('style_pantry.ai_styling_text')}
+              </Text>
+            </View>
+          ) : null}
+
+          {messages.length > 0 && !generating ? (
             <Button
               title={t('style_pantry.view_outfit_details')}
-              onPress={() =>
-                navigation.navigate('OutfitDetails', { outfit: recommendation })
-              }
+              onPress={() => {
+                const last = [...messages].reverse().find(m => m.role === 'ai');
+                if (last && last.role === 'ai') {
+                  navigation.navigate('OutfitDetails', { outfit: last.outfit });
+                }
+              }}
+              style={{ marginTop: 8 }}
             />
-          </GlassCard>
-        ) : null}
-      </ScrollView>
+          ) : null}
+        </ScrollView>
+
+        {/* Composer */}
+        <View style={[styles.composerRow, { paddingBottom: insets.bottom + 8 }]}>
+          <TextInput
+            style={styles.composerInput}
+            value={composerText}
+            onChangeText={setComposerText}
+            placeholder={t('style_chat.composer_placeholder')}
+            placeholderTextColor={styles.placeholder.color}
+            onSubmitEditing={handleSend}
+            returnKeyType="send"
+          />
+          <Pressable
+            style={styles.sendBtn}
+            onPress={handleSend}
+            disabled={generating || !composerText.trim()}
+          >
+            <Send size={18} color={styles.headerIconOnPrimary.color} />
+          </Pressable>
+        </View>
+      </View>
 
       <BottomSheet
         visible={showAddSheet}
@@ -586,7 +680,7 @@ export default function StyleMirrorScreen({ navigation }: Props) {
           style={{ marginTop: 8 }}
         />
       </BottomSheet>
-    </View>
+    </KeyboardAvoidingView>
   );
 }
 
@@ -627,9 +721,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     aiAccent: {
       color: colors.primary,
     },
-    successColor: {
-      color: colors.forest,
-    },
     weatherIconColor: {
       color: colors.turmeric,
     },
@@ -640,7 +731,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     content: {
       paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xxl,
+      paddingBottom: spacing.xl,
     },
     weatherHeroCard: {
       marginBottom: spacing.md,
@@ -778,7 +869,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      marginBottom: spacing.xs,
+      marginBottom: spacing.sm,
       marginTop: spacing.xs,
     },
     aiSectionTitle: {
@@ -786,14 +877,35 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       fontSize: 16,
       color: colors.textPrimary,
     },
+    userBubbleRow: {
+      alignItems: 'flex-end',
+      marginBottom: spacing.sm,
+    },
+    userBubble: {
+      backgroundColor: colors.primary,
+      borderRadius: radius.lg,
+      borderBottomRightRadius: 4,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      maxWidth: '80%',
+    },
+    userBubbleText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.textOnPrimary,
+    },
+    aiCard: {
+      marginBottom: spacing.md,
+    },
     loadingBox: {
       backgroundColor: colors.surface,
       borderRadius: radius.lg,
-      padding: spacing.xxl,
+      padding: spacing.xl,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: colors.border,
+      marginBottom: spacing.md,
     },
     loadingText: {
       fontFamily: fonts.sansMedium,
@@ -802,12 +914,12 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginTop: spacing.md,
     },
     badgesRow: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
       gap: 6,
       marginBottom: spacing.sm,
     },
     matchBadgePrimary: {
-      flexDirection: 'row',
-      alignItems: 'center',
       backgroundColor: colors.surfaceElevated,
       paddingHorizontal: spacing.sm,
       paddingVertical: 4,
@@ -819,8 +931,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.primary,
     },
     matchBadgeGreen: {
-      flexDirection: 'row',
-      alignItems: 'center',
       backgroundColor: colors.blush,
       paddingHorizontal: spacing.sm,
       paddingVertical: 4,
@@ -868,28 +978,64 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       color: colors.textPrimary,
       textAlign: 'center',
     },
-    itemMiniCat: {
-      fontFamily: fonts.sans,
-      fontSize: 9,
-      color: colors.textSecondary,
-      textTransform: 'uppercase',
-      marginTop: 2,
+    chatActionRow: {
+      flexDirection: 'row',
+      gap: spacing.xs,
+      alignItems: 'center',
     },
-    actionRow: {
-      marginBottom: spacing.md,
-    },
-    reGenerateBtn: {
+    chatActionBtn: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      backgroundColor: colors.blush,
+      backgroundColor: colors.surfaceElevated,
       borderRadius: radius.md,
       paddingVertical: spacing.sm,
+      paddingHorizontal: spacing.md,
+      gap: 4,
     },
-    reGenerateText: {
+    chatActionBtnPrimary: {
+      backgroundColor: colors.primary,
+      flex: 1,
+    },
+    chatActionText: {
       fontFamily: fonts.sansBold,
-      fontSize: 13,
+      fontSize: 12,
       color: colors.primary,
+    },
+    chatActionTextPrimary: {
+      fontFamily: fonts.sansBold,
+      fontSize: 12,
+      color: colors.textOnPrimary,
+    },
+    composerRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.sm,
+      backgroundColor: colors.background,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    composerInput: {
+      flex: 1,
+      fontFamily: fonts.sans,
+      fontSize: 14,
+      color: colors.textPrimary,
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    sendBtn: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     inputLabel: {
       fontFamily: fonts.sansMedium,

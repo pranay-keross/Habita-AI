@@ -21,7 +21,7 @@ import User from 'lucide-react-native/icons/user';
 import Eye from 'lucide-react-native/icons/eye';
 import EyeOff from 'lucide-react-native/icons/eye-off';
 import ShieldCheck from 'lucide-react-native/icons/shield-check';
-import Trash2 from 'lucide-react-native/icons/trash-2';
+import Trash2 from 'lucide-react-native/icons/trash';
 import Clock from 'lucide-react-native/icons/clock';
 import File from 'lucide-react-native/icons/file';
 import ExternalLink from 'lucide-react-native/icons/external-link';

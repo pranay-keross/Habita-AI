@@ -33,7 +33,7 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
-  const { outfit } = route.params;
+  const { outfit, readOnly } = route.params;
   const [, setLocaleVersion] = useState(0);
 
   const [wearing, setWearing] = useState(false);
@@ -85,9 +85,13 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
         <Text style={styles.headerTitle}>
           {t('style_pantry.outfit_preview_title')}
         </Text>
-        <Pressable onPress={handleSaveOutfit} style={styles.headerBtn}>
-          <Bookmark size={18} color={styles.aiAccent.color} />
-        </Pressable>
+        {readOnly ? (
+          <View style={styles.headerBtn} />
+        ) : (
+          <Pressable onPress={handleSaveOutfit} style={styles.headerBtn}>
+            <Bookmark size={18} color={styles.aiAccent.color} />
+          </Pressable>
+        )}
       </View>
 
       <ScrollView
@@ -163,23 +167,25 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
         </View>
 
         {/* Bottom Actions */}
-        <View style={styles.btnRow}>
-          <Button
-            title={t('style_pantry.wear_today')}
-            onPress={handleWearToday}
-            loading={wearing}
-          />
-          <Pressable style={styles.saveOutlineBtn} onPress={handleSaveOutfit}>
-            <Bookmark
-              size={18}
-              color={styles.aiAccent.color}
-              style={{ marginRight: 6 }}
+        {!readOnly && (
+          <View style={styles.btnRow}>
+            <Button
+              title={t('style_pantry.wear_today')}
+              onPress={handleWearToday}
+              loading={wearing}
             />
-            <Text style={styles.saveOutlineText}>
-              {t('style_pantry.save_outfit')}
-            </Text>
-          </Pressable>
-        </View>
+            <Pressable style={styles.saveOutlineBtn} onPress={handleSaveOutfit}>
+              <Bookmark
+                size={18}
+                color={styles.aiAccent.color}
+                style={{ marginRight: 6 }}
+              />
+              <Text style={styles.saveOutlineText}>
+                {t('style_pantry.save_outfit')}
+              </Text>
+            </Pressable>
+          </View>
+        )}
       </ScrollView>
     </View>
   );

@@ -16,7 +16,7 @@ import useThemedStyles from '../../../hooks/useThemedStyles';
 import useAuth from '../../../hooks/useAuth';
 import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Pencil from 'lucide-react-native/icons/pencil';
-import Trash2 from 'lucide-react-native/icons/trash-2';
+import Trash2 from 'lucide-react-native/icons/trash';
 import Tag from 'lucide-react-native/icons/tag';
 import Clock from 'lucide-react-native/icons/clock';
 import Button from '../../../components/Button';

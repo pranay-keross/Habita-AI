@@ -25,6 +25,8 @@ export interface ClothingItem {
   emoji: string;
   wearCount: number;
   lastWornDate?: string; // YYYY-MM-DD
+  purchasePrice?: number; // powers the Style Calendar's "Expenses" stat
+  isWishlist?: boolean; // not yet owned — excluded from outfit generation
   createdAt?: string;
   updatedAt?: string;
 }
@@ -101,3 +103,51 @@ export interface WornOutfitEntry {
   itemIds: string[];
   mood?: Mood;
 }
+
+// A user-created closet folder (aCloset-style "Collections"). "All Clothes" and
+// "Winter items" are computed client-side (all items / season === 'winter') and never
+// stored as a WardrobeCollection — only custom, user-named folders are backend-owned.
+export interface WardrobeCollection {
+  id: string;
+  name: string;
+  iconKey: string; // resolved via collectionIcons.ts
+  itemIds: string[];
+  createdAt?: string;
+}
+
+export type CreateCollectionRequest = Omit<WardrobeCollection, 'id' | 'createdAt'>;
+
+export interface WardrobeTrip {
+  id: string;
+  title: string;
+  coverImageUri?: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string; // YYYY-MM-DD
+  location?: string;
+  notes?: string;
+  packedItemIds?: string[];
+  createdAt?: string;
+}
+
+export type CreateTripRequest = Omit<WardrobeTrip, 'id' | 'createdAt'>;
+
+// One row in a trip's day-by-day outfit itinerary.
+export interface TripOutfitEntry {
+  id: string;
+  tripId: string;
+  date: string; // YYYY-MM-DD
+  itemIds: string[];
+  outfitTitle: string;
+  weatherHint?: string;
+}
+
+export type CreateTripOutfitRequest = Omit<TripOutfitEntry, 'id'>;
+
+export interface TripChecklistItem {
+  id: string;
+  tripId: string;
+  label: string;
+  checked: boolean;
+}
+
+export type CreateTripChecklistItemRequest = Omit<TripChecklistItem, 'id'>;

@@ -1,30 +1,53 @@
 import { getItem, setItem } from '../../utils/storage';
 import { isNetworkError } from '../../utils/networkStatus';
 import {
+  createCollection,
   createOccasion,
+  createTrip,
+  createTripChecklistItem,
   createWardrobeItem,
+  deleteCollection,
   deleteOccasion,
   deleteSavedOutfit,
+  deleteTrip,
+  deleteTripChecklistItem,
+  deleteTripOutfit,
   deleteWardrobeItem,
   generateOutfitRecommendationRemote,
   getWeather,
+  listCollections,
   listOccasions,
   listSavedOutfits,
   listStyleHistory,
+  listTripChecklist,
+  listTripOutfits,
+  listTrips,
   listWardrobeItems,
   recordStyleHistoryEntry,
   recordWearEvent,
   saveOutfitRemote,
+  updateCollection,
+  updateTrip,
+  updateTripChecklistItem,
   updateWardrobeItem,
+  upsertTripOutfit,
 } from './api';
 import type {
   ClothingItem,
   ClothingCategory,
   ClothingItemInput,
   CalendarEvent,
+  CreateCollectionRequest,
   CreateOccasionRequest,
+  CreateTripChecklistItemRequest,
+  CreateTripOutfitRequest,
+  CreateTripRequest,
   Mood,
   PickedFile,
+  TripChecklistItem,
+  TripOutfitEntry,
+  WardrobeCollection,
+  WardrobeTrip,
   WeatherContext,
   OutfitRecommendation,
   WornOutfitEntry,
@@ -34,6 +57,10 @@ const CLOSET_STORAGE_KEY = 'habita.style_pantry_items';
 const SAVED_OUTFITS_KEY = 'habita.style_pantry_saved_outfits';
 const OCCASIONS_STORAGE_KEY = 'habita.style_pantry_occasions';
 const STYLE_HISTORY_STORAGE_KEY = 'habita.style_pantry_history';
+const COLLECTIONS_STORAGE_KEY = 'habita.style_pantry_collections';
+const TRIPS_STORAGE_KEY = 'habita.style_pantry_trips';
+const TRIP_OUTFITS_STORAGE_KEY = 'habita.style_pantry_trip_outfits';
+const TRIP_CHECKLIST_STORAGE_KEY = 'habita.style_pantry_trip_checklist';
 
 // Local/offline fallback data — kept as the manual fallback per docs/BACKLOG.md M8-T4
 // ("each hook-point's manual/local fallback must keep working if the AI call fails"),
@@ -469,39 +496,82 @@ const MOOD_NOTE_PHRASE: Record<Mood, string> = {
   playful: ' with a playful, fun touch',
 };
 
+// Naive keyword -> tag-bias heuristic for the chat screen's free-text refinement
+// ("make it more formal?"). Mirrors the mood-tag-hint approach above and is meant to be
+// upgraded to a real LLM call server-side later (docs/WARDROBE_API_SPEC.md §4.4) without
+// changing this function's shape — it's the permanent local fallback, not a temporary
+// shim.
+const REFINEMENT_TAG_KEYWORDS: Record<string, string[]> = {
+  formal: ['formal', 'office'],
+  office: ['formal', 'office'],
+  professional: ['formal', 'office'],
+  casual: ['casual'],
+  relaxed: ['casual'],
+  party: ['party'],
+  bold: ['party'],
+  fun: ['party', 'casual'],
+  warm: ['jacket'],
+  cold: ['jacket'],
+  jacket: ['jacket'],
+  workout: ['workout'],
+  gym: ['workout'],
+};
+
+function tagsFromRefinementNote(note?: string): string[] {
+  if (!note) return [];
+  const lower = note.toLowerCase();
+  const tags = new Set<string>();
+  for (const [keyword, hints] of Object.entries(REFINEMENT_TAG_KEYWORDS)) {
+    if (lower.includes(keyword)) {
+      hints.forEach(h => tags.add(h));
+    }
+  }
+  return Array.from(tags);
+}
+
 // Pure, testable rule-based outfit matcher — kept as the manual/local fallback per
 // docs/BACKLOG.md M7-T4/M8-T4, used whenever there's no token or the backend
 // recommendation call fails. Never renamed/changed shape so it keeps working standalone;
-// `mood` was added additively (optional, defaults to no preference) so existing callers
-// keep compiling untouched.
+// `mood` and `refinementNote` were added additively (optional, default to no preference)
+// so existing callers keep compiling untouched.
 export function generateAIOutfit(
   weather: WeatherContext,
   event: CalendarEvent,
   items: ClothingItem[],
   mood?: Mood,
+  refinementNote?: string,
 ): OutfitRecommendation {
+  const ownedItems = items.filter(i => !i.isWishlist);
   const targetTag = event.eventType;
-  const moodTags = mood ? MOOD_TAG_HINTS[mood] : [];
+  const refinementTags = tagsFromRefinementNote(refinementNote);
+  const moodTags = [...(mood ? MOOD_TAG_HINTS[mood] : []), ...refinementTags];
+  const wantsJacket = refinementTags.includes('jacket');
   const findItem = (category: ClothingCategory): ClothingItem | undefined => {
-    const matchingCat = items.filter(i => i.category === category);
+    const matchingCat = ownedItems.filter(i => i.category === category);
     if (matchingCat.length === 0) return undefined;
     const moodAndOccasionMatch = matchingCat.find(
       i =>
         i.tags.includes(targetTag) &&
         moodTags.some(hint => i.tags.includes(hint)),
     );
+    const moodOnlyMatch = matchingCat.find(i =>
+      moodTags.some(hint => i.tags.includes(hint)),
+    );
     const tagMatch =
-      moodAndOccasionMatch || matchingCat.find(i => i.tags.includes(targetTag));
+      moodAndOccasionMatch ||
+      moodOnlyMatch ||
+      matchingCat.find(i => i.tags.includes(targetTag));
     return (
       tagMatch || matchingCat[Math.floor(Math.random() * matchingCat.length)]
     );
   };
 
-  const top = findItem('tops') || items[0];
-  const bottom = findItem('bottoms') || items.find(i => i !== top);
-  const shoes = findItem('shoes') || items.find(i => i !== top && i !== bottom);
+  const top = findItem('tops') || ownedItems[0];
+  const bottom = findItem('bottoms') || ownedItems.find(i => i !== top);
+  const shoes =
+    findItem('shoes') || ownedItems.find(i => i !== top && i !== bottom);
   const jacket =
-    weather.temperature < 22 || targetTag === 'office'
+    wantsJacket || weather.temperature < 22 || targetTag === 'office'
       ? findItem('jackets')
       : undefined;
   const accessory = findItem('accessories');
@@ -566,15 +636,21 @@ export async function generateOutfitRecommendation(
   items: ClothingItem[],
   token?: string | null,
   mood?: Mood,
+  refinementNote?: string,
 ): Promise<OutfitRecommendation> {
   if (token) {
     try {
-      return await generateOutfitRecommendationRemote(event.id, token, mood);
+      return await generateOutfitRecommendationRemote(
+        event.id,
+        token,
+        mood,
+        refinementNote,
+      );
     } catch {
       // fall through to the local rule-based matcher
     }
   }
-  return generateAIOutfit(weather, event, items, mood);
+  return generateAIOutfit(weather, event, items, mood, refinementNote);
 }
 
 /**
@@ -631,5 +707,331 @@ export async function logStyleHistoryEntry(
 
   const current = await loadStyleHistory();
   await setItem(STYLE_HISTORY_STORAGE_KEY, [entry, ...current]);
+  return { offline };
+}
+
+// ---------------------------------------------------------------------------
+// Closet Collections (custom folders) — same online-first/AsyncStorage-fallback shape
+// as every read/write above.
+// ---------------------------------------------------------------------------
+
+export async function loadCollections(
+  token?: string | null,
+): Promise<WardrobeCollection[]> {
+  if (token) {
+    try {
+      const collections = await listCollections(token);
+      await setItem(COLLECTIONS_STORAGE_KEY, collections);
+      return collections;
+    } catch {
+      // fall through to local cache
+    }
+  }
+  return (
+    (await getItem<WardrobeCollection[]>(COLLECTIONS_STORAGE_KEY, [])) || []
+  );
+}
+
+export async function addCollection(
+  data: CreateCollectionRequest,
+  token?: string | null,
+): Promise<{ collection: WardrobeCollection; offline: boolean }> {
+  let offline = !token;
+  let created: WardrobeCollection = { ...data, id: `collection_${Date.now()}` };
+  if (token) {
+    try {
+      created = await createCollection(data, token);
+      offline = false;
+    } catch {
+      offline = true;
+    }
+  }
+  const current = await loadCollections();
+  await setItem(COLLECTIONS_STORAGE_KEY, [created, ...current]);
+  return { collection: created, offline };
+}
+
+export async function editCollection(
+  collection: WardrobeCollection,
+  token?: string | null,
+): Promise<{ collection: WardrobeCollection; offline: boolean }> {
+  let offline = !token;
+  let result = collection;
+  if (token) {
+    try {
+      result = await updateCollection(collection.id, collection, token);
+      offline = false;
+    } catch {
+      offline = true;
+    }
+  }
+  const current = await loadCollections();
+  await setItem(
+    COLLECTIONS_STORAGE_KEY,
+    current.map(c => (c.id === result.id ? result : c)),
+  );
+  return { collection: result, offline };
+}
+
+export async function removeCollection(
+  collectionId: string,
+  token?: string | null,
+): Promise<{ offline: boolean }> {
+  let offline = !token;
+  if (token) {
+    try {
+      await deleteCollection(collectionId, token);
+      offline = false;
+    } catch (err) {
+      offline = isNetworkError(err);
+    }
+  }
+  const current = await loadCollections();
+  await setItem(
+    COLLECTIONS_STORAGE_KEY,
+    current.filter(c => c.id !== collectionId),
+  );
+  return { offline };
+}
+
+// ---------------------------------------------------------------------------
+// Trips (aCloset-style travel outfit planner)
+// ---------------------------------------------------------------------------
+
+export async function loadTrips(token?: string | null): Promise<WardrobeTrip[]> {
+  if (token) {
+    try {
+      const trips = await listTrips(token);
+      await setItem(TRIPS_STORAGE_KEY, trips);
+      return trips;
+    } catch {
+      // fall through to local cache
+    }
+  }
+  return (await getItem<WardrobeTrip[]>(TRIPS_STORAGE_KEY, [])) || [];
+}
+
+export async function addTrip(
+  data: CreateTripRequest,
+  token?: string | null,
+): Promise<{ trip: WardrobeTrip; offline: boolean }> {
+  let offline = !token;
+  let created: WardrobeTrip = { ...data, id: `trip_${Date.now()}` };
+  if (token) {
+    try {
+      created = await createTrip(data, token);
+      offline = false;
+    } catch {
+      offline = true;
+    }
+  }
+  const current = await loadTrips();
+  await setItem(TRIPS_STORAGE_KEY, [created, ...current]);
+  return { trip: created, offline };
+}
+
+export async function editTrip(
+  trip: WardrobeTrip,
+  token?: string | null,
+): Promise<{ trip: WardrobeTrip; offline: boolean }> {
+  let offline = !token;
+  let result = trip;
+  if (token) {
+    try {
+      result = await updateTrip(trip.id, trip, token);
+      offline = false;
+    } catch {
+      offline = true;
+    }
+  }
+  const current = await loadTrips();
+  await setItem(
+    TRIPS_STORAGE_KEY,
+    current.map(t => (t.id === result.id ? result : t)),
+  );
+  return { trip: result, offline };
+}
+
+export async function removeTrip(
+  tripId: string,
+  token?: string | null,
+): Promise<{ offline: boolean }> {
+  let offline = !token;
+  if (token) {
+    try {
+      await deleteTrip(tripId, token);
+      offline = false;
+    } catch (err) {
+      offline = isNetworkError(err);
+    }
+  }
+  const current = await loadTrips();
+  await setItem(
+    TRIPS_STORAGE_KEY,
+    current.filter(t => t.id !== tripId),
+  );
+  return { offline };
+}
+
+export async function loadTripOutfits(
+  tripId: string,
+  token?: string | null,
+): Promise<TripOutfitEntry[]> {
+  if (token) {
+    try {
+      const entries = await listTripOutfits(tripId, token);
+      await setItem(TRIP_OUTFITS_STORAGE_KEY, entries);
+      return entries;
+    } catch {
+      // fall through to local cache
+    }
+  }
+  const cached =
+    (await getItem<TripOutfitEntry[]>(TRIP_OUTFITS_STORAGE_KEY, [])) || [];
+  return cached.filter(e => e.tripId === tripId);
+}
+
+export async function saveTripOutfit(
+  tripId: string,
+  data: Omit<CreateTripOutfitRequest, 'tripId'>,
+  token?: string | null,
+): Promise<{ entry: TripOutfitEntry; offline: boolean }> {
+  let offline = !token;
+  let entry: TripOutfitEntry = {
+    ...data,
+    tripId,
+    id: `trip_outfit_${Date.now()}`,
+  };
+  if (token) {
+    try {
+      entry = await upsertTripOutfit(tripId, { ...data, tripId }, token);
+      offline = false;
+    } catch {
+      offline = true;
+    }
+  }
+  const all =
+    (await getItem<TripOutfitEntry[]>(TRIP_OUTFITS_STORAGE_KEY, [])) || [];
+  const withoutSameDay = all.filter(
+    e => !(e.tripId === tripId && e.date === entry.date),
+  );
+  await setItem(TRIP_OUTFITS_STORAGE_KEY, [entry, ...withoutSameDay]);
+  return { entry, offline };
+}
+
+export async function removeTripOutfit(
+  tripId: string,
+  outfitEntryId: string,
+  token?: string | null,
+): Promise<{ offline: boolean }> {
+  let offline = !token;
+  if (token) {
+    try {
+      await deleteTripOutfit(tripId, outfitEntryId, token);
+      offline = false;
+    } catch (err) {
+      offline = isNetworkError(err);
+    }
+  }
+  const all =
+    (await getItem<TripOutfitEntry[]>(TRIP_OUTFITS_STORAGE_KEY, [])) || [];
+  await setItem(
+    TRIP_OUTFITS_STORAGE_KEY,
+    all.filter(e => e.id !== outfitEntryId),
+  );
+  return { offline };
+}
+
+export async function loadTripChecklist(
+  tripId: string,
+  token?: string | null,
+): Promise<TripChecklistItem[]> {
+  if (token) {
+    try {
+      const items = await listTripChecklist(tripId, token);
+      await setItem(TRIP_CHECKLIST_STORAGE_KEY, items);
+      return items;
+    } catch {
+      // fall through to local cache
+    }
+  }
+  const cached =
+    (await getItem<TripChecklistItem[]>(TRIP_CHECKLIST_STORAGE_KEY, [])) || [];
+  return cached.filter(i => i.tripId === tripId);
+}
+
+export async function addTripChecklistItem(
+  tripId: string,
+  data: Omit<CreateTripChecklistItemRequest, 'tripId'>,
+  token?: string | null,
+): Promise<{ item: TripChecklistItem; offline: boolean }> {
+  let offline = !token;
+  let created: TripChecklistItem = {
+    ...data,
+    tripId,
+    id: `trip_check_${Date.now()}`,
+  };
+  if (token) {
+    try {
+      created = await createTripChecklistItem(
+        tripId,
+        { ...data, tripId },
+        token,
+      );
+      offline = false;
+    } catch {
+      offline = true;
+    }
+  }
+  const all =
+    (await getItem<TripChecklistItem[]>(TRIP_CHECKLIST_STORAGE_KEY, [])) || [];
+  await setItem(TRIP_CHECKLIST_STORAGE_KEY, [created, ...all]);
+  return { item: created, offline };
+}
+
+export async function toggleTripChecklistItem(
+  tripId: string,
+  item: TripChecklistItem,
+  token?: string | null,
+): Promise<{ offline: boolean }> {
+  let offline = !token;
+  const updated: TripChecklistItem = { ...item, checked: !item.checked };
+  if (token) {
+    try {
+      await updateTripChecklistItem(tripId, item.id, updated, token);
+      offline = false;
+    } catch (err) {
+      offline = isNetworkError(err);
+    }
+  }
+  const all =
+    (await getItem<TripChecklistItem[]>(TRIP_CHECKLIST_STORAGE_KEY, [])) || [];
+  await setItem(
+    TRIP_CHECKLIST_STORAGE_KEY,
+    all.map(i => (i.id === updated.id ? updated : i)),
+  );
+  return { offline };
+}
+
+export async function removeTripChecklistItem(
+  tripId: string,
+  itemId: string,
+  token?: string | null,
+): Promise<{ offline: boolean }> {
+  let offline = !token;
+  if (token) {
+    try {
+      await deleteTripChecklistItem(tripId, itemId, token);
+      offline = false;
+    } catch (err) {
+      offline = isNetworkError(err);
+    }
+  }
+  const all =
+    (await getItem<TripChecklistItem[]>(TRIP_CHECKLIST_STORAGE_KEY, [])) || [];
+  await setItem(
+    TRIP_CHECKLIST_STORAGE_KEY,
+    all.filter(i => i.id !== itemId),
+  );
   return { offline };
 }

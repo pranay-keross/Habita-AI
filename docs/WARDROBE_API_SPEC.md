@@ -3,16 +3,32 @@
 > **Target Audience:** Backend Developers & AI Agents building the Spring Boot / PostgreSQL backend for Habita AI.
 > **Module Reference:** SRS Module Group 4, §15 "Wardrobe & Weather-Adaptive Style Mirror" & API Ecosystem Summary (`/api/style`). Backend package name: `wardrobe` (`docs/BACKEND_CONTEXT.md`).
 > **Frontend Consumers:**
-> - `src/features/style_pantry/screens/WardrobeDashboardScreen.tsx`
-> - `src/features/style_pantry/screens/StyleMirrorScreen.tsx`
+> - `src/features/style_pantry/screens/AiStylistHomeScreen.tsx` — aCloset-style AI Stylist
+>   home hub (quick actions, today's outfit, recently added items)
+> - `src/features/style_pantry/screens/WardrobeDashboardScreen.tsx` — Closet screen
+>   (folders/collections: All Clothes, Winter Items, custom closets, Wishlist)
+> - `src/features/style_pantry/screens/ClosetItemsScreen.tsx` — item grid/search for a
+>   given folder
+> - `src/features/style_pantry/screens/StyleMirrorScreen.tsx` — Style Chat (conversational
+>   outfit recommendation with free-text refinement)
 > - `src/features/style_pantry/screens/OutfitDetailsScreen.tsx`
 > - `src/features/style_pantry/screens/AddEditClothingScreen.tsx`
 > - `src/features/style_pantry/screens/ClothingDetailsScreen.tsx`
 > - `src/features/style_pantry/screens/StyleLogScreen.tsx`
+> - `src/features/style_pantry/screens/StyleCalendarScreen.tsx` — OOTD monthly calendar +
+>   stats
+> - `src/features/style_pantry/screens/TripPlannerScreen.tsx` /
+>   `TripDetailsScreen.tsx` — trip/travel outfit planner
 > - `src/features/style_pantry/api.ts`
 > - `src/features/style_pantry/stylePantryStore.ts`
 > - `src/features/style_pantry/types.ts`
 > - `src/features/style_pantry/moods.ts`
+> - `src/features/style_pantry/collectionIcons.ts`
+> **Status (2026-09-14):** Redesigned client-side to match the aCloset reference app
+> (closet folders, chat-based recommendation, OOTD calendar, trip planner, AI Stylist
+> home hub). Every new read/write is wired online-first against the endpoints below with
+> the same permanent AsyncStorage/local-rule-based fallback as the original module — none
+> of it is built server-side yet.
 
 ---
 
@@ -51,6 +67,37 @@ today's weather and what's actually in the user's closet.
    distinct from each item's own `wearCount`/`lastWornDate` — so the client can show a
    browsable history (aCloset-style "what did I actually wear") instead of only
    aggregate per-item counters.
+9. **Closet Collections:** User-created named folders (e.g. "Work Outfits") grouping an
+   explicit set of the caller's own items — the aCloset-style "closets" grid. "All
+   Clothes" and season filters like "Winter Items" are **not** backend entities; the
+   client computes them from the existing item list (`season === 'winter'`, etc.).
+10. **Wishlist:** Items the caller doesn't yet own — just a boolean flag
+    (`WardrobeItem.isWishlist`) rather than a separate entity, so they reuse the same
+    CRUD/photo pipeline as owned items. Wishlist items are excluded from outfit
+    generation.
+11. **Purchase Price:** An optional `purchasePrice` on each item, used only to power the
+    OOTD calendar's "Expenses" stat (§4.4/StyleCalendarScreen) — not a full expense-
+    tracking integration; Expenses remains its own module.
+12. **Trips (Travel Outfit Planner):** A trip (title, dates, location, notes, optional
+    cover photo) with a day-by-day outfit itinerary and a simple packing checklist — the
+    aCloset-style trip planner.
+13. **Conversational Refinement:** The outfit-generation endpoint accepts an optional
+    free-text `refinementNote` (e.g. "make it more formal?") that nudges which items are
+    picked, powering the new chat-style Style Mirror UI without changing its response
+    shape.
+
+### Explicitly out of scope
+The following aCloset-style capabilities were deliberately **not** included in this pass
+and have no endpoints below — they're flagged here as backlog items rather than silently
+dropped:
+- **Retailer purchase-history import** (Amazon/SHEIN/Zara/ASOS "sign in and import") —
+  needs a per-retailer OAuth/scraping integration with no existing precedent in this
+  backend; scope it as its own spec when prioritized.
+- **True AI-vision quick actions** ("Find my color", "Find my fit", "Rate style", "Try
+  On") — each needs a multimodal vision model, not just `LlmClientService`'s text
+  generation. The client ships these as tappable entry points that show a "coming soon"
+  sheet today (`AiStylistHomeScreen.tsx`); wire them up alongside the M8-T4 multimodal
+  work when that lands.
 
 ### Explicit scope decision — no family/group sharing
 Unlike Expenses or DocHub, a closet is inherently personal. Every row in this module
@@ -142,6 +189,8 @@ interface WardrobeItem {
   emoji: string;                // ClothingIconKey
   wearCount: number;
   lastWornDate?: string;        // YYYY-MM-DD
+  purchasePrice?: number;       // powers the Style Calendar's "Expenses" stat only
+  isWishlist?: boolean;         // not yet owned — excluded from outfit generation
   createdAt: string;
   updatedAt: string;
 }
@@ -184,6 +233,46 @@ interface WornOutfitEntry {           // one Style Log row — "what did I actua
   eventTitle: string;
   itemIds: string[];             // references WardrobeItem.id
   mood?: Mood;
+}
+
+// A user-created closet folder (§1 item 9). "All Clothes" and season filters like
+// "Winter Items" are NOT persisted here — the client computes those from the plain item
+// list. Only custom, user-named folders are backend-owned.
+interface WardrobeCollection {
+  id: string;
+  name: string;
+  iconKey: string;               // resolved client-side via collectionIcons.ts
+  itemIds: string[];             // references WardrobeItem.id
+  createdAt: string;
+}
+
+interface WardrobeTrip {
+  id: string;
+  title: string;
+  coverImageUri?: string;
+  startDate: string;              // YYYY-MM-DD
+  endDate: string;                // YYYY-MM-DD
+  location?: string;
+  notes?: string;
+  packedItemIds?: string[];       // WardrobeItem ids flagged as packed for this trip
+  createdAt: string;
+}
+
+// One row in a trip's day-by-day outfit itinerary — upserted per (tripId, date).
+interface TripOutfitEntry {
+  id: string;
+  tripId: string;
+  date: string;                   // YYYY-MM-DD
+  itemIds: string[];              // references WardrobeItem.id
+  outfitTitle: string;
+  weatherHint?: string;
+}
+
+interface TripChecklistItem {
+  id: string;
+  tripId: string;
+  label: string;
+  checked: boolean;
 }
 ```
 
@@ -349,10 +438,13 @@ and, optionally, a `mood` (§3.6).
 
 - **Request Body:**
 ```json
-{ "occasionId": "evt_1", "mood": "confident" }
+{ "occasionId": "evt_1", "mood": "confident", "refinementNote": "make it more formal" }
 ```
 `mood` is optional — omit it (or send `null`) for a mood-agnostic recommendation,
-identical to the pre-mood behavior.
+identical to the pre-mood behavior. `refinementNote` is also optional — free text from
+the Style Chat screen's composer (e.g. "make it more formal?", "add a jacket") that
+nudges which items get picked; omitting it behaves exactly as before mood/refinement
+existed. Both `mood` and `refinementNote` may be sent together.
 - **Response (200 OK):** `OutfitRecommendation` (see §3.7), with `mood` echoed back
   exactly as sent (absent if the request didn't send one). `id` should be freshly
   generated per call (calling this endpoint twice for the same occasion is expected to
@@ -364,16 +456,21 @@ identical to the pre-mood behavior.
 - **Response (422 Unprocessable Entity):** `INSUFFICIENT_WARDROBE` if the caller has too
   few items to assemble a coherent outfit (fewer than one top, one bottom, and one pair
   of shoes) — the client falls back to its own local rule-based matcher on any failure
-  here, so this is safe to return rather than forcing a degraded recommendation.
+  here, so this is safe to return rather than forcing a degraded recommendation. Wishlist
+  items (`isWishlist: true`) never count toward this check or toward the picked outfit.
 - **Implementation note (M8-T4):** Ship this first as a rule-based matcher — pick items
   whose `tags` include the occasion's `eventType`, preferring (not requiring) one whose
   `tags` also include one of `mood`'s preferred tags (§3.6 table) when `mood` was sent;
   prefer a jacket when `temperature < 22°C` or `eventType == 'office'`, and derive
   `weatherSuitability`/`occasionSuitability` as descriptive strings the same way the
   client's local `generateAIOutfit()` (`src/features/style_pantry/stylePantryStore.ts`)
-  already does.
+  already does. For `refinementNote`, mirror the client's naive keyword→tag-bias
+  heuristic (`tagsFromRefinementNote()` in the same file — e.g. "formal"/"office" biases
+  toward the `formal`/`office` tags, "warm"/"jacket" forces a jacket pick) rather than
+  parsing free text with an LLM in this first pass.
   When `LlmClientService` is wired up (M8-T4), swap the implementation behind this same
-  endpoint/response contract — no frontend change required either way.
+  endpoint/response contract — no frontend change required either way; `refinementNote`
+  is exactly the field a real LLM call would consume as its prompt addition.
 
 ---
 
@@ -439,6 +536,151 @@ Records a style-log entry for an outfit just worn.
   `mood`, if present, must be a valid `Mood` (`400 Bad Request` / `INVALID_MOOD`); any
   `itemIds` not owned by the caller are silently dropped from the stored entry rather
   than failing the whole request (same tolerance as §4.1's bulk wear endpoint).
+
+---
+
+### 4.7 Closet Collections API
+
+#### `GET /api/style/collections`
+Lists the caller's custom closet folders. "All Clothes" and season-filtered folders like
+"Winter Items" are **not** returned here — the client computes those from
+`GET /api/style/items` directly.
+
+- **Response (200 OK):** `WardrobeCollection[]`
+
+---
+
+#### `POST /api/style/collections`
+Creates a custom closet folder.
+
+- **Request Body:**
+```json
+{ "name": "Work Outfits", "iconKey": "office", "itemIds": ["item_1", "item_4"] }
+```
+- **Response (201 Created):** `WardrobeCollection`
+- **Validation:** `name` required, max 80 chars; any `itemIds` not owned by the caller
+  are silently dropped (same tolerance as §4.1/§4.6).
+
+---
+
+#### `PUT /api/style/collections/{collectionId}`
+Replaces a folder's name/icon/membership. Same request shape as create.
+
+- **Response (200 OK):** Updated `WardrobeCollection`.
+- **Response (404 Not Found):** `COLLECTION_NOT_FOUND`.
+
+---
+
+#### `DELETE /api/style/collections/{collectionId}`
+Deletes a custom closet folder. This never deletes the underlying `WardrobeItem`s — only
+the folder/grouping.
+
+- **Response (204 No Content)**
+- **Response (404 Not Found):** `COLLECTION_NOT_FOUND`
+
+---
+
+### 4.8 Trips API (Travel Outfit Planner)
+
+#### `GET /api/style/trips`
+Lists the caller's trips, most recently created first.
+
+- **Response (200 OK):** `WardrobeTrip[]`
+
+---
+
+#### `POST /api/style/trips`
+Creates a trip.
+
+- **Request Body:**
+```json
+{
+  "title": "Tokyo Travel",
+  "startDate": "2026-12-29",
+  "endDate": "2026-12-30",
+  "location": "Tokyo, Japan",
+  "notes": "I'm so excited!!"
+}
+```
+- **Response (201 Created):** `WardrobeTrip`
+- **Validation:** `title` required; `startDate`/`endDate` must be valid `YYYY-MM-DD` and
+  `endDate >= startDate` (`400 Bad Request` / `INVALID_DATE`).
+
+---
+
+#### `PUT /api/style/trips/{tripId}`
+Updates a trip's metadata (including `packedItemIds`, written whenever the client's Item
+tab toggles a packed item). Same request shape as create, plus optional
+`packedItemIds: string[]`.
+
+- **Response (200 OK):** Updated `WardrobeTrip`.
+- **Response (404 Not Found):** `TRIP_NOT_FOUND`
+
+---
+
+#### `DELETE /api/style/trips/{tripId}`
+Deletes a trip and, per the household-data cascade convention used elsewhere in this
+backend, its `wardrobe_trip_outfits`/`wardrobe_trip_checklist` rows.
+
+- **Response (204 No Content)**
+- **Response (404 Not Found):** `TRIP_NOT_FOUND`
+
+---
+
+#### `GET /api/style/trips/{tripId}/outfits`
+Lists the trip's day-by-day outfit itinerary.
+
+- **Response (200 OK):** `TripOutfitEntry[]`
+- **Response (404 Not Found):** `TRIP_NOT_FOUND`
+
+---
+
+#### `POST /api/style/trips/{tripId}/outfits`
+Creates or replaces the outfit entry for a given day — the client always sends the full
+day entry (upsert keyed on `(tripId, date)`), so there's no separate update endpoint.
+
+- **Request Body:**
+```json
+{ "date": "2026-12-29", "itemIds": ["item_1", "item_2"], "outfitTitle": "Day 1 - Sightseeing" }
+```
+- **Response (201 Created):** `TripOutfitEntry`
+- **Response (404 Not Found):** `TRIP_NOT_FOUND`
+
+---
+
+#### `DELETE /api/style/trips/{tripId}/outfits/{outfitEntryId}`
+Removes one day's outfit entry.
+
+- **Response (204 No Content)**
+
+---
+
+#### `GET /api/style/trips/{tripId}/checklist`
+Lists the trip's packing checklist.
+
+- **Response (200 OK):** `TripChecklistItem[]`
+
+---
+
+#### `POST /api/style/trips/{tripId}/checklist`
+Adds a checklist item.
+
+- **Request Body:** `{ "label": "Passport", "checked": false }`
+- **Response (201 Created):** `TripChecklistItem`
+
+---
+
+#### `PUT /api/style/trips/{tripId}/checklist/{itemId}`
+Updates a checklist item (used to toggle `checked`).
+
+- **Response (200 OK):** Updated `TripChecklistItem`.
+
+---
+
+#### `DELETE /api/style/trips/{tripId}/checklist/{itemId}`
+Removes a checklist item.
+
+- **Response (204 No Content)**
 
 ---
 
@@ -519,6 +761,70 @@ CREATE TABLE wardrobe_style_history (
 CREATE INDEX idx_wardrobe_style_history_user ON wardrobe_style_history(user_id, worn_date DESC);
 ```
 
+Filename: `V5__wardrobe_collections_trips.sql` (continuing the double-underscore Flyway
+convention) — the aCloset-redesign additions: closet collections, trips, and the two new
+`wardrobe_items` columns.
+
+```sql
+-- 0. NEW COLUMNS ON THE EXISTING ITEMS TABLE
+ALTER TABLE wardrobe_items
+    ADD COLUMN purchase_price NUMERIC(10,2) NULL,
+    ADD COLUMN is_wishlist BOOLEAN NOT NULL DEFAULT false;
+
+-- 5. WARDROBE COLLECTIONS TABLE — user-created custom closet folders. "All Clothes" and
+-- season filters like "Winter Items" are NEVER stored here — computed client-side.
+CREATE TABLE wardrobe_collections (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    name VARCHAR(80) NOT NULL,
+    icon_key VARCHAR(32) NOT NULL DEFAULT 'closet',
+    item_ids JSONB NOT NULL DEFAULT '[]', -- references wardrobe_items.id, not a join table
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX idx_wardrobe_collections_user ON wardrobe_collections(user_id);
+
+-- 6. WARDROBE TRIPS TABLE
+CREATE TABLE wardrobe_trips (
+    id VARCHAR(64) PRIMARY KEY,
+    user_id VARCHAR(64) NOT NULL,
+    title VARCHAR(150) NOT NULL,
+    cover_image_url TEXT NULL,
+    start_date DATE NOT NULL,
+    end_date DATE NOT NULL,
+    location VARCHAR(150) NULL,
+    notes TEXT NULL,
+    packed_item_ids JSONB NOT NULL DEFAULT '[]', -- references wardrobe_items.id
+    created_at TIMESTAMP WITH TIME ZONE DEFAULT CURRENT_TIMESTAMP,
+    CHECK (end_date >= start_date)
+);
+
+CREATE INDEX idx_wardrobe_trips_user ON wardrobe_trips(user_id, start_date);
+
+-- 7. WARDROBE TRIP OUTFITS TABLE — one row per (trip, day) in the itinerary.
+CREATE TABLE wardrobe_trip_outfits (
+    id VARCHAR(64) PRIMARY KEY,
+    trip_id VARCHAR(64) NOT NULL REFERENCES wardrobe_trips(id) ON DELETE CASCADE,
+    outfit_date DATE NOT NULL,
+    item_ids JSONB NOT NULL DEFAULT '[]', -- references wardrobe_items.id
+    outfit_title VARCHAR(150) NOT NULL,
+    weather_hint VARCHAR(60) NULL,
+    UNIQUE (trip_id, outfit_date)
+);
+
+CREATE INDEX idx_wardrobe_trip_outfits_trip ON wardrobe_trip_outfits(trip_id, outfit_date);
+
+-- 8. WARDROBE TRIP CHECKLIST TABLE
+CREATE TABLE wardrobe_trip_checklist (
+    id VARCHAR(64) PRIMARY KEY,
+    trip_id VARCHAR(64) NOT NULL REFERENCES wardrobe_trips(id) ON DELETE CASCADE,
+    label VARCHAR(150) NOT NULL,
+    checked BOOLEAN NOT NULL DEFAULT false
+);
+
+CREATE INDEX idx_wardrobe_trip_checklist_trip ON wardrobe_trip_checklist(trip_id);
+```
+
 ---
 
 ## 6. Error Codes & Format
@@ -536,6 +842,8 @@ Following Spring Boot global exception handler conventions (`@ControllerAdvice`)
 | `404 Not Found` | `ITEM_NOT_FOUND` | Wardrobe item doesn't exist, or isn't owned by the caller. |
 | `404 Not Found` | `OCCASION_NOT_FOUND` | Occasion doesn't exist, or isn't owned by the caller. |
 | `404 Not Found` | `OUTFIT_NOT_FOUND` | Saved outfit doesn't exist, or isn't owned by the caller. |
+| `404 Not Found` | `COLLECTION_NOT_FOUND` | Closet collection doesn't exist, or isn't owned by the caller. |
+| `404 Not Found` | `TRIP_NOT_FOUND` | Trip doesn't exist, or isn't owned by the caller. |
 | `422 Unprocessable Entity` | `INSUFFICIENT_WARDROBE` | Not enough items in the closet to generate a recommendation (see §4.4). |
 
 **Standard Error Payload:**
@@ -566,9 +874,10 @@ shape Expenses/Vault used):
 5. `loadWeather(token)` → `GET /api/style/weather`
 6. `loadOccasions(token)` / `createOccasionEntry(data, token)` →
    `GET` / `POST /api/style/occasions`
-7. `generateOutfitRecommendation(weather, event, items, token, mood?)` →
-   `POST /api/style/recommendations/generate` (`mood` optional; falls back to the local
-   `generateAIOutfit()` rule-based matcher on any failure — kept permanently as the
+7. `generateOutfitRecommendation(weather, event, items, token, mood?, refinementNote?)` →
+   `POST /api/style/recommendations/generate` (`mood`/`refinementNote` optional; falls
+   back to the local `generateAIOutfit()` rule-based matcher — including its own
+   `tagsFromRefinementNote()` heuristic — on any failure, kept permanently as the
    manual/local fallback per `docs/BACKLOG.md` M8-T4, not a temporary shim to delete
    once the backend ships)
 8. `loadSavedOutfits(token)` / `saveOutfit(outfit, token)` →
@@ -576,6 +885,20 @@ shape Expenses/Vault used):
 9. `loadStyleHistory(token)` / `logStyleHistoryEntry(outfit, token)` →
    `GET` / `POST /api/style/history` (§4.6) — called alongside `recordWearOutfit`, not
    instead of it, from `OutfitDetailsScreen`'s "Wear Today" action.
+10. `loadCollections(token)` / `addCollection(data, token)` /
+    `editCollection(collection, token)` / `removeCollection(id, token)` →
+    `GET` / `POST` / `PUT` / `DELETE /api/style/collections[/{id}]` (§4.7)
+11. `loadTrips(token)` / `addTrip(data, token)` / `editTrip(trip, token)` /
+    `removeTrip(id, token)` → `GET` / `POST` / `PUT` / `DELETE /api/style/trips[/{id}]`
+    (§4.8)
+12. `loadTripOutfits(tripId, token)` / `saveTripOutfit(tripId, data, token)` /
+    `removeTripOutfit(tripId, entryId, token)` →
+    `GET` / `POST` / `DELETE /api/style/trips/{tripId}/outfits[/{entryId}]` (§4.8)
+13. `loadTripChecklist(tripId, token)` / `addTripChecklistItem(tripId, data, token)` /
+    `toggleTripChecklistItem(tripId, item, token)` /
+    `removeTripChecklistItem(tripId, itemId, token)` →
+    `GET` / `POST` / `PUT` / `DELETE /api/style/trips/{tripId}/checklist[/{itemId}]`
+    (§4.8)
 
 No further frontend changes are required once this backend is deployed matching the
 contract above.
