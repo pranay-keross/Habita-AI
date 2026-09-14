@@ -263,6 +263,7 @@ export type PantryErrorKind =
   | 'meal_ai_unavailable'
   | 'no_meals_generated'
   | 'refresh_limit'
+  | 'endpoint_unavailable'
   | 'unknown';
 
 export function parsePantryError(err: unknown): PantryErrorKind {
@@ -277,6 +278,11 @@ export function parsePantryError(err: unknown): PantryErrorKind {
   }
   const body = err.body as { code?: string } | null;
   const code = body?.code;
+  if (err.status === 404 && !code) {
+    // No domain error code means the route itself is missing — the server is running a
+    // backend build that predates this pantry endpoint.
+    return 'endpoint_unavailable';
+  }
   switch (code) {
     case 'NO_FAMILY':
       return 'no_family';
@@ -363,7 +369,7 @@ export function pantryErrorMessage(err: unknown): string {
 
   switch (kind) {
     case 'network':
-      return 'No internet connection. Please check your network and try again.';
+      return "Couldn't reach the server. Check your internet connection, or try again in a moment.";
     case 'unauthorized':
       return 'Your session has expired. Please sign in again.';
     case 'no_family':
@@ -382,6 +388,8 @@ export function pantryErrorMessage(err: unknown): string {
       return "We couldn't generate today's suggestions right now. Please try again.";
     case 'no_meals_generated':
       return "We couldn't build healthy meals from your current stock. Try adding a few more ingredients.";
+    case 'endpoint_unavailable':
+      return 'This feature is not available on the server yet. Please try again after the next update.';
     case 'refresh_limit':
       return "You've refreshed today's suggestions the maximum number of times. New meals arrive tomorrow.";
     default:

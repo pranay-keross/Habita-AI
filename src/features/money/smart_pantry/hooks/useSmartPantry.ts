@@ -164,10 +164,14 @@ export function useSmartPantry() {
 
   const updateQuantity = (id: string, delta: number) => {
     let optimisticQty = 0;
+    let applied = delta;
     setItems((prev) =>
       prev.map((i) => {
         if (i.id !== id) return i;
         optimisticQty = Math.max(0, i.quantity + delta);
+        // Clamping at zero means we may have applied less than the caller asked
+        // for; only the part we actually applied may be sent to the server.
+        applied = optimisticQty - i.quantity;
         return { ...i, quantity: optimisticQty, isLowStock: optimisticQty <= 1 };
       }),
     );
@@ -177,7 +181,8 @@ export function useSmartPantry() {
         : prev,
     );
 
-    pendingDeltas.current[id] = (pendingDeltas.current[id] ?? 0) + delta;
+    if (applied === 0) return;
+    pendingDeltas.current[id] = (pendingDeltas.current[id] ?? 0) + applied;
 
     if (flushTimers.current[id]) {
       clearTimeout(flushTimers.current[id]);

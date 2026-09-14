@@ -168,14 +168,13 @@ export async function modifyPantryQuantity(
 ): Promise<number> {
   // The server's post-adjustment quantity is authoritative when we have it; recomputing
   // locally from a possibly stale cached value is how the UI drifts away from real stock.
+  // A failed sync must propagate: the caller puts the delta back on the pending
+  // queue and retries it. Swallowing the error here would write a locally-
+  // computed quantity to the cache and report success, so the tap is lost.
   let serverQty: number | null = null;
   if (token) {
-    try {
-      const resp = await adjustPantryQuantityRemote(id, delta, token);
-      serverQty = resp.newQuantity;
-    } catch (err) {
-      console.warn('Remote adjust pantry quantity failed:', err);
-    }
+    const resp = await adjustPantryQuantityRemote(id, delta, token);
+    serverQty = resp.newQuantity;
   }
 
   const existing = await readCachedItems();

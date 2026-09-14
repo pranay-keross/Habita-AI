@@ -69,7 +69,8 @@ export async function postMultipart<T>(
   let res: Response;
   try {
     res = await fetch(`${API_BASE_URL}${path}`, { method, headers, body: form });
-  } catch {
+  } catch (err) {
+    console.warn(`[postMultipart] ${method} ${API_BASE_URL}${path} failed before a response:`, err);
     throw new ApiError(0, null);
   }
 

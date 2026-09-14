@@ -12,9 +12,9 @@ import { Platform } from 'react-native';
 //   Platform.OS === 'android' ? 'http://10.0.2.2:8080/api' : 'http://localhost:8080/api';
 
 // Deployed backend — swap back to this before shipping a build:
-// export const API_BASE_URL = 'https://ikon-vpm.keross.com/saheli/api';
+export const API_BASE_URL = 'https://ikon-vpm.keross.com/saheli/api';
 //    Physical device        -> 'http://<your-machine-LAN-IP>:8080/api'
 //   Real deployed server (current) -> 'https://ikon-vpm.keross.com/saheli/api'
-export const API_BASE_URL = 'https://ikon-vpm.keross.com/saheli/api';
+// export const API_BASE_URL = 'https://ikon-vpm.keross.com/saheli/api';
 // export const API_BASE_URL = 'http://10.0.2.2:8080/api';
 //testing

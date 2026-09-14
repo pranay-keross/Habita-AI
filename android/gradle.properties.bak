@@ -10,25 +10,12 @@
 # Specifies the JVM arguments used for the daemon process.
 # The setting is particularly useful for tweaking memory settings.
 # Default value: -Xmx512m -XX:MaxMetaspaceSize=256m
-org.gradle.jvmargs=-Xmx6144m -XX:MaxMetaspaceSize=1024m -XX:+UseParallelGC -Dfile.encoding=UTF-8
+org.gradle.jvmargs=-Xmx2048m -XX:MaxMetaspaceSize=512m
 
 # When configured, Gradle will run in incubating parallel mode.
 # This option should only be used with decoupled projects. More details, visit
 # http://www.gradle.org/docs/current/userguide/multi_project_builds.html#sec:decoupled_projects
-org.gradle.parallel=true
-
-# Reuse task outputs across builds (biggest win on rebuilds).
-org.gradle.caching=true
-
-# Skip the configuration phase entirely when nothing in the build scripts changed.
-org.gradle.configuration-cache=true
-
-# NOTE: org.gradle.configureondemand must stay OFF. It configures only the
-# projects needed for the requested task, so :notifee_react-native never runs
-# its `rootProject.allprojects { repositories { maven { ... } } }` block that
-# registers the bundled app.notifee:core repo. Result:
-#   Could not find any matches for app.notifee:core:+
-org.gradle.configureondemand=false
+# org.gradle.parallel=true
 
 # AndroidX package structure to make it clearer which packages are bundled with the
 # Android operating system, and which are packaged with your app's APK
@@ -36,11 +23,8 @@ org.gradle.configureondemand=false
 android.useAndroidX=true
 
 # Use this property to specify which architecture you want to build.
-# Physical devices use arm64-v8a (armeabi-v7a for very old ones); emulators use x86_64.
-# Narrowed to arm64-v8a: building 4 ABIs multiplies all native/CMake work by 4.
-# For an emulator build, override on the command line:
-#   ./gradlew assembleRelease -PreactNativeArchitectures=x86_64
-reactNativeArchitectures=arm64-v8a
+# Physical devices use arm64-v8a and armeabi-v7a; emulators use x86_64.
+reactNativeArchitectures=armeabi-v7a,arm64-v8a,x86,x86_64
 
 # Use this property to enable support to the new architecture.
 # This will allow you to use TurboModules and the Fabric render in
@@ -58,11 +42,3 @@ hermesEnabled=true
 # Note: Only works with ReactActivity and should not be used with custom Activity.
 edgeToEdgeEnabled=false
 
-
-# Kotlin compiles in a reusable daemon process instead of in-process.
-kotlin.incremental=true
-kapt.incremental.apt=true
-
-# Skip building unused resource/BuildConfig artifacts.
-android.nonTransitiveRClass=true
-android.nonFinalResIds=true
