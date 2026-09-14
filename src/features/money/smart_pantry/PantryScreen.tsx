@@ -80,7 +80,7 @@ export default function PantryScreen({ navigation }: Props) {
           hitSlop={8}
           accessibilityRole="button"
           accessibilityLabel={t('common.back', { defaultValue: 'Back' })}>
-          <ArrowLeft size={18} color={styles.backIcon.color} strokeWidth={1.5} />
+          <ArrowLeft size={22} color={styles.backIcon.color} strokeWidth={1.8} />
         </Pressable>
         <View style={styles.headerTitleBlock}>
           <Text style={styles.headerTitle} numberOfLines={1}>
@@ -157,7 +157,10 @@ export default function PantryScreen({ navigation }: Props) {
       </View>
 
       {/* Main Screen Content */}
-      <ScrollView contentContainerStyle={styles.contentContainer} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        style={styles.scrollArea}
+        contentContainerStyle={styles.contentContainer}
+        showsVerticalScrollIndicator={false}>
         {loading ? (
           <View style={{ paddingTop: 8 }}>
             <SkeletonHeroCard />
@@ -270,6 +273,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     headerBar: {
       flexDirection: 'row',
       alignItems: 'center',
+      minHeight: 64,
       paddingHorizontal: spacing.md,
       paddingBottom: spacing.sm,
       backgroundColor: colors.navBackground || colors.background,
@@ -278,9 +282,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       ...shadow.soft,
     },
     backBtn: {
-      width: 38,
-      height: 38,
-      borderRadius: 19,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       backgroundColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
@@ -289,10 +293,27 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     backIcon: { color: colors.textPrimary },
     // minWidth 0 lets the title block actually shrink instead of pushing the
-    // Add & Scan button off the row on long translations.
-    headerTitleBlock: { flex: 1, minWidth: 0, marginLeft: 10, marginRight: 10 },
-    headerTitle: { fontFamily: fonts.sansBold, fontSize: 17, color: colors.textPrimary },
-    headerSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted },
+    // Add & Scan button off the row on long translations. justifyContent centers
+    // the two text lines as a block against the taller back button beside them.
+    headerTitleBlock: {
+      flex: 1,
+      minWidth: 0,
+      marginLeft: 12,
+      marginRight: 10,
+    },
+    headerTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 22,
+      lineHeight: 24,
+      color: colors.textPrimary,
+    },
+    headerSub: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      lineHeight: 16,
+      color: colors.textMuted,
+      marginTop: 1,
+    },
     headerAddBtn: {
       backgroundColor: colors.primary,
       paddingHorizontal: 12,
@@ -308,6 +329,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingVertical: 6,
     },
     topTabScroll: { paddingHorizontal: spacing.md, gap: 6 },
+    // Without an explicit flex:1 style (contentContainerStyle alone isn't enough),
+    // the ScrollView can fail to constrain to the space left by the fixed header/tab
+    // bars above it, letting the whole screen drift instead of just this content.
+    scrollArea: { flex: 1 },
     tabChip: {
       backgroundColor: colors.background,
       paddingHorizontal: 12,

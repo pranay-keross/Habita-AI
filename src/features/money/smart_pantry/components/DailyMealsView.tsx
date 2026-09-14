@@ -47,6 +47,14 @@ const MEAL_SECTIONS: { key: string; labelKey: string; label: string; icon: strin
   { key: 'snack', labelKey: 'smart_pantry.meal_snack', label: 'Snack', icon: '🍎' },
 ];
 
+const OTHER_SECTION = { key: 'other', labelKey: 'smart_pantry.meal_other', label: 'Other', icon: '🍽️' };
+
+/** Backend mealType strings are matched case/whitespace-insensitively so a casing
+ * difference (e.g. "Breakfast") never silently drops a meal from every section. */
+function normalizeMealType(mealType: string): string {
+  return (mealType || '').trim().toLowerCase();
+}
+
 function formatQuantity(value: number): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '';
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
@@ -247,9 +255,24 @@ export const DailyMealsView: React.FC<Props> = ({
         </View>
       )}
 
-      {/* Meal sections grouped by meal type */}
-      {MEAL_SECTIONS.map((section) => {
-        const sectionMeals = meals.filter((m) => m.mealType === section.key);
+      {/* Meal sections grouped by meal type; anything that doesn't match a known
+          type (unexpected casing, a backend synonym) falls into "Other" instead
+          of being silently dropped from every section. */}
+      {(() => {
+        const matchedIds = new Set<string>();
+        const knownSections = MEAL_SECTIONS.map((section) => {
+          const sectionMeals = meals.filter(
+            (m) => normalizeMealType(m.mealType) === section.key,
+          );
+          sectionMeals.forEach((m) => matchedIds.add(m.id));
+          return { section, sectionMeals };
+        });
+        const leftover = meals.filter((m) => !matchedIds.has(m.id));
+        const allSections = leftover.length > 0
+          ? [...knownSections, { section: OTHER_SECTION, sectionMeals: leftover }]
+          : knownSections;
+
+        return allSections.map(({ section, sectionMeals }) => {
         if (sectionMeals.length === 0) {
           return null;
         }
@@ -325,7 +348,8 @@ export const DailyMealsView: React.FC<Props> = ({
             ))}
           </View>
         );
-      })}
+        });
+      })()}
 
       {nutritionDisclaimer ? (
         <Text style={styles.disclaimer}>{nutritionDisclaimer}</Text>
