@@ -1993,6 +1993,90 @@ is an exact alarm and reintroduces this exact failure.
 
 ---
 
+## D-063 — Wardrobe goes server-authoritative: no seed data, one result contract, honest failures
+
+**Date:** 2026-09-15
+
+**Symptom reported.** "Collections, generate and saved outfits are not working", then, after
+the backend side was fixed, "lots of flaws in api responses, api calls, logical mistakes and
+gathered unstructured everything". A two-part audit (data layer + all eleven screens)
+found 29 + 60 defects. Only 5 of the 30 backend routes were called with a wrong shape — the
+wiring was mostly right; the damage was in what happened around the calls.
+
+### Root causes
+
+1. **Fake data leaked into real data.** `loadClothingItems()` seeded `INITIAL_CLOTHING`
+   (`c_1…c_8`) whenever a call failed or had no token, `loadOccasions()` substituted
+   `MOCK_EVENTS`, and *every write* used the token-less loader as its merge base — so the
+   seed rows were merged back in after every action. This is where the "unstructured"
+   closet came from.
+2. **Failures looked like success.** Screens showed the "saved" alert unconditionally; the
+   store set `offline=true` on real HTTP errors (400/404/415/422) and wrote a phantom local
+   row with a fake id (`item_…`, `trip_…`, `collection_…`) that could never sync and
+   vanished on the next fetch. The backend's `{code, message}` envelope was never shown.
+3. **Six different return shapes** (`{item,offline}`, `{trip,offline}`, `{offline}`, bare
+   arrays, thrown errors…) so screens ignored results.
+4. **UTC "today".** `toISOString().split('T')[0]` in six places — yesterday's date before
+   05:30 IST.
+5. Mount-only fetches, photos uploaded but never rendered, wishlist items in pickers and
+   folders, calendar stats computed on lifetime `wearCount`, no collection edit/delete,
+   duplicate routes (`StylePantryDashboard`≡`Wardrobe`, `StyleChat`≡`StyleMirror`) that
+   broke `popTo`, a second dead copy of the module under `features/money/`, no request
+   timeout.
+
+### Decisions
+
+- **Server-authoritative, cache-only offline.** Reads return
+  `ReadResult<T> = {data, offline, error?}`: server first, AsyncStorage only when the
+  server is unreachable. Writes return `WriteResult<T>` and *never* write locally on
+  failure. `INITIAL_CLOTHING`, `MOCK_EVENTS`, `MOCK_WEATHER` and the local
+  `generateAIOutfit()` recommender were deleted — an empty closet is a valid state, and
+  the backend's `POST /recommendations/generate` is the only recommender. This
+  supersedes the "keep the local fallback permanently" note on `M7-T4`/`M8-T4`: the
+  fallback is the cache, not a second engine.
+- **Typed boundary.** `api.ts` maps every response (`null → undefined`, upper-cased enums
+  → lower-case unions) and sends exactly the spec's request shape; `types.ts` splits
+  `*Input` from response types. `errors.ts` turns the backend envelope into
+  `StoreError` with a localized `style_pantry.err_<CODE>` string.
+- **Shared screen plumbing.** `useFocusLoad` (refetch on focus + pull-to-refresh),
+  `useBusy`, `WardrobeHeader`, `ItemThumb` (photo with icon fallback), `OfflineBanner`,
+  `ItemPickerSheet` (scrollable — the old fixed-height pickers hid items), `format.ts`
+  (no raw enum/date/price text anywhere).
+- **Local calendar dates** via `src/utils/date.ts`; `apiFetch` aborts after 15 s
+  (uploads 60 s) and reports it as a network error.
+- **Backend relaxations that made this possible** (backend D-029): generate accepts an
+  ad-hoc `eventType`/`eventTitle` (the AI Stylist home's `today` pseudo-event) and save
+  mints a UUID for a non-UUID id. Today's outfit is cached per calendar day.
+- **Calendar "Expenses" relabelled "Value of items worn"** (sum of `purchasePrice` over
+  distinct items worn that month); real spend needs a purchase date the API doesn't have.
+- **i18n parity.** ~70 wardrobe keys had only ever been added to `en.json`; all six
+  locales now carry the full `style_pantry`/`ai_stylist`/`closet`/`calendar`/`trip` sets.
+
+**Same-day follow-ups (backend D-030).** (a) The Style Mirror composer is a real
+conversation: `sendStyleMessage` → `POST /api/style/chat`, a style-only OpenAI stylist
+that can hand back an outfit from the closet; the transcript stays client-side and the
+last 12 turns are sent. Generation itself now goes through the same model first.
+(b) `OutfitShowcase` renders outfits with a large hero photo and big item tiles in the
+chat and on Outfit Details. (c) Creating an item from inside a closet folder passes
+`collectionId` to `AddEditClothing`, which appends the new id via `addItemToCollection`
+— previously new items only ever appeared in "All Clothes". (d) Photos stopped
+re-flickering on every visit: the server reuses a presigned URL for 8 of its 10
+minutes and `ItemThumb` keeps the last loaded URL per object path.
+
+**Redesign pass (same day).** The product owner rejected the first outfit preview/details and
+the AI Stylist home ("extremely disgusting") and asked for two distinct entry points. Now:
+`StyleMirror` is the wardrobe-driven *outfit suggestion* screen (looks feed + refinement
+composer that calls the stylist with occasion/mood context) and `StyleChat` is a separate
+*pure chat* screen (suggested prompts, avatar bubbles, an outfit card only when the stylist
+proposes one). `OutfitShowcase` became a magazine card: 3:4 main photo + two stacked tiles
+(+N overflow), serif title, percentage match meters, quote-style stylist note, item rows;
+`OutfitDetails` is a full-bleed version with the controls inside the scrolling hero and a
+sticky Wear/Save bar. The home is an editorial layout: dark "today's look" hero with the
+weather pill and the main item's photo, two purpose cards, a stats strip, a 3:4 photo
+carousel of recent items and a compact "coming soon" row.
+
+---
+
 ## Open decisions
 
 Tracked in `docs/BACKLOG.md` → Open questions. Move each here once answered.

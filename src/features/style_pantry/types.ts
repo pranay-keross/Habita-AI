@@ -1,9 +1,21 @@
+// Wire contract: docs/WARDROBE_API_SPEC.md. Response types describe what the client
+// holds after `api.ts` has normalised the server JSON (nulls → undefined, enum casing
+// lower-cased); *Input types are exactly what the client is allowed to send.
+
 export type ClothingCategory =
   | 'tops'
   | 'bottoms'
   | 'shoes'
   | 'jackets'
   | 'accessories';
+
+export const CLOTHING_CATEGORIES: ClothingCategory[] = [
+  'tops',
+  'bottoms',
+  'shoes',
+  'jackets',
+  'accessories',
+];
 
 export type ClothingSeason =
   | 'summer'
@@ -12,30 +24,13 @@ export type ClothingSeason =
   | 'spring'
   | 'all-year';
 
-export interface ClothingItem {
-  id: string;
-  name: string;
-  category: ClothingCategory;
-  color: string;
-  brand?: string;
-  season: ClothingSeason;
-  material?: string;
-  tags: string[]; // e.g. ['office', 'formal', 'meeting']
-  imageUri?: string; // local file:// uri before sync, remote CDN url once synced
-  emoji: string;
-  wearCount: number;
-  lastWornDate?: string; // YYYY-MM-DD
-  purchasePrice?: number; // powers the Style Calendar's "Expenses" stat
-  isWishlist?: boolean; // not yet owned — excluded from outfit generation
-  createdAt?: string;
-  updatedAt?: string;
-}
-
-// Fields the client sends when creating/updating an item — server assigns id/wearCount.
-export type ClothingItemInput = Omit<
-  ClothingItem,
-  'id' | 'wearCount' | 'createdAt' | 'updatedAt'
->;
+export const CLOTHING_SEASONS: ClothingSeason[] = [
+  'all-year',
+  'summer',
+  'winter',
+  'monsoon',
+  'spring',
+];
 
 export type EventType =
   | 'office'
@@ -45,77 +40,167 @@ export type EventType =
   | 'formal'
   | 'workout';
 
-// How the wearer wants to feel today — a second, independent axis from the occasion's
-// EventType (e.g. a 'confident' office look vs. a 'relaxed' office look). Optional
-// everywhere: a recommendation generated before this existed, or with no mood picked,
-// simply omits it.
+export const EVENT_TYPES: EventType[] = [
+  'office',
+  'party',
+  'meeting',
+  'casual',
+  'formal',
+  'workout',
+];
+
+// How the wearer wants to feel — a second axis independent of the occasion's EventType.
 export type Mood = 'confident' | 'relaxed' | 'bold' | 'cozy' | 'playful';
 
-export interface CalendarEvent {
+export type WeatherCondition = 'sunny' | 'rainy' | 'cloudy' | 'cold' | 'hot';
+
+// ---------------------------------------------------------------------------
+// Items
+// ---------------------------------------------------------------------------
+
+export interface ClothingItem {
   id: string;
-  title: string;
-  date: string; // YYYY-MM-DD
-  time: string; // e.g. '10:00 AM'
-  eventType: EventType;
-  location?: string;
+  name: string;
+  category: ClothingCategory;
+  color: string;
+  brand?: string;
+  season: ClothingSeason;
+  material?: string;
+  tags: string[];
+  /** Presigned S3 URL (≈10 min validity). Render with an icon fallback on load error. */
+  imageUri?: string;
+  emoji: string; // ClothingIconKey, resolved via clothingIcons.ts
+  wearCount: number;
+  lastWornDate?: string; // YYYY-MM-DD
+  purchasePrice?: number;
+  isWishlist: boolean;
+  createdAt: string;
+  updatedAt: string;
 }
 
-export type CreateOccasionRequest = Omit<CalendarEvent, 'id'>;
-
-export interface WeatherContext {
-  temperature: number; // in Celsius e.g. 28
-  condition: 'sunny' | 'rainy' | 'cloudy' | 'cold' | 'hot';
-  description: string; // e.g. '28°C · Sunny & Mild'
-  icon: string;
-  city?: string; // resolved server-side from the caller's saved profile city
+export interface ClothingItemInput {
+  name: string;
+  category: ClothingCategory;
+  color: string;
+  brand?: string;
+  season: ClothingSeason;
+  material?: string;
+  tags: string[];
+  emoji: string;
+  purchasePrice?: number;
+  isWishlist?: boolean;
 }
 
-// A locally-picked photo before it's uploaded — mirrors document_hub's PickedFile.
+// A locally-picked photo before it's uploaded.
 export interface PickedFile {
   uri: string;
   name: string;
   type: string;
 }
 
+// ---------------------------------------------------------------------------
+// Weather & occasions
+// ---------------------------------------------------------------------------
+
+export interface WeatherContext {
+  temperature: number; // Celsius
+  condition: WeatherCondition;
+  description: string;
+  icon: string;
+  city?: string;
+}
+
+export interface CalendarEvent {
+  id: string;
+  title: string;
+  date: string; // YYYY-MM-DD
+  time: string; // display string, e.g. "10:00 AM"
+  eventType: EventType;
+  location?: string;
+}
+
+export interface OccasionInput {
+  title: string;
+  date: string;
+  time: string;
+  eventType: EventType;
+  location?: string;
+}
+
+// ---------------------------------------------------------------------------
+// Recommendations, saved outfits, style log
+// ---------------------------------------------------------------------------
+
 export interface OutfitRecommendation {
   id: string;
   title: string;
-  occasion: string;
+  occasion: EventType;
   eventTitle: string;
   weatherSuitability: string;
   occasionSuitability: string;
   items: ClothingItem[];
   stylistNote: string;
   mood?: Mood;
-  isSaved?: boolean;
-  isWornToday?: boolean;
+  isSaved: boolean;
 }
 
-// One row of the wearer's style log — recorded whenever "Wear Today" is tapped, so past
-// outfits (and the mood/occasion behind each) can be browsed instead of only tracking
-// each item's own wearCount/lastWornDate in isolation.
+export interface GenerateOutfitInput {
+  /** A saved occasion, or an ad-hoc one (e.g. the "today" pseudo-event). */
+  event: Pick<CalendarEvent, 'id' | 'title' | 'eventType'>;
+  mood?: Mood;
+  refinementNote?: string;
+}
+
+export interface StyleChatTurn {
+  role: 'user' | 'assistant';
+  text: string;
+}
+
+export interface StyleChatInput {
+  message: string;
+  /** Recent transcript (the server keeps the last 12 turns). */
+  history: StyleChatTurn[];
+  event?: Pick<CalendarEvent, 'id' | 'title' | 'eventType'>;
+  mood?: Mood;
+}
+
+export interface StyleChatReply {
+  reply: string;
+  /** Present when the stylist proposed an outfit from the closet. */
+  outfit?: OutfitRecommendation;
+}
+
 export interface WornOutfitEntry {
   id: string;
   date: string; // YYYY-MM-DD
   outfitTitle: string;
-  occasion: string;
+  occasion: EventType;
   eventTitle: string;
   itemIds: string[];
   mood?: Mood;
 }
 
-// A user-created closet folder (aCloset-style "Collections"). "All Clothes" and
-// "Winter items" are computed client-side (all items / season === 'winter') and never
-// stored as a WardrobeCollection — only custom, user-named folders are backend-owned.
+// ---------------------------------------------------------------------------
+// Collections
+// ---------------------------------------------------------------------------
+
 export interface WardrobeCollection {
   id: string;
   name: string;
   iconKey: string; // resolved via collectionIcons.ts
   itemIds: string[];
-  createdAt?: string;
+  createdAt: string;
 }
 
-export type CreateCollectionRequest = Omit<WardrobeCollection, 'id' | 'createdAt'>;
+export interface CollectionInput {
+  name: string;
+  iconKey: string;
+  itemIds: string[];
+}
+
+// ---------------------------------------------------------------------------
+// Trips
+// ---------------------------------------------------------------------------
 
 export interface WardrobeTrip {
   id: string;
@@ -125,13 +210,21 @@ export interface WardrobeTrip {
   endDate: string; // YYYY-MM-DD
   location?: string;
   notes?: string;
-  packedItemIds?: string[];
-  createdAt?: string;
+  packedItemIds: string[];
+  createdAt: string;
 }
 
-export type CreateTripRequest = Omit<WardrobeTrip, 'id' | 'createdAt'>;
+export interface TripInput {
+  title: string;
+  coverImageUri?: string;
+  startDate: string;
+  endDate: string;
+  location?: string;
+  notes?: string;
+  /** Omit to leave the packed list unchanged on update. */
+  packedItemIds?: string[];
+}
 
-// One row in a trip's day-by-day outfit itinerary.
 export interface TripOutfitEntry {
   id: string;
   tripId: string;
@@ -141,7 +234,12 @@ export interface TripOutfitEntry {
   weatherHint?: string;
 }
 
-export type CreateTripOutfitRequest = Omit<TripOutfitEntry, 'id'>;
+export interface TripOutfitInput {
+  date: string;
+  itemIds: string[];
+  outfitTitle: string;
+  weatherHint?: string;
+}
 
 export interface TripChecklistItem {
   id: string;
@@ -150,4 +248,7 @@ export interface TripChecklistItem {
   checked: boolean;
 }
 
-export type CreateTripChecklistItemRequest = Omit<TripChecklistItem, 'id'>;
+export interface TripChecklistInput {
+  label?: string;
+  checked?: boolean;
+}

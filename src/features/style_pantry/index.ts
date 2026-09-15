@@ -4,11 +4,11 @@ export { default as AddEditClothingScreen } from './screens/AddEditClothingScree
 export { default as ClothingDetailsScreen } from './screens/ClothingDetailsScreen';
 export { default as AiStylistHomeScreen } from './screens/AiStylistHomeScreen';
 export { default as StyleMirrorScreen } from './screens/StyleMirrorScreen';
+export { default as StyleChatScreen } from './screens/StyleChatScreen';
 export { default as OutfitDetailsScreen } from './screens/OutfitDetailsScreen';
 export { default as StyleLogScreen } from './screens/StyleLogScreen';
 export { default as StyleCalendarScreen } from './screens/StyleCalendarScreen';
 export { default as TripPlannerScreen } from './screens/TripPlannerScreen';
 export { default as TripDetailsScreen } from './screens/TripDetailsScreen';
 export * from './types';
-export * from './stylePantryStore';
 export * from './moods';

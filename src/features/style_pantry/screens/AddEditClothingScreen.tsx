@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -20,64 +20,38 @@ import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import useAuth from '../../../hooks/useAuth';
-import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Camera from 'lucide-react-native/icons/camera';
+import ImageIcon from 'lucide-react-native/icons/image';
 import Button from '../../../components/Button';
 import BottomSheet from '../../../components/BottomSheet';
+import { SkeletonBox } from '../../../components/Skeleton';
 import {
   addClothingItem,
+  addItemToCollection,
   updateClothingItem,
-  loadClothingItems,
+  getClothingItem,
 } from '../stylePantryStore';
+import { showStoreErrorAlert } from '../errors';
+import { useBusy, useFocusLoad, useLocaleRerender } from '../hooks';
+import { categoryLabel, seasonLabel } from '../format';
+import WardrobeHeader from '../components/WardrobeHeader';
+import ItemThumb from '../components/ItemThumb';
+import OfflineBanner from '../components/OfflineBanner';
 import { CATEGORY_ICON_KEYS, getClothingIconComponent } from '../clothingIcons';
-import type { ClothingCategory, ClothingSeason, PickedFile } from '../types';
-import { subscribeToLanguageChanges, t } from '../../../i18n';
+import {
+  CLOTHING_CATEGORIES,
+  CLOTHING_SEASONS,
+  type ClothingCategory,
+  type ClothingItemInput,
+  type ClothingSeason,
+  type PickedFile,
+} from '../types';
+import { t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'AddEditClothing'>;
 
-const CATEGORY_OPTIONS: {
-  key: ClothingCategory;
-  labelKey: string;
-  iconKey: string;
-}[] = [
-  {
-    key: 'tops',
-    labelKey: 'style_pantry.cat_tops',
-    iconKey: CATEGORY_ICON_KEYS.tops,
-  },
-  {
-    key: 'bottoms',
-    labelKey: 'style_pantry.cat_bottoms',
-    iconKey: CATEGORY_ICON_KEYS.bottoms,
-  },
-  {
-    key: 'shoes',
-    labelKey: 'style_pantry.cat_shoes',
-    iconKey: CATEGORY_ICON_KEYS.shoes,
-  },
-  {
-    key: 'jackets',
-    labelKey: 'style_pantry.cat_jackets',
-    iconKey: CATEGORY_ICON_KEYS.jackets,
-  },
-  {
-    key: 'accessories',
-    labelKey: 'style_pantry.cat_accessories',
-    iconKey: CATEGORY_ICON_KEYS.accessories,
-  },
-];
-
-const SEASON_OPTIONS: { key: ClothingSeason; label: string }[] = [
-  { key: 'all-year', label: 'All Year' },
-  { key: 'summer', label: 'Summer' },
-  { key: 'winter', label: 'Winter' },
-  { key: 'monsoon', label: 'Monsoon' },
-  { key: 'spring', label: 'Spring / Autumn' },
-];
-
 // On iOS the picker can return asset-library URIs (ph://) that a later multipart
-// upload can't read from directly — copy a local cache copy first, same safeguard
-// `PrescriptionsScreen.tsx` uses for its camera/gallery uploads.
+// upload can't read from directly — copy a local cache copy first.
 async function resolveLocalUri(uri: string, fileName: string): Promise<string> {
   if (!uri.startsWith('ph://') && !uri.startsWith('assets-library://')) {
     return uri;
@@ -96,184 +70,138 @@ async function resolveLocalUri(uri: string, fileName: string): Promise<string> {
   return uri;
 }
 
+function parsePrice(value: string): { ok: true; price?: number } | { ok: false } {
+  const trimmed = value.trim();
+  if (!trimmed) return { ok: true, price: undefined };
+  if (!/^\d+(\.\d{1,2})?$/.test(trimmed)) return { ok: false };
+  const n = Number(trimmed);
+  return Number.isFinite(n) && n >= 0 ? { ok: true, price: n } : { ok: false };
+}
+
 export default function AddEditClothingScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
   const itemId = route.params?.itemId;
-  const [, setLocaleVersion] = useState(0);
+  const collectionId = route.params?.collectionId;
+  const wishlistDefault = !itemId && route.params?.wishlist === true;
+  useLocaleRerender();
 
-  const [saving, setSaving] = useState(false);
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ClothingCategory>('tops');
-  const [color, setColor] = useState('Navy Blue');
+  const [color, setColor] = useState('');
   const [brand, setBrand] = useState('');
   const [season, setSeason] = useState<ClothingSeason>('all-year');
   const [material, setMaterial] = useState('');
-  const [tagsStr, setTagsStr] = useState('office, formal');
+  const [tagsStr, setTagsStr] = useState('');
   const [purchasePriceStr, setPurchasePriceStr] = useState('');
-  const [isWishlist, setIsWishlist] = useState(false);
-  const [existingImageUri, setExistingImageUri] = useState<string | undefined>(
-    undefined,
-  );
+  const [isWishlist, setIsWishlist] = useState(wishlistDefault);
+  const [existingImageUri, setExistingImageUri] = useState<string | undefined>(undefined);
+  const [notFound, setNotFound] = useState(false);
   const [pickedPhoto, setPickedPhoto] = useState<PickedFile | null>(null);
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
-  const [existingWearCount, setExistingWearCount] = useState(0);
-  const [existingLastWorn, setExistingLastWorn] = useState<string | undefined>(
-    undefined,
+  const [busy, run] = useBusy();
+
+  const { loading, offline } = useFocusLoad(
+    useCallback(async () => {
+      if (!itemId) return;
+      const token = await getAccessToken();
+      const r = await getClothingItem(itemId, token);
+      const found = r.data;
+      if (!found) {
+        setNotFound(true);
+        return { offline: r.offline };
+      }
+      setName(found.name);
+      setCategory(found.category);
+      setColor(found.color);
+      setBrand(found.brand ?? '');
+      setSeason(found.season);
+      setMaterial(found.material ?? '');
+      setTagsStr(found.tags.join(', '));
+      setPurchasePriceStr(found.purchasePrice != null ? String(found.purchasePrice) : '');
+      setIsWishlist(found.isWishlist);
+      setExistingImageUri(found.imageUri);
+      return { offline: r.offline };
+    }, [getAccessToken, itemId]),
   );
 
-  useEffect(() => {
-    const unsubLang = subscribeToLanguageChanges(() =>
-      setLocaleVersion(v => v + 1),
-    );
-    if (itemId) {
-      loadClothingItems().then(items => {
-        const found = items.find(i => i.id === itemId);
-        if (found) {
-          setName(found.name);
-          setCategory(found.category);
-          setColor(found.color);
-          setBrand(found.brand || '');
-          setSeason(found.season);
-          setMaterial(found.material || '');
-          setTagsStr(found.tags.join(', '));
-          setPurchasePriceStr(
-            found.purchasePrice != null ? String(found.purchasePrice) : '',
-          );
-          setIsWishlist(!!found.isWishlist);
-          setExistingImageUri(found.imageUri);
-          setExistingWearCount(found.wearCount);
-          setExistingLastWorn(found.lastWornDate);
-        }
-      });
-    }
-    return () => {
-      unsubLang();
-    };
-  }, [itemId]);
+  const pickAsset = (asset: { uri?: string; fileName?: string; type?: string } | undefined) =>
+    run(async () => {
+      if (!asset?.uri) return;
+      const fileName = asset.fileName || 'item.jpg';
+      const uri = await resolveLocalUri(asset.uri, fileName);
+      setPickedPhoto({ uri, name: fileName, type: asset.type || 'image/jpeg' });
+    });
 
   const handleTakePhoto = async () => {
     setShowPhotoSheet(false);
-    const res = await launchCamera({
-      mediaType: 'photo',
-      cameraType: 'back',
-      quality: 0.8,
-      saveToPhotos: false,
-    });
+    const res = await launchCamera({ mediaType: 'photo', cameraType: 'back', quality: 0.8, saveToPhotos: false });
     if (res.didCancel) return;
-    const asset = res.assets && res.assets[0];
-    if (!asset || !asset.uri) return;
-    const uri = await resolveLocalUri(asset.uri, asset.fileName || 'item.jpg');
-    setPickedPhoto({
-      uri,
-      name: asset.fileName || 'item.jpg',
-      type: asset.type || 'image/jpeg',
-    });
+    await pickAsset(res.assets?.[0]);
   };
 
   const handlePickFromGallery = async () => {
     setShowPhotoSheet(false);
-    const res = await launchImageLibrary({
-      mediaType: 'photo',
-      selectionLimit: 1,
-      quality: 0.8,
-    });
+    const res = await launchImageLibrary({ mediaType: 'photo', selectionLimit: 1, quality: 0.8 });
     if (res.didCancel) return;
-    const asset = res.assets && res.assets[0];
-    if (!asset || !asset.uri) return;
-    const uri = await resolveLocalUri(asset.uri, asset.fileName || 'item.jpg');
-    setPickedPhoto({
-      uri,
-      name: asset.fileName || 'item.jpg',
-      type: asset.type || 'image/jpeg',
+    await pickAsset(res.assets?.[0]);
+  };
+
+  const handleSave = () =>
+    run(async () => {
+      if (!name.trim()) {
+        Alert.alert(t('style_pantry.missing_name'), t('style_pantry.enter_name_msg'));
+        return;
+      }
+      const price = parsePrice(purchasePriceStr);
+      if (!price.ok) {
+        Alert.alert(t('style_pantry.error_title'), t('style_pantry.invalid_price_msg'));
+        return;
+      }
+
+      const input: ClothingItemInput = {
+        name: name.trim(),
+        category,
+        color: color.trim() || t('style_pantry.not_specified'),
+        brand: brand.trim() || undefined,
+        season,
+        material: material.trim() || undefined,
+        tags: tagsStr
+          .split(',')
+          .map(tag => tag.trim().toLowerCase())
+          .filter(tag => tag.length > 0),
+        emoji: CATEGORY_ICON_KEYS[category],
+        purchasePrice: price.price,
+        isWishlist,
+      };
+
+      const token = await getAccessToken();
+      const result = itemId
+        ? await updateClothingItem(itemId, input, pickedPhoto, token)
+        : await addClothingItem(input, pickedPhoto, token);
+      if (!result.ok) {
+        showStoreErrorAlert(result.error);
+        return;
+      }
+      if (!itemId && collectionId) {
+        const added = await addItemToCollection(collectionId, result.data.id, token);
+        if (!added.ok) {
+          // The item exists either way; only the folder membership failed.
+          showStoreErrorAlert(added.error);
+        }
+      }
+      navigation.goBack();
     });
-  };
 
-  const handleSave = async () => {
-    if (!name.trim()) {
-      Alert.alert(
-        t('style_pantry.missing_name'),
-        t('style_pantry.enter_name_msg'),
-      );
-      return;
-    }
-
-    setSaving(true);
-    const token = await getAccessToken();
-    const tags = tagsStr
-      .split(',')
-      .map(tag => tag.trim().toLowerCase())
-      .filter(tag => tag.length > 0);
-
-    const chosenCat =
-      CATEGORY_OPTIONS.find(c => c.key === category) || CATEGORY_OPTIONS[0];
-    const parsedPrice = parseFloat(purchasePriceStr);
-    const purchasePrice = Number.isFinite(parsedPrice) ? parsedPrice : undefined;
-
-    if (itemId) {
-      await updateClothingItem(
-        {
-          id: itemId,
-          name: name.trim(),
-          category,
-          color: color.trim() || 'Custom',
-          brand: brand.trim(),
-          season,
-          material: material.trim(),
-          tags,
-          emoji: chosenCat.iconKey,
-          imageUri: pickedPhoto?.uri ?? existingImageUri,
-          wearCount: existingWearCount,
-          lastWornDate: existingLastWorn,
-          purchasePrice,
-          isWishlist,
-        },
-        pickedPhoto,
-        token,
-      );
-    } else {
-      await addClothingItem(
-        {
-          name: name.trim(),
-          category,
-          color: color.trim() || 'Custom',
-          brand: brand.trim(),
-          season,
-          material: material.trim(),
-          tags,
-          emoji: chosenCat.iconKey,
-          imageUri: pickedPhoto?.uri,
-          purchasePrice,
-          isWishlist,
-        },
-        pickedPhoto,
-        token,
-      );
-    }
-
-    setSaving(false);
-    Alert.alert(
-      t('style_pantry.dash_title'),
-      t('style_pantry.saved_msg', { name }),
-    );
-    navigation.goBack();
-  };
-
-  const photoUri = pickedPhoto?.uri ?? existingImageUri;
+  const CategoryIcon = getClothingIconComponent(CATEGORY_ICON_KEYS[category]);
 
   return (
     <View style={styles.root}>
-      {/* Header Bar */}
-      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <ArrowLeft size={20} color={styles.headerIcon.color} />
-        </Pressable>
-        <Text style={styles.headerTitle}>
-          {itemId ? t('style_pantry.edit_title') : t('style_pantry.add_title')}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <WardrobeHeader
+        title={itemId ? t('style_pantry.edit_title') : t('style_pantry.add_title')}
+        onBack={() => navigation.goBack()}
+      />
 
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -281,220 +209,165 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
         keyboardVerticalOffset={Platform.OS === 'ios' ? insets.top + 54 : 0}
       >
         <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: insets.bottom + 160 },
-          ]}
+          contentContainerStyle={[styles.content, { paddingBottom: insets.bottom + 160 }]}
           showsVerticalScrollIndicator={false}
           keyboardShouldPersistTaps="handled"
         >
-          {/* Photo Upload Card */}
-          <Pressable
-            style={styles.photoUploadCard}
-            onPress={() => setShowPhotoSheet(true)}
-          >
-            {photoUri ? (
-              <Image
-                source={{ uri: photoUri }}
-                style={styles.photoPreview}
-                resizeMode="cover"
-              />
-            ) : (
-              <View style={styles.cameraCircle}>
-                <Camera size={24} color={styles.iconTint.color} />
-              </View>
-            )}
-            <Text style={styles.photoUploadTitle}>
-              {photoUri
-                ? t('style_pantry.photo_selected')
-                : t('style_pantry.take_photo')}
-            </Text>
-          </Pressable>
+          <OfflineBanner visible={offline} />
 
-          {/* Input Fields Card */}
-          <View style={styles.card}>
-            <Text style={styles.inputLabel}>
-              {t('style_pantry.item_name_label')}
-            </Text>
-            <TextInput
-              style={styles.textInput}
-              value={name}
-              onChangeText={setName}
-              placeholder={t('style_pantry.name_placeholder')}
-              placeholderTextColor={styles.placeholder.color}
-            />
-
-            <Text style={styles.inputLabel}>
-              {t('style_pantry.category_label')}
-            </Text>
-            <View style={styles.categoryWrap}>
-              {CATEGORY_OPTIONS.map(c => {
-                const CatIcon = getClothingIconComponent(c.iconKey);
-                return (
-                  <Pressable
-                    key={c.key}
-                    style={[
-                      styles.catOptionChip,
-                      category === c.key && styles.catOptionChipActive,
-                    ]}
-                    onPress={() => setCategory(c.key)}
-                  >
-                    <CatIcon
-                      size={14}
-                      color={
-                        category === c.key
-                          ? styles.headerIconOnPrimary.color
-                          : styles.catOptionText.color
-                      }
-                      style={styles.catOptionIcon}
-                    />
-                    <Text
-                      style={[
-                        styles.catOptionText,
-                        category === c.key && styles.catOptionTextActive,
-                      ]}
-                    >
-                      {t(c.labelKey)}
-                    </Text>
-                  </Pressable>
-                );
-              })}
+          {itemId && loading ? (
+            <>
+              <SkeletonBox width="100%" height={150} borderRadius={14} style={styles.skeletonGap} />
+              <SkeletonBox width="100%" height={220} borderRadius={14} />
+            </>
+          ) : itemId && notFound ? (
+            <View style={styles.emptyCard}>
+              <Text style={styles.emptyTitle}>{t('style_pantry.item_not_found')}</Text>
+              <Button title={t('style_pantry.go_back')} onPress={() => navigation.goBack()} style={styles.saveBtn} />
             </View>
-
-            <Text style={styles.inputLabel}>
-              {t('style_pantry.color_label')}
-            </Text>
-            <TextInput
-              style={styles.textInput}
-              value={color}
-              onChangeText={setColor}
-              placeholder="e.g. Navy Blue, Charcoal Black"
-              placeholderTextColor={styles.placeholder.color}
-            />
-
-            <Text style={styles.inputLabel}>
-              {t('style_pantry.brand_label')}
-            </Text>
-            <TextInput
-              style={styles.textInput}
-              value={brand}
-              onChangeText={setBrand}
-              placeholder={t('style_pantry.brand_placeholder')}
-              placeholderTextColor={styles.placeholder.color}
-            />
-
-            <Text style={styles.inputLabel}>
-              {t('style_pantry.purchase_price_label')}
-            </Text>
-            <TextInput
-              style={styles.textInput}
-              value={purchasePriceStr}
-              onChangeText={setPurchasePriceStr}
-              placeholder={t('style_pantry.purchase_price_placeholder')}
-              placeholderTextColor={styles.placeholder.color}
-              keyboardType="decimal-pad"
-            />
-          </View>
-
-          {/* Specialized Details Card */}
-          <Text style={styles.sectionTitle}>
-            {t('style_pantry.season_material_tags')}
-          </Text>
-          <View style={styles.card}>
-            <Text style={styles.inputLabel}>
-              {t('style_pantry.season_label')}
-            </Text>
-            <View style={styles.seasonWrap}>
-              {SEASON_OPTIONS.map(s => (
-                <Pressable
-                  key={s.key}
-                  style={[
-                    styles.seasonChip,
-                    season === s.key && styles.seasonChipActive,
-                  ]}
-                  onPress={() => setSeason(s.key)}
-                >
-                  <Text
-                    style={[
-                      styles.seasonChipText,
-                      season === s.key && styles.seasonChipTextActive,
-                    ]}
-                  >
-                    {s.label}
-                  </Text>
-                </Pressable>
-              ))}
-            </View>
-
-            <Text style={styles.inputLabel}>
-              {t('style_pantry.material_label')}
-            </Text>
-            <TextInput
-              style={styles.textInput}
-              value={material}
-              onChangeText={setMaterial}
-              placeholder={t('style_pantry.material_placeholder')}
-              placeholderTextColor={styles.placeholder.color}
-            />
-
-            <Text style={styles.inputLabel}>
-              {t('style_pantry.tags_label')}
-            </Text>
-            <TextInput
-              style={styles.textInput}
-              value={tagsStr}
-              onChangeText={setTagsStr}
-              placeholder={t('style_pantry.tags_placeholder')}
-              placeholderTextColor={styles.placeholder.color}
-            />
-
-            <View style={styles.wishlistRow}>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.wishlistLabel}>
-                  {t('style_pantry.wishlist_toggle_label')}
+          ) : (
+            <>
+              <Pressable style={styles.photoUploadCard} onPress={() => setShowPhotoSheet(true)}>
+                {pickedPhoto ? (
+                  <Image source={{ uri: pickedPhoto.uri }} style={styles.photoPreview} resizeMode="cover" />
+                ) : existingImageUri ? (
+                  <ItemThumb
+                    item={{ imageUri: existingImageUri, emoji: CATEGORY_ICON_KEYS[category], name }}
+                    size={96}
+                    style={styles.photoPreview}
+                  />
+                ) : (
+                  <View style={styles.cameraCircle}>
+                    <CategoryIcon size={24} color={styles.iconTint.color} />
+                  </View>
+                )}
+                <Text style={styles.photoUploadTitle}>
+                  {pickedPhoto ? t('style_pantry.photo_selected') : t('style_pantry.take_photo')}
                 </Text>
-                <Text style={styles.wishlistSub}>
-                  {t('style_pantry.wishlist_toggle_sub')}
-                </Text>
-              </View>
-              <Switch value={isWishlist} onValueChange={setIsWishlist} />
-            </View>
-          </View>
+              </Pressable>
 
-          {/* Save Button */}
-          <Button
-            title={t('style_pantry.save_item')}
-            onPress={handleSave}
-            loading={saving}
-            style={styles.saveBtn}
-          />
+              <View style={styles.card}>
+                <Text style={styles.inputLabel}>{t('style_pantry.item_name_label')}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={name}
+                  onChangeText={setName}
+                  placeholder={t('style_pantry.name_placeholder')}
+                  placeholderTextColor={styles.placeholder.color}
+                />
+
+                <Text style={styles.inputLabel}>{t('style_pantry.category_label')}</Text>
+                <View style={styles.chipWrap}>
+                  {CLOTHING_CATEGORIES.map(c => {
+                    const active = category === c;
+                    const CatIcon = getClothingIconComponent(CATEGORY_ICON_KEYS[c]);
+                    return (
+                      <Pressable
+                        key={c}
+                        style={[styles.chip, active && styles.chipActive]}
+                        onPress={() => setCategory(c)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: active }}
+                      >
+                        <CatIcon size={14} color={active ? styles.chipTextActive.color : styles.chipText.color} style={styles.chipIcon} />
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{categoryLabel(c)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.inputLabel}>{t('style_pantry.color_label')}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={color}
+                  onChangeText={setColor}
+                  placeholder={t('style_pantry.color_placeholder')}
+                  placeholderTextColor={styles.placeholder.color}
+                />
+
+                <Text style={styles.inputLabel}>{t('style_pantry.brand_label')}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={brand}
+                  onChangeText={setBrand}
+                  placeholder={t('style_pantry.brand_placeholder')}
+                  placeholderTextColor={styles.placeholder.color}
+                />
+
+                <Text style={styles.inputLabel}>{t('style_pantry.purchase_price_label')}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={purchasePriceStr}
+                  onChangeText={setPurchasePriceStr}
+                  placeholder={t('style_pantry.purchase_price_placeholder')}
+                  placeholderTextColor={styles.placeholder.color}
+                  keyboardType="decimal-pad"
+                />
+              </View>
+
+              <Text style={styles.sectionTitle}>{t('style_pantry.season_material_tags')}</Text>
+              <View style={styles.card}>
+                <Text style={styles.inputLabel}>{t('style_pantry.season_label')}</Text>
+                <View style={styles.chipWrap}>
+                  {CLOTHING_SEASONS.map(s => {
+                    const active = season === s;
+                    return (
+                      <Pressable
+                        key={s}
+                        style={[styles.chip, active && styles.chipActive]}
+                        onPress={() => setSeason(s)}
+                        accessibilityRole="radio"
+                        accessibilityState={{ selected: active }}
+                      >
+                        <Text style={[styles.chipText, active && styles.chipTextActive]}>{seasonLabel(s)}</Text>
+                      </Pressable>
+                    );
+                  })}
+                </View>
+
+                <Text style={styles.inputLabel}>{t('style_pantry.material_label')}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={material}
+                  onChangeText={setMaterial}
+                  placeholder={t('style_pantry.material_placeholder')}
+                  placeholderTextColor={styles.placeholder.color}
+                />
+
+                <Text style={styles.inputLabel}>{t('style_pantry.tags_label')}</Text>
+                <TextInput
+                  style={styles.textInput}
+                  value={tagsStr}
+                  onChangeText={setTagsStr}
+                  placeholder={t('style_pantry.tags_placeholder')}
+                  placeholderTextColor={styles.placeholder.color}
+                  autoCapitalize="none"
+                />
+                <Text style={styles.hint}>{t('style_pantry.tags_hint')}</Text>
+
+                <View style={styles.wishlistRow}>
+                  <View style={styles.wishlistTextWrap}>
+                    <Text style={styles.wishlistLabel}>{t('style_pantry.wishlist_toggle_label')}</Text>
+                    <Text style={styles.wishlistSub}>{t('style_pantry.wishlist_toggle_sub')}</Text>
+                  </View>
+                  <Switch value={isWishlist} onValueChange={setIsWishlist} />
+                </View>
+              </View>
+
+              <Button title={t('style_pantry.save_item')} onPress={handleSave} loading={busy} style={styles.saveBtn} />
+            </>
+          )}
         </ScrollView>
       </KeyboardAvoidingView>
 
-      <BottomSheet
-        visible={showPhotoSheet}
-        onClose={() => setShowPhotoSheet(false)}
-        title={t('style_pantry.choose_photo_title')}
-      >
+      <BottomSheet visible={showPhotoSheet} onClose={() => setShowPhotoSheet(false)} title={t('style_pantry.choose_photo_title')}>
         <Pressable style={styles.photoOption} onPress={handleTakePhoto}>
-          <Camera
-            size={18}
-            color={styles.iconTint.color}
-            style={{ marginRight: 10 }}
-          />
-          <Text style={styles.photoOptionText}>
-            {t('style_pantry.take_photo_option')}
-          </Text>
+          <Camera size={18} color={styles.iconTint.color} style={styles.photoOptionIcon} />
+          <Text style={styles.photoOptionText}>{t('style_pantry.take_photo_option')}</Text>
         </Pressable>
         <Pressable style={styles.photoOption} onPress={handlePickFromGallery}>
-          <Camera
-            size={18}
-            color={styles.iconTint.color}
-            style={{ marginRight: 10 }}
-          />
-          <Text style={styles.photoOptionText}>
-            {t('style_pantry.choose_gallery_option')}
-          </Text>
+          <ImageIcon size={18} color={styles.iconTint.color} style={styles.photoOptionIcon} />
+          <Text style={styles.photoOptionText}>{t('style_pantry.choose_gallery_option')}</Text>
         </Pressable>
       </BottomSheet>
     </View>
@@ -503,50 +376,20 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
 
 const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
   StyleSheet.create({
-    root: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    headerBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.sm,
-      backgroundColor: colors.background,
-    },
-    headerBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
+    root: { flex: 1, backgroundColor: colors.background },
+    iconTint: { color: colors.primary },
+    keyboardContainer: { flex: 1 },
+    content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+    skeletonGap: { marginBottom: spacing.md },
+    emptyCard: {
       backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      padding: spacing.xl,
       alignItems: 'center',
-      justifyContent: 'center',
       borderWidth: 1,
       borderColor: colors.border,
-      ...shadow.soft,
     },
-    headerIcon: {
-      color: colors.textPrimary,
-    },
-    headerIconOnPrimary: {
-      color: colors.textOnPrimary,
-    },
-    iconTint: {
-      color: colors.primary,
-    },
-    headerTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 18,
-      color: colors.textPrimary,
-    },
-    keyboardContainer: {
-      flex: 1,
-    },
-    content: {
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xxl,
-    },
+    emptyTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.textPrimary },
     photoUploadCard: {
       backgroundColor: colors.blush,
       borderRadius: radius.lg,
@@ -559,12 +402,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: spacing.md,
       overflow: 'hidden',
     },
-    photoPreview: {
-      width: 96,
-      height: 96,
-      borderRadius: radius.md,
-      marginBottom: spacing.xs,
-    },
+    photoPreview: { width: 96, height: 96, borderRadius: radius.md, marginBottom: spacing.xs },
     cameraCircle: {
       width: 52,
       height: 52,
@@ -574,11 +412,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       justifyContent: 'center',
       marginBottom: spacing.xs,
     },
-    photoUploadTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 14,
-      color: colors.primary,
-    },
+    photoUploadTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.primary },
     card: {
       backgroundColor: colors.glassSurface,
       borderRadius: radius.lg,
@@ -588,13 +422,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: spacing.md,
       ...shadow.soft,
     },
-    inputLabel: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 13,
-      color: colors.textSecondary,
-      marginBottom: spacing.xs,
-      marginTop: spacing.xs,
-    },
+    inputLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.xs },
     textInput: {
       fontFamily: fonts.sans,
       fontSize: 14,
@@ -607,79 +435,27 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderColor: colors.border,
       marginBottom: spacing.sm,
     },
-    placeholder: {
-      color: colors.textSecondary,
-    },
-    categoryWrap: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.xs,
-      marginBottom: spacing.sm,
-    },
-    catOptionChip: {
+    hint: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted, marginTop: -4, marginBottom: spacing.sm },
+    placeholder: { color: colors.textSecondary },
+    chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs, marginBottom: spacing.sm },
+    chip: {
       flexDirection: 'row',
       alignItems: 'center',
       paddingHorizontal: spacing.md,
       paddingVertical: spacing.xs,
-      borderRadius: radius.pill,
+      borderRadius: radius.full,
       backgroundColor: colors.background,
       borderWidth: 1,
       borderColor: colors.border,
       marginRight: 4,
       marginBottom: 4,
     },
-    catOptionChipActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    catOptionIcon: {
-      marginRight: 4,
-    },
-    catOptionText: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 12,
-      color: colors.textSecondary,
-    },
-    catOptionTextActive: {
-      color: colors.textOnPrimary,
-    },
-    sectionTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 15,
-      color: colors.textPrimary,
-      marginBottom: spacing.xs,
-    },
-    seasonWrap: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.xs,
-      marginBottom: spacing.sm,
-    },
-    seasonChip: {
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs,
-      borderRadius: radius.pill,
-      backgroundColor: colors.background,
-      borderWidth: 1,
-      borderColor: colors.border,
-      marginRight: 4,
-      marginBottom: 4,
-    },
-    seasonChipActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    seasonChipText: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 12,
-      color: colors.textSecondary,
-    },
-    seasonChipTextActive: {
-      color: colors.textOnPrimary,
-    },
-    saveBtn: {
-      marginTop: spacing.md,
-    },
+    chipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    chipIcon: { marginRight: 4 },
+    chipText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary },
+    chipTextActive: { color: colors.textOnPrimary },
+    sectionTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.textPrimary, marginBottom: spacing.xs },
+    saveBtn: { marginTop: spacing.md },
     wishlistRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -688,17 +464,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderTopWidth: 1,
       borderTopColor: colors.border,
     },
-    wishlistLabel: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 13,
-      color: colors.textPrimary,
-    },
-    wishlistSub: {
-      fontFamily: fonts.sans,
-      fontSize: 11,
-      color: colors.textSecondary,
-      marginTop: 2,
-    },
+    wishlistTextWrap: { flex: 1 },
+    wishlistLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textPrimary },
+    wishlistSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.textSecondary, marginTop: 2 },
     photoOption: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -706,9 +474,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderBottomWidth: 1,
       borderBottomColor: colors.border,
     },
-    photoOptionText: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 14,
-      color: colors.textPrimary,
-    },
+    photoOptionIcon: { marginRight: 10 },
+    photoOptionText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.textPrimary },
   });

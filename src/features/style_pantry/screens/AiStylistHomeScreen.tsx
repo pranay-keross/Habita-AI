@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import {
   View,
   Text,
@@ -6,54 +6,56 @@ import {
   StyleSheet,
   Pressable,
   RefreshControl,
+  Alert,
+  useWindowDimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import useAuth from '../../../hooks/useAuth';
-import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import FolderOpen from 'lucide-react-native/icons/folder-open';
 import Luggage from 'lucide-react-native/icons/luggage';
-import Sparkles from 'lucide-react-native/icons/sparkles';
+import WandSparkles from 'lucide-react-native/icons/wand-sparkles';
 import MessageCircle from 'lucide-react-native/icons/message-circle';
 import Palette from 'lucide-react-native/icons/palette';
 import Ruler from 'lucide-react-native/icons/ruler';
 import Star from 'lucide-react-native/icons/star';
 import Camera from 'lucide-react-native/icons/camera';
 import Plus from 'lucide-react-native/icons/plus';
-import ChevronRight from 'lucide-react-native/icons/chevron-right';
-import GlassCard from '../../../components/GlassCard';
+import ArrowRight from 'lucide-react-native/icons/arrow-right';
+import RefreshCw from 'lucide-react-native/icons/refresh-cw';
+import Shirt from 'lucide-react-native/icons/shirt';
 import BottomSheet from '../../../components/BottomSheet';
 import Button from '../../../components/Button';
-import QuickActionTile from '../../../components/QuickActionTile';
 import { SkeletonBox, SkeletonText } from '../../../components/Skeleton';
 import {
   loadClothingItems,
+  loadSavedOutfits,
+  loadStyleHistory,
+  loadTodaysOutfit,
   loadWeather,
-  generateOutfitRecommendation,
+  ownedItems,
+  wearOutfit,
 } from '../stylePantryStore';
-import { getClothingIconComponent } from '../clothingIcons';
+import { showStoreErrorAlert, type StoreError } from '../errors';
+import { useBusy, useFocusLoad, useLocaleRerender } from '../hooks';
+import { categoryLabel } from '../format';
+import { getWeatherIconComponent } from '../clothingIcons';
+import WardrobeHeader from '../components/WardrobeHeader';
+import ItemThumb from '../components/ItemThumb';
+import OfflineBanner from '../components/OfflineBanner';
+import { addDays, todayString } from '../../../utils/date';
 import type {
-  CalendarEvent,
   ClothingItem,
   OutfitRecommendation,
+  WeatherContext,
 } from '../types';
-import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'AiStylistHome'>;
 
-function todaysPseudoEvent(): CalendarEvent {
-  const today = new Date().toISOString().split('T')[0];
-  return {
-    id: 'today',
-    title: t('ai_stylist.today_outfit_event_title'),
-    date: today,
-    time: '',
-    eventType: 'casual',
-  };
-}
+const HERO_ORDER = ['tops', 'jackets', 'bottoms', 'shoes', 'accessories'];
 
 function greetingKey(): string {
   const hour = new Date().getHours();
@@ -62,83 +64,273 @@ function greetingKey(): string {
   return 'ai_stylist.greeting_evening';
 }
 
+function heroItems(outfit: OutfitRecommendation): ClothingItem[] {
+  return [...outfit.items].sort(
+    (a, b) => HERO_ORDER.indexOf(a.category) - HERO_ORDER.indexOf(b.category),
+  );
+}
+
 export default function AiStylistHomeScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
-  const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
-  const [, setLocaleVersion] = useState(0);
+  const { width } = useWindowDimensions();
+  useLocaleRerender();
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<ClothingItem[]>([]);
+  const [weather, setWeather] = useState<WeatherContext | null>(null);
+  const [savedCount, setSavedCount] = useState(0);
+  const [wornThisWeek, setWornThisWeek] = useState(0);
   const [recommendation, setRecommendation] =
     useState<OutfitRecommendation | null>(null);
+  const [outfitError, setOutfitError] = useState<StoreError | null>(null);
   const [comingSoon, setComingSoon] = useState<string | null>(null);
+  const [regenerating, regenerate] = useBusy();
+  const [wearing, wear] = useBusy();
 
-  const fetchData = useCallback(async () => {
+  const load = useCallback(async () => {
     const token = await getAccessToken();
-    const [list, weather] = await Promise.all([
+    const [list, w, saved, history] = await Promise.all([
       loadClothingItems(token),
       loadWeather(token),
+      loadSavedOutfits(token),
+      loadStyleHistory(token),
     ]);
-    setItems(list);
-    if (list.length > 0) {
-      const outfit = await generateOutfitRecommendation(
-        weather,
-        todaysPseudoEvent(),
-        list,
-        token,
-      );
-      setRecommendation(outfit);
+    setItems(list.data);
+    setWeather(w.data);
+    setSavedCount(saved.data.length);
+    const weekAgo = addDays(todayString(), -6);
+    setWornThisWeek(history.data.filter(e => e.date >= weekAgo).length);
+
+    if (ownedItems(list.data).length > 0) {
+      const outfit = await loadTodaysOutfit(token);
+      if (outfit.ok) {
+        setRecommendation(outfit.data);
+        setOutfitError(null);
+      } else {
+        setRecommendation(null);
+        setOutfitError(outfit.error);
+      }
     } else {
       setRecommendation(null);
+      setOutfitError(null);
     }
+    return { offline: list.offline };
   }, [getAccessToken]);
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
-  }, [fetchData]);
+  const { loading, refreshing, offline, refresh } = useFocusLoad(load);
 
-  useEffect(() => {
-    const unsubLang = subscribeToLanguageChanges(() =>
-      setLocaleVersion(v => v + 1),
-    );
-    const unsubFocus = navigation.addListener('focus', () => {
-      setLoading(true);
-      fetchData().finally(() => setLoading(false));
+  const handleRegenerate = () =>
+    regenerate(async () => {
+      const token = await getAccessToken();
+      const outfit = await loadTodaysOutfit(token, { regenerate: true });
+      if (outfit.ok) {
+        setRecommendation(outfit.data);
+        setOutfitError(null);
+      } else if (outfit.error.code === 'INSUFFICIENT_WARDROBE') {
+        setRecommendation(null);
+        setOutfitError(outfit.error);
+      } else {
+        showStoreErrorAlert(outfit.error);
+      }
     });
-    return () => {
-      unsubLang();
-      unsubFocus();
-    };
-  }, [navigation, fetchData]);
 
-  const recentItems = items.slice(0, 8);
+  const handleWear = () =>
+    wear(async () => {
+      if (!recommendation) return;
+      const token = await getAccessToken();
+      const result = await wearOutfit(recommendation, token);
+      if (!result.ok) {
+        showStoreErrorAlert(result.error);
+        return;
+      }
+      setWornThisWeek(n => n + 1);
+      Alert.alert(
+        t('style_pantry.worn_alert_title'),
+        t('style_pantry.worn_alert_msg'),
+      );
+    });
+
+  const owned = ownedItems(items);
+  const recentItems = owned
+    .slice()
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt))
+    .slice(0, 8);
+  const hasOwnedItems = owned.length > 0;
+  const WeatherIcon = getWeatherIconComponent(weather?.condition);
+  const heroPhotoWidth = Math.round((width - 2 * 24 - 2 * 20) * 0.44);
+
+  const renderHero = () => {
+    if (loading) {
+      return (
+        <View style={styles.hero}>
+          <SkeletonText width="40%" height={12} dark />
+          <SkeletonBox height={180} borderRadius={20} style={styles.heroSkeleton} dark />
+        </View>
+      );
+    }
+
+    const weatherPill = weather ? (
+      <View style={styles.weatherPill}>
+        <WeatherIcon size={14} color={styles.heroMuted.color} />
+        <Text style={styles.weatherPillText} numberOfLines={1}>
+          {weather.description.includes('°')
+            ? weather.description
+            : `${weather.temperature}° · ${weather.description}`}
+          {weather.city ? ` · ${weather.city}` : ''}
+        </Text>
+      </View>
+    ) : null;
+
+    if (recommendation) {
+      const ordered = heroItems(recommendation);
+      const [main, ...others] = ordered;
+      return (
+        <Pressable
+          style={styles.hero}
+          onPress={() =>
+            navigation.navigate('OutfitDetails', { outfit: recommendation })
+          }
+          accessibilityRole="button"
+          accessibilityLabel={recommendation.title}
+        >
+          <View style={styles.heroTopRow}>
+            <Text style={styles.heroKicker}>{t('ai_stylist.hero_kicker')}</Text>
+            {weatherPill}
+          </View>
+          <View style={styles.heroBody}>
+            <View style={styles.heroTextCol}>
+              <Text style={styles.heroTitle} numberOfLines={3}>
+                {recommendation.title}
+              </Text>
+              <Text style={styles.heroMeta}>
+                {t('style_pantry.outfit_pieces', {
+                  count: recommendation.items.length,
+                })}
+              </Text>
+              <View style={styles.heroActions}>
+                <Pressable
+                  style={styles.heroPrimaryBtn}
+                  onPress={handleWear}
+                  disabled={wearing}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('style_pantry.wear_today')}
+                >
+                  <Text style={styles.heroPrimaryBtnText}>
+                    {t('style_pantry.wear_today')}
+                  </Text>
+                </Pressable>
+                <Pressable
+                  style={styles.heroGhostBtn}
+                  onPress={handleRegenerate}
+                  disabled={regenerating}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('ai_stylist.regenerate')}
+                >
+                  <RefreshCw size={14} color={styles.heroOnPrimary.color} />
+                  <Text style={styles.heroGhostBtnText}>
+                    {t('ai_stylist.regenerate')}
+                  </Text>
+                </Pressable>
+              </View>
+            </View>
+            <View style={[styles.heroPhotoCol, { width: heroPhotoWidth }]}>
+              <View
+                style={[
+                  styles.heroPhoto,
+                  { width: heroPhotoWidth, height: Math.round(heroPhotoWidth * 4 / 3) },
+                ]}
+              >
+                {main ? <ItemThumb item={main} fill radius={20} /> : null}
+              </View>
+              {others.length > 0 ? (
+                <View style={styles.heroThumbRow}>
+                  {others.slice(0, 4).map((item, i) => (
+                    <View
+                      key={item.id}
+                      style={[styles.heroThumbWrap, i > 0 && styles.heroThumbOverlap]}
+                    >
+                      <ItemThumb item={item} size={36} radius={18} />
+                    </View>
+                  ))}
+                </View>
+              ) : null}
+            </View>
+          </View>
+        </Pressable>
+      );
+    }
+
+    if (!hasOwnedItems || outfitError?.code === 'INSUFFICIENT_WARDROBE') {
+      return (
+        <View style={styles.hero}>
+          <View style={styles.heroTopRow}>
+            <Text style={styles.heroKicker}>{t('ai_stylist.hero_kicker')}</Text>
+            {weatherPill}
+          </View>
+          <View style={styles.heroEmptyIcon}>
+            <Shirt size={26} color={styles.heroOnPrimary.color} />
+          </View>
+          <Text style={styles.heroTitle}>{t('ai_stylist.hero_empty_title')}</Text>
+          <Text style={styles.heroEmptySub}>{t('ai_stylist.hero_empty_sub')}</Text>
+          <Pressable
+            style={[styles.heroPrimaryBtn, styles.heroBtnSelf]}
+            onPress={() => navigation.navigate('AddEditClothing', {})}
+            accessibilityRole="button"
+            accessibilityLabel={t('style_pantry.add_item_btn')}
+          >
+            <Text style={styles.heroPrimaryBtnText}>
+              {t('style_pantry.add_item_btn')}
+            </Text>
+          </Pressable>
+        </View>
+      );
+    }
+
+    return (
+      <View style={styles.hero}>
+        <View style={styles.heroTopRow}>
+          <Text style={styles.heroKicker}>{t('ai_stylist.hero_kicker')}</Text>
+          {weatherPill}
+        </View>
+        <Text style={styles.heroTitle}>{t('style_pantry.generate_failed')}</Text>
+        <Pressable
+          style={[styles.heroPrimaryBtn, styles.heroBtnSelf]}
+          onPress={handleRegenerate}
+          disabled={regenerating}
+          accessibilityRole="button"
+          accessibilityLabel={t('style_pantry.retry')}
+        >
+          <Text style={styles.heroPrimaryBtnText}>{t('style_pantry.retry')}</Text>
+        </Pressable>
+      </View>
+    );
+  };
+
+  const labs = [
+    { key: 'qa_find_color', Icon: Palette },
+    { key: 'qa_find_fit', Icon: Ruler },
+    { key: 'qa_rate_style', Icon: Star },
+    { key: 'qa_try_on', Icon: Camera },
+  ];
 
   return (
     <View style={styles.root}>
-      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <ArrowLeft size={20} color={styles.headerIcon.color} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('ai_stylist.hub_title')}</Text>
-        <View style={styles.headerRightGroup}>
-          <Pressable
-            onPress={() => navigation.navigate('Trips')}
-            style={styles.headerBtn}
-          >
-            <Luggage size={18} color={styles.headerIcon.color} />
-          </Pressable>
-          <Pressable
-            onPress={() => navigation.navigate('Wardrobe')}
-            style={styles.headerBtn}
-          >
-            <FolderOpen size={18} color={styles.headerIcon.color} />
-          </Pressable>
-        </View>
-      </View>
+      <WardrobeHeader
+        title={t('ai_stylist.hub_title')}
+        onBack={() => navigation.goBack()}
+        right={[
+          {
+            icon: Luggage,
+            onPress: () => navigation.navigate('Trips'),
+            accessibilityLabel: t('trip.list_title'),
+          },
+          {
+            icon: FolderOpen,
+            onPress: () => navigation.navigate('Wardrobe'),
+            accessibilityLabel: t('closet.title'),
+          },
+        ]}
+      />
 
       <ScrollView
         contentContainerStyle={styles.content}
@@ -146,115 +338,93 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
         refreshControl={
           <RefreshControl
             refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={styles.headerIcon.color}
-            colors={[styles.headerIcon.color]}
+            onRefresh={refresh}
+            tintColor={styles.iconTint.color}
+            colors={[styles.iconTint.color]}
           />
         }
       >
         <Text style={styles.greeting}>{t(greetingKey())}</Text>
         <Text style={styles.subGreeting}>{t('ai_stylist.hub_subtitle')}</Text>
 
-        {/* Quick actions */}
-        <View style={styles.quickActionsGrid}>
-          <QuickActionTile
-            label={t('ai_stylist.qa_outfit_suggestion')}
-            Icon={Sparkles}
+        <OfflineBanner visible={offline} />
+
+        {renderHero()}
+
+        <View style={styles.purposeRow}>
+          <Pressable
+            style={[styles.purposeCard, styles.purposeCardOutline]}
+            onPress={() => navigation.navigate('StyleMirror')}
+            accessibilityRole="button"
+            accessibilityLabel={t('ai_stylist.action_outfit_title')}
+          >
+            <View style={styles.purposeIconCircle}>
+              <WandSparkles size={20} color={styles.iconTint.color} />
+            </View>
+            <View style={styles.purposeTextBlock}>
+              <Text style={styles.purposeTitle}>
+                {t('ai_stylist.action_outfit_title')}
+              </Text>
+              <Text style={styles.purposeSub} numberOfLines={3}>
+                {t('ai_stylist.action_outfit_sub')}
+              </Text>
+            </View>
+            <View style={styles.purposeArrow}>
+              <ArrowRight size={16} color={styles.iconTint.color} />
+            </View>
+          </Pressable>
+          <Pressable
+            style={[styles.purposeCard, styles.purposeCardBlush]}
             onPress={() => navigation.navigate('StyleChat')}
-            style={styles.quickActionTile}
-          />
-          <QuickActionTile
-            label={t('ai_stylist.qa_style_chat')}
-            Icon={MessageCircle}
-            onPress={() => navigation.navigate('StyleChat')}
-            style={styles.quickActionTile}
-          />
-          <QuickActionTile
-            label={t('ai_stylist.qa_find_color')}
-            Icon={Palette}
-            onPress={() => setComingSoon(t('ai_stylist.qa_find_color'))}
-            style={styles.quickActionTile}
-          />
-          <QuickActionTile
-            label={t('ai_stylist.qa_find_fit')}
-            Icon={Ruler}
-            onPress={() => setComingSoon(t('ai_stylist.qa_find_fit'))}
-            style={styles.quickActionTile}
-          />
-          <QuickActionTile
-            label={t('ai_stylist.qa_rate_style')}
-            Icon={Star}
-            onPress={() => setComingSoon(t('ai_stylist.qa_rate_style'))}
-            style={styles.quickActionTile}
-          />
-          <QuickActionTile
-            label={t('ai_stylist.qa_try_on')}
-            Icon={Camera}
-            onPress={() => setComingSoon(t('ai_stylist.qa_try_on'))}
-            style={styles.quickActionTile}
-          />
+            accessibilityRole="button"
+            accessibilityLabel={t('ai_stylist.action_chat_title')}
+          >
+            <View style={[styles.purposeIconCircle, styles.purposeIconCircleDark]}>
+              <MessageCircle size={20} color={styles.heroOnPrimary.color} />
+            </View>
+            <View style={styles.purposeTextBlock}>
+              <Text style={styles.purposeTitle}>
+                {t('ai_stylist.action_chat_title')}
+              </Text>
+              <Text style={styles.purposeSub} numberOfLines={3}>
+                {t('ai_stylist.action_chat_sub')}
+              </Text>
+            </View>
+            <View style={styles.purposeArrow}>
+              <ArrowRight size={16} color={styles.iconTint.color} />
+            </View>
+          </Pressable>
         </View>
 
-        {/* Today's outfit */}
-        <Text style={styles.sectionTitle}>{t('ai_stylist.today_outfit')}</Text>
-        {loading ? (
-          <View style={styles.loadingBox}>
-            <SkeletonBox
-              width={40}
-              height={40}
-              borderRadius={20}
-              style={{ marginBottom: 12 }}
-            />
-            <SkeletonText width="60%" />
-          </View>
-        ) : recommendation ? (
-          <GlassCard
-            variant="glow"
-            onPress={() =>
-              navigation.navigate('OutfitDetails', { outfit: recommendation })
-            }
-          >
-            <Text style={styles.outfitTitle}>{recommendation.title}</Text>
-            <Text style={styles.stylistNote} numberOfLines={2}>
-              {recommendation.stylistNote}
-            </Text>
-            <View style={styles.itemsPreviewRow}>
-              {recommendation.items.map(item => {
-                const ItemIcon = getClothingIconComponent(item.emoji);
-                return (
-                  <View key={item.id} style={styles.itemMiniCard}>
-                    <ItemIcon size={22} color={styles.iconTint.color} />
-                  </View>
-                );
-              })}
-            </View>
-            <View style={styles.viewMoreRow}>
-              <Text style={styles.viewMoreText}>
-                {t('ai_stylist.view_full_outfit')}
+        <View style={styles.statsRow}>
+          {[
+            { key: 'stat_items', value: owned.length },
+            { key: 'stat_saved', value: savedCount },
+            { key: 'stat_worn_week', value: wornThisWeek },
+          ].map((s, i) => (
+            <View key={s.key} style={[styles.statTile, i > 0 && styles.statTileSpaced]}>
+              {loading ? (
+                <SkeletonText width="40%" height={20} />
+              ) : (
+                <Text style={styles.statValue}>{s.value}</Text>
+              )}
+              <Text style={styles.statLabel} numberOfLines={2}>
+                {t(`ai_stylist.${s.key}`)}
               </Text>
-              <ChevronRight size={16} color={styles.iconTint.color} />
             </View>
-          </GlassCard>
-        ) : (
-          <GlassCard variant="default">
-            <Text style={styles.emptyOutfitText}>
-              {t('ai_stylist.no_items_yet')}
-            </Text>
-            <Button
-              title={t('style_pantry.add_item_btn')}
-              onPress={() => navigation.navigate('AddEditClothing', {})}
-              style={{ marginTop: 8 }}
-            />
-          </GlassCard>
-        )}
+          ))}
+        </View>
 
-        {/* Recently added items */}
         <View style={styles.listHeaderRow}>
-          <Text style={styles.sectionTitle}>
-            {t('ai_stylist.recently_added')}
-          </Text>
-          <Pressable onPress={() => navigation.navigate('Wardrobe')}>
-            <ChevronRight size={18} color={styles.iconTint.color} />
+          <Text style={styles.sectionTitle}>{t('ai_stylist.recently_added')}</Text>
+          <Pressable
+            onPress={() => navigation.navigate('Wardrobe')}
+            accessibilityRole="button"
+            accessibilityLabel={t('ai_stylist.see_all')}
+            style={styles.seeAllRow}
+          >
+            <Text style={styles.seeAllText}>{t('ai_stylist.see_all')}</Text>
+            <ArrowRight size={14} color={styles.iconTint.color} />
           </Pressable>
         </View>
         <ScrollView
@@ -262,27 +432,63 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.recentScroll}
         >
-          <Pressable
-            style={styles.addRecentTile}
-            onPress={() => navigation.navigate('AddEditClothing', {})}
-          >
-            <Plus size={20} color={styles.iconTint.color} />
-          </Pressable>
-          {recentItems.map(item => {
-            const ItemIcon = getClothingIconComponent(item.emoji);
-            return (
-              <Pressable
-                key={item.id}
-                style={styles.recentTile}
-                onPress={() =>
-                  navigation.navigate('ClothingDetails', { itemId: item.id })
-                }
-              >
-                <ItemIcon size={22} color={styles.iconTint.color} />
-              </Pressable>
-            );
-          })}
+          {loading
+            ? [0, 1, 2].map(i => (
+                <SkeletonBox key={i} width={150} height={200} borderRadius={20} />
+              ))
+            : recentItems.map(item => (
+                <Pressable
+                  key={item.id}
+                  style={styles.recentCard}
+                  onPress={() =>
+                    navigation.navigate('ClothingDetails', { itemId: item.id })
+                  }
+                  accessibilityRole="button"
+                  accessibilityLabel={item.name}
+                >
+                  <View style={styles.recentPhoto}>
+                    <ItemThumb item={item} fill radius={20} />
+                  </View>
+                  <Text style={styles.recentName} numberOfLines={1}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.recentCategory} numberOfLines={1}>
+                    {categoryLabel(item.category)}
+                  </Text>
+                </Pressable>
+              ))}
+          {!loading ? (
+            <Pressable
+              style={styles.addRecentCard}
+              onPress={() => navigation.navigate('AddEditClothing', {})}
+              accessibilityRole="button"
+              accessibilityLabel={t('style_pantry.add_item_btn')}
+            >
+              <View style={styles.addRecentCircle}>
+                <Plus size={20} color={styles.iconTint.color} />
+              </View>
+              <Text style={styles.addRecentText}>{t('style_pantry.add_item_btn')}</Text>
+            </Pressable>
+          ) : null}
         </ScrollView>
+
+        <Text style={[styles.sectionTitle, styles.labsTitle]}>
+          {t('ai_stylist.labs_title')}
+        </Text>
+        <View style={styles.labsRow}>
+          {labs.map(({ key, Icon }) => (
+            <Pressable
+              key={key}
+              style={styles.labChip}
+              onPress={() => setComingSoon(t(`ai_stylist.${key}`))}
+              accessibilityRole="button"
+              accessibilityLabel={t(`ai_stylist.${key}`)}
+            >
+              <Icon size={14} color={styles.labChipText.color} />
+              <Text style={styles.labChipText}>{t(`ai_stylist.${key}`)}</Text>
+            </Pressable>
+          ))}
+        </View>
       </ScrollView>
 
       <BottomSheet
@@ -294,159 +500,314 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
         <Button
           title={t('ai_stylist.coming_soon_ok')}
           onPress={() => setComingSoon(null)}
-          style={{ marginTop: 8 }}
+          style={styles.comingSoonBtn}
         />
       </BottomSheet>
     </View>
   );
 }
 
-const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
+const makeStyles = ({ colors, fonts, radius, spacing, shadow }: ThemeTokens) =>
   StyleSheet.create({
     root: { flex: 1, backgroundColor: colors.background },
-    headerBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.sm,
-      backgroundColor: colors.background,
-    },
-    headerRightGroup: {
-      flexDirection: 'row',
-      gap: spacing.xs,
-    },
-    headerBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...shadow.soft,
-    },
-    headerIcon: { color: colors.textPrimary },
     iconTint: { color: colors.primary },
-    headerTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 18,
-      color: colors.textPrimary,
-    },
+    heroOnPrimary: { color: colors.textOnPrimary },
+    heroMuted: { color: colors.textOnPrimaryMuted },
     content: {
       paddingHorizontal: spacing.lg,
       paddingBottom: spacing.xxl,
     },
     greeting: {
-      fontFamily: fonts.sansBold,
-      fontSize: 22,
+      fontFamily: fonts.serif,
+      fontSize: 30,
       color: colors.textPrimary,
       marginTop: spacing.sm,
     },
     subGreeting: {
       fontFamily: fonts.sans,
-      fontSize: 13,
+      fontSize: 14,
       color: colors.textSecondary,
       marginTop: 2,
       marginBottom: spacing.lg,
     },
-    quickActionsGrid: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
+
+    // Hero
+    hero: {
+      backgroundColor: colors.primary,
+      borderRadius: 28,
+      padding: spacing.lg - 4,
       marginBottom: spacing.lg,
+      ...shadow.medium,
     },
-    quickActionTile: {
-      width: '33.33%',
+    heroSkeleton: { marginTop: spacing.md },
+    heroTopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+      marginBottom: spacing.md,
     },
+    heroKicker: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 11,
+      letterSpacing: 1.4,
+      textTransform: 'uppercase',
+      color: colors.textOnPrimaryMuted,
+    },
+    weatherPill: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: colors.primaryDark,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm + 2,
+      paddingVertical: 6,
+      flexShrink: 1,
+    },
+    weatherPillText: {
+      fontFamily: fonts.sans,
+      fontSize: 11,
+      color: colors.textOnPrimaryMuted,
+      flexShrink: 1,
+    },
+    heroBody: { flexDirection: 'row', gap: spacing.md },
+    heroTextCol: { flex: 1, justifyContent: 'space-between' },
+    heroTitle: {
+      fontFamily: fonts.serif,
+      fontSize: 22,
+      lineHeight: 28,
+      color: colors.textOnPrimary,
+    },
+    heroMeta: {
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      color: colors.textOnPrimaryMuted,
+      marginTop: spacing.xs,
+    },
+    heroActions: { marginTop: spacing.md, gap: spacing.sm },
+    heroPrimaryBtn: {
+      backgroundColor: colors.textOnPrimary,
+      borderRadius: radius.pill,
+      paddingVertical: 10,
+      paddingHorizontal: spacing.md,
+      alignItems: 'center',
+    },
+    heroBtnSelf: { alignSelf: 'flex-start', marginTop: spacing.md },
+    heroPrimaryBtnText: {
+      fontFamily: fonts.sansBold,
+      fontSize: 13,
+      color: colors.primary,
+    },
+    heroGhostBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.textOnPrimaryMuted,
+      paddingVertical: 9,
+      paddingHorizontal: spacing.md,
+    },
+    heroGhostBtnText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.textOnPrimary,
+    },
+    heroPhotoCol: { alignItems: 'flex-end' },
+    heroPhoto: {
+      borderRadius: 20,
+      overflow: 'hidden',
+      backgroundColor: colors.primaryDark,
+    },
+    heroThumbRow: {
+      flexDirection: 'row',
+      marginTop: spacing.sm,
+      paddingLeft: 10,
+    },
+    heroThumbWrap: {
+      borderRadius: 18,
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    heroThumbOverlap: { marginLeft: -10 },
+    heroEmptyIcon: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      backgroundColor: colors.primaryDark,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.md,
+    },
+    heroEmptySub: {
+      fontFamily: fonts.sans,
+      fontSize: 13,
+      lineHeight: 19,
+      color: colors.textOnPrimaryMuted,
+      marginTop: spacing.xs,
+    },
+
+    // Purpose cards
+    purposeRow: { flexDirection: 'row', gap: spacing.sm + 4, marginBottom: spacing.lg },
+    purposeCard: {
+      flex: 1,
+      minHeight: 150,
+      borderRadius: radius.xxl,
+      padding: spacing.md,
+      borderWidth: 1,
+    },
+    purposeCardOutline: {
+      backgroundColor: colors.surface,
+      borderColor: colors.primary,
+    },
+    purposeCardBlush: {
+      backgroundColor: colors.blush,
+      borderColor: colors.border,
+    },
+    purposeIconCircle: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.blush,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.sm + 4,
+    },
+    purposeIconCircleDark: { backgroundColor: colors.primary },
+    purposeTextBlock: { flex: 1 },
+    purposeTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 15,
+      color: colors.textPrimary,
+    },
+    purposeSub: {
+      fontFamily: fonts.sans,
+      fontSize: 12,
+      lineHeight: 17,
+      color: colors.textSecondary,
+      marginTop: 4,
+    },
+    purposeArrow: {
+      alignSelf: 'flex-end',
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginTop: spacing.sm,
+    },
+
+    // Stats
+    statsRow: { flexDirection: 'row', marginBottom: spacing.lg },
+    statTile: {
+      flex: 1,
+      backgroundColor: colors.surface,
+      borderRadius: radius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+      paddingVertical: spacing.md,
+      paddingHorizontal: spacing.sm,
+      alignItems: 'center',
+    },
+    statTileSpaced: { marginLeft: spacing.sm },
+    statValue: {
+      fontFamily: fonts.serif,
+      fontSize: 24,
+      color: colors.textPrimary,
+    },
+    statLabel: {
+      fontFamily: fonts.sans,
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 2,
+      textAlign: 'center',
+    },
+
+    // Recently added
     sectionTitle: {
       fontFamily: fonts.sansBold,
       fontSize: 16,
       color: colors.textPrimary,
-      marginBottom: spacing.sm,
-    },
-    loadingBox: {
-      backgroundColor: colors.surface,
-      borderRadius: radius.lg,
-      padding: spacing.xl,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-      marginBottom: spacing.lg,
-    },
-    outfitTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 16,
-      color: colors.textPrimary,
-    },
-    stylistNote: {
-      fontFamily: fonts.sans,
-      fontSize: 13,
-      color: colors.textSecondary,
-      marginTop: spacing.xs,
-      lineHeight: 18,
-    },
-    itemsPreviewRow: {
-      flexDirection: 'row',
-      gap: spacing.xs,
-      marginTop: spacing.md,
-    },
-    itemMiniCard: {
-      width: 40,
-      height: 40,
-      borderRadius: radius.md,
-      backgroundColor: colors.surfaceElevated,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    viewMoreRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'flex-end',
-      marginTop: spacing.md,
-      gap: 2,
-    },
-    viewMoreText: {
-      fontFamily: fonts.sansBold,
-      fontSize: 12,
-      color: colors.primary,
-    },
-    emptyOutfitText: {
-      fontFamily: fonts.sans,
-      fontSize: 13,
-      color: colors.textSecondary,
     },
     listHeaderRow: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'space-between',
-      marginTop: spacing.lg,
-      marginBottom: spacing.sm,
+      marginBottom: spacing.sm + 4,
     },
-    recentScroll: {
-      gap: spacing.sm,
-      paddingBottom: spacing.xs,
+    seeAllRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    seeAllText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.primary,
     },
-    addRecentTile: {
-      width: 56,
-      height: 56,
-      borderRadius: radius.md,
+    recentScroll: { gap: spacing.sm + 4, paddingBottom: spacing.xs },
+    recentCard: { width: 150 },
+    recentPhoto: {
+      width: 150,
+      height: 200,
+      borderRadius: 20,
+      overflow: 'hidden',
+    },
+    recentName: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 13,
+      color: colors.textPrimary,
+      marginTop: spacing.sm,
+    },
+    recentCategory: {
+      fontFamily: fonts.sans,
+      fontSize: 11,
+      color: colors.textMuted,
+      marginTop: 1,
+    },
+    addRecentCard: {
+      width: 150,
+      height: 200,
+      borderRadius: 20,
       borderWidth: 1,
       borderStyle: 'dashed',
-      borderColor: colors.border,
+      borderColor: colors.borderStrong,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.sm,
+    },
+    addRecentCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.blush,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    recentTile: {
-      width: 56,
-      height: 56,
-      borderRadius: radius.md,
-      backgroundColor: colors.surfaceElevated,
+    addRecentText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.textSecondary,
+    },
+
+    // Labs
+    labsTitle: { marginTop: spacing.lg, marginBottom: spacing.sm },
+    labsRow: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm },
+    labChip: {
+      flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: 8,
+      paddingHorizontal: spacing.sm + 4,
+      borderRadius: radius.pill,
+      backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
+    },
+    labChipText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 12,
+      color: colors.textSecondary,
     },
     comingSoonText: {
       fontFamily: fonts.sans,
@@ -455,4 +816,5 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       lineHeight: 20,
       marginBottom: spacing.sm,
     },
+    comingSoonBtn: { marginTop: spacing.sm },
   });

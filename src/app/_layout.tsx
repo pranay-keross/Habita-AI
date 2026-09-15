@@ -47,6 +47,7 @@ import {
   ClothingDetailsScreen,
   AiStylistHomeScreen,
   StyleMirrorScreen,
+  StyleChatScreen,
   OutfitDetailsScreen,
   StyleLogScreen,
   StyleCalendarScreen,
@@ -105,7 +106,6 @@ export type RootStackParamList = {
   Pantry: undefined;
   AiStylistHome: undefined;
   Wardrobe: undefined;
-  StylePantryDashboard: undefined;
   ClosetItems:
     | {
         title?: string;
@@ -114,7 +114,16 @@ export type RootStackParamList = {
         wishlistOnly?: boolean;
       }
     | undefined;
-  AddEditClothing: { itemId?: string } | undefined;
+  AddEditClothing:
+    | {
+        itemId?: string;
+        /** Closet folder to add a newly created item to. */
+        collectionId?: string;
+        collectionName?: string;
+        /** Pre-select the wishlist toggle (opened from the Wishlist folder). */
+        wishlist?: boolean;
+      }
+    | undefined;
   ClothingDetails: { itemId: string };
   StyleMirror: undefined;
   StyleChat: undefined;
@@ -269,10 +278,6 @@ const AppLayout = () => {
           <Stack.Screen name="Pantry" component={PantryScreen} />
           <Stack.Screen name="AiStylistHome" component={AiStylistHomeScreen} />
           <Stack.Screen name="Wardrobe" component={WardrobeDashboardScreen} />
-          <Stack.Screen
-            name="StylePantryDashboard"
-            component={WardrobeDashboardScreen}
-          />
           <Stack.Screen name="ClosetItems" component={ClosetItemsScreen} />
           <Stack.Screen
             name="AddEditClothing"
@@ -283,7 +288,7 @@ const AppLayout = () => {
             component={ClothingDetailsScreen}
           />
           <Stack.Screen name="StyleMirror" component={StyleMirrorScreen} />
-          <Stack.Screen name="StyleChat" component={StyleMirrorScreen} />
+          <Stack.Screen name="StyleChat" component={StyleChatScreen} />
           <Stack.Screen name="OutfitDetails" component={OutfitDetailsScreen} />
           <Stack.Screen name="StyleLog" component={StyleLogScreen} />
           <Stack.Screen name="StyleCalendar" component={StyleCalendarScreen} />
