@@ -7,7 +7,10 @@ import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import { subscribeToLanguageChanges, t } from '../../../i18n';
 import { ArrowLeft } from 'lucide-react-native';
+import UsersRound from 'lucide-react-native/icons/users-round';
 import { SkeletonCard, SkeletonHeroCard } from '../../../components/Skeleton';
+import useAuth from '../../../hooks/useAuth';
+import { getMyPrimaryFamily } from '../../family/api';
 
 import { ScreenTab } from './types';
 import { useSmartPantry } from './hooks/useSmartPantry';
@@ -27,6 +30,9 @@ export default function PantryScreen({ navigation }: Props) {
   const insets = useSafeAreaInsets();
   const [activeTab, setActiveTab] = useState<ScreenTab>('dashboard');
   const [, setLocaleVersion] = useState(0);
+  const { getAccessToken } = useAuth();
+  const [hasFamily, setHasFamily] = useState(false);
+  const [familyChecked, setFamilyChecked] = useState(false);
 
   useEffect(() => {
     const unsubscribe = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
@@ -34,6 +40,22 @@ export default function PantryScreen({ navigation }: Props) {
       unsubscribe();
     };
   }, []);
+
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const token = await getAccessToken().catch(() => null);
+      const family = token ? await getMyPrimaryFamily(token).catch(() => null) : null;
+      if (cancelled) return;
+      setHasFamily(!!family);
+      setFamilyChecked(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [getAccessToken]);
+
+  const noFamily = familyChecked && !hasFamily;
 
   const {
     loading,
@@ -90,16 +112,39 @@ export default function PantryScreen({ navigation }: Props) {
             {t('smart_pantry.header_sub')}
           </Text>
         </View>
-        <Pressable
-          onPress={() => setActiveTab('add')}
-          style={styles.headerAddBtn}
-          hitSlop={8}
-          accessibilityRole="button">
-          <Text style={styles.headerAddBtnText} numberOfLines={1}>
-            {t('smart_pantry.add_scan_btn')}
-          </Text>
-        </Pressable>
+        {noFamily ? (
+          <View style={styles.headerAddBtnSpacer} />
+        ) : (
+          <Pressable
+            onPress={() => setActiveTab('add')}
+            style={styles.headerAddBtn}
+            hitSlop={8}
+            accessibilityRole="button">
+            <Text style={styles.headerAddBtnText} numberOfLines={1}>
+              {t('smart_pantry.add_scan_btn')}
+            </Text>
+          </Pressable>
+        )}
       </View>
+
+      {noFamily ? (
+        <ScrollView
+          style={styles.scrollArea}
+          contentContainerStyle={styles.contentContainer}
+          showsVerticalScrollIndicator={false}>
+          <View style={styles.noFamilyBanner}>
+            <View style={styles.noFamilyIconCircle}>
+              <UsersRound size={22} color={styles.backIcon.color} strokeWidth={1.8} />
+            </View>
+            <Text style={styles.noFamilyTitle}>{t('smart_pantry.no_family_title')}</Text>
+            <Text style={styles.noFamilyText}>{t('smart_pantry.no_family_banner_message')}</Text>
+            <Pressable style={styles.noFamilyButton} onPress={() => navigation.navigate('Family')}>
+              <Text style={styles.noFamilyButtonText}>{t('smart_pantry.go_to_family')}</Text>
+            </Pressable>
+          </View>
+        </ScrollView>
+      ) : (
+      <>
 
       {/* 6 Top Navigation Tabs */}
       <View style={styles.topTabBar}>
@@ -263,6 +308,8 @@ export default function PantryScreen({ navigation }: Props) {
           </>
         )}
       </ScrollView>
+      </>
+      )}
     </View>
   );
 }
@@ -322,6 +369,53 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       flexShrink: 0,
     },
     headerAddBtnText: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textOnPrimary },
+    headerAddBtnSpacer: { width: 1, height: 1 },
+    noFamilyBanner: {
+      alignItems: 'center',
+      backgroundColor: colors.glassSurface || colors.surfaceElevated,
+      borderRadius: radius.card || 20,
+      borderWidth: 1,
+      borderColor: colors.glassBorder || colors.border,
+      padding: spacing.xl,
+      marginTop: spacing.md,
+      ...shadow.soft,
+    },
+    noFamilyIconCircle: {
+      width: 52,
+      height: 52,
+      borderRadius: 26,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.blush,
+      marginBottom: spacing.md,
+    },
+    noFamilyTitle: {
+      fontFamily: fonts.serif,
+      fontSize: 20,
+      color: colors.textPrimary,
+      textAlign: 'center',
+      marginBottom: spacing.xs,
+    },
+    noFamilyText: {
+      fontFamily: fonts.sans,
+      fontSize: 14,
+      lineHeight: 20,
+      color: colors.textSecondary,
+      textAlign: 'center',
+      marginBottom: spacing.lg,
+    },
+    noFamilyButton: {
+      alignSelf: 'stretch',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      borderRadius: radius.lg,
+      paddingVertical: spacing.sm + 2,
+    },
+    noFamilyButtonText: {
+      fontFamily: fonts.sansBold,
+      fontSize: 14,
+      color: colors.textOnPrimary,
+    },
     topTabBar: {
       backgroundColor: colors.surface,
       borderBottomWidth: 1,
