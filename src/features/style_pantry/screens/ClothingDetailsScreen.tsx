@@ -1,5 +1,5 @@
 import React, { useCallback, useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert, RefreshControl } from 'react-native';
+import { View, Text, ScrollView, StyleSheet, Pressable, Alert, RefreshControl, useWindowDimensions } from 'react-native';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
@@ -9,25 +9,30 @@ import Pencil from 'lucide-react-native/icons/pencil';
 import Trash2 from 'lucide-react-native/icons/trash';
 import Tag from 'lucide-react-native/icons/tag';
 import Clock from 'lucide-react-native/icons/clock';
+import Bookmark from 'lucide-react-native/icons/bookmark';
 import Button from '../../../components/Button';
 import GlassCard from '../../../components/GlassCard';
 import { SkeletonBox } from '../../../components/Skeleton';
 import { getClothingItem, deleteClothingItem } from '../stylePantryStore';
 import { showStoreErrorAlert } from '../errors';
 import { useBusy, useFocusLoad, useLocaleRerender } from '../hooks';
-import { categoryLabel, dateLabel, priceLabel, seasonLabel } from '../format';
+import { dateLabel, itemCategoryLabel, priceLabel, seasonLabel } from '../format';
 import WardrobeHeader from '../components/WardrobeHeader';
-import ItemThumb from '../components/ItemThumb';
+import PhotoCard from '../components/PhotoCard';
 import OfflineBanner from '../components/OfflineBanner';
 import type { ClothingItem } from '../types';
 import { t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'ClothingDetails'>;
 
+// Matches this screen's `content` horizontal padding (spacing.lg).
+const HERO_HORIZONTAL_INSET = 24;
+
 export default function ClothingDetailsScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const { getAccessToken } = useAuth();
   const { itemId } = route.params;
+  const { width: screenWidth } = useWindowDimensions();
   useLocaleRerender();
 
   const [item, setItem] = useState<ClothingItem | undefined>();
@@ -122,21 +127,40 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
       >
         <OfflineBanner visible={offline} />
 
-        <GlassCard variant="elevated" style={styles.heroCard}>
-          <ItemThumb item={item} size={120} style={styles.heroThumb} />
-          <Text style={styles.heroTitle}>{item.name}</Text>
-          <Text style={styles.heroSub}>
-            {categoryLabel(item.category)} · {item.color}
-          </Text>
-          {item.isWishlist ? (
-            <View style={styles.wishlistBadge}>
-              <Text style={styles.wishlistBadgeText}>{t('style_pantry.wishlist_badge')}</Text>
+        {(() => {
+          const heroWidth = screenWidth - HERO_HORIZONTAL_INSET * 2;
+          const heroHeight = Math.round(heroWidth * 0.92);
+          return (
+            <View style={[styles.heroWrap, { width: heroWidth, height: heroHeight }]}>
+              <PhotoCard
+                item={item}
+                width={heroWidth}
+                height={heroHeight}
+                radius={28}
+                stripHeight={Math.round(heroHeight * 0.3)}
+                overlay={
+                  item.isWishlist ? (
+                    <View style={styles.wishlistBadge}>
+                      <Bookmark size={12} color={styles.onPrimary.color} />
+                      <Text style={styles.wishlistBadgeText}>{t('style_pantry.wishlist_badge')}</Text>
+                    </View>
+                  ) : undefined
+                }
+              >
+                <View>
+                  <Text style={styles.heroKicker}>{itemCategoryLabel(item)}</Text>
+                  <Text style={styles.heroTitle} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.heroSub}>{item.color}</Text>
+                </View>
+              </PhotoCard>
             </View>
-          ) : null}
-        </GlassCard>
+          );
+        })()}
 
         <Text style={styles.sectionTitle}>{t('style_pantry.clothing_info')}</Text>
-        <GlassCard variant="default" style={styles.card}>
+        <GlassCard variant="elevated" style={styles.card}>
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('style_pantry.brand_label')}</Text>
             <Text style={styles.metaVal}>{item.brand || t('style_pantry.not_specified')}</Text>
@@ -215,18 +239,30 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     iconTint: { color: colors.primary },
     content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
     skeletonGap: { marginBottom: spacing.md },
-    heroCard: { alignItems: 'center', marginBottom: spacing.md },
-    heroThumb: { marginBottom: spacing.md },
-    heroTitle: { fontFamily: fonts.sansBold, fontSize: 18, color: colors.textPrimary, textAlign: 'center' },
-    heroSub: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary, marginTop: 4 },
-    wishlistBadge: {
-      marginTop: spacing.sm,
-      backgroundColor: colors.blush,
-      borderRadius: radius.full,
-      paddingHorizontal: spacing.md,
-      paddingVertical: 3,
+    onPrimary: { color: colors.textOnPrimary },
+    heroWrap: { alignSelf: 'center', marginBottom: spacing.md },
+    heroKicker: {
+      fontFamily: fonts.sansBold,
+      fontSize: 10,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      color: colors.textOnPrimaryMuted,
     },
-    wishlistBadgeText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.primary },
+    heroTitle: { fontFamily: fonts.serif, fontSize: 22, lineHeight: 27, color: colors.textOnPrimary, marginTop: 2 },
+    heroSub: { fontFamily: fonts.sans, fontSize: 13, color: colors.textOnPrimaryMuted, marginTop: 3 },
+    wishlistBadge: {
+      position: 'absolute',
+      top: spacing.sm + 4,
+      right: spacing.sm + 4,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      backgroundColor: colors.primary,
+      borderRadius: radius.full,
+      paddingHorizontal: spacing.sm + 2,
+      paddingVertical: 5,
+    },
+    wishlistBadgeText: { fontFamily: fonts.sansBold, fontSize: 11, color: colors.textOnPrimary },
     sectionTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.textPrimary, marginBottom: spacing.xs },
     card: { marginBottom: spacing.md },
     metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.xs },

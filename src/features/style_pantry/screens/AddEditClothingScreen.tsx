@@ -22,29 +22,35 @@ import useThemedStyles from '../../../hooks/useThemedStyles';
 import useAuth from '../../../hooks/useAuth';
 import Camera from 'lucide-react-native/icons/camera';
 import ImageIcon from 'lucide-react-native/icons/image';
+import WandSparkles from 'lucide-react-native/icons/wand-sparkles';
 import Button from '../../../components/Button';
 import BottomSheet from '../../../components/BottomSheet';
 import { SkeletonBox } from '../../../components/Skeleton';
 import {
   addClothingItem,
   addItemToCollection,
+  analyzeItemPhoto,
   updateClothingItem,
   getClothingItem,
 } from '../stylePantryStore';
-import { showStoreErrorAlert } from '../errors';
+import { describeStoreError, showStoreErrorAlert } from '../errors';
 import { useBusy, useFocusLoad, useLocaleRerender } from '../hooks';
-import { categoryLabel, seasonLabel } from '../format';
+import { categoryLabel, dressTypeLabel, seasonLabel } from '../format';
 import WardrobeHeader from '../components/WardrobeHeader';
 import ItemThumb from '../components/ItemThumb';
 import OfflineBanner from '../components/OfflineBanner';
+import PhotoSuggestionSheet, { type SuggestionStatus } from '../components/PhotoSuggestionSheet';
 import { CATEGORY_ICON_KEYS, getClothingIconComponent } from '../clothingIcons';
 import {
   CLOTHING_CATEGORIES,
   CLOTHING_SEASONS,
+  DRESS_TYPES,
   type ClothingCategory,
   type ClothingItemInput,
   type ClothingSeason,
+  type DressType,
   type PickedFile,
+  type WardrobeItemSuggestion,
 } from '../types';
 import { t } from '../../../i18n';
 
@@ -89,6 +95,7 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
 
   const [name, setName] = useState('');
   const [category, setCategory] = useState<ClothingCategory>('tops');
+  const [dressType, setDressType] = useState<DressType | undefined>(undefined);
   const [color, setColor] = useState('');
   const [brand, setBrand] = useState('');
   const [season, setSeason] = useState<ClothingSeason>('all-year');
@@ -102,6 +109,12 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
   const [showPhotoSheet, setShowPhotoSheet] = useState(false);
   const [busy, run] = useBusy();
 
+  const [showSuggestionSheet, setShowSuggestionSheet] = useState(false);
+  const [suggestionStatus, setSuggestionStatus] = useState<SuggestionStatus>('analyzing');
+  const [suggestion, setSuggestion] = useState<WardrobeItemSuggestion | null>(null);
+  const [suggestionError, setSuggestionError] = useState<string | undefined>(undefined);
+  const [lastAnalyzedPhoto, setLastAnalyzedPhoto] = useState<PickedFile | null>(null);
+
   const { loading, offline } = useFocusLoad(
     useCallback(async () => {
       if (!itemId) return;
@@ -114,6 +127,7 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
       }
       setName(found.name);
       setCategory(found.category);
+      setDressType(found.dressType);
       setColor(found.color);
       setBrand(found.brand ?? '');
       setSeason(found.season);
@@ -131,8 +145,41 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
       if (!asset?.uri) return;
       const fileName = asset.fileName || 'item.jpg';
       const uri = await resolveLocalUri(asset.uri, fileName);
-      setPickedPhoto({ uri, name: fileName, type: asset.type || 'image/jpeg' });
+      const photo: PickedFile = { uri, name: fileName, type: asset.type || 'image/jpeg' };
+      setPickedPhoto(photo);
+      analyzePhoto(photo);
     });
+
+  // Vision auto-fill: runs right after a photo is picked, before the rest of the form
+  // is touched. Nothing here is persisted — the user still confirms via the sheet.
+  const analyzePhoto = async (photo: PickedFile) => {
+    setLastAnalyzedPhoto(photo);
+    setSuggestion(null);
+    setSuggestionError(undefined);
+    setSuggestionStatus('analyzing');
+    setShowSuggestionSheet(true);
+
+    const token = await getAccessToken();
+    const result = await analyzeItemPhoto(photo, token);
+    if (!result.ok) {
+      setSuggestionError(describeStoreError(result.error));
+      setSuggestionStatus('error');
+      return;
+    }
+    setSuggestion(result.data);
+    setSuggestionStatus('ready');
+  };
+
+  const applySuggestion = (s: WardrobeItemSuggestion) => {
+    if (s.name) setName(s.name);
+    if (s.category) setCategory(s.category);
+    setDressType(s.category === 'dresses' ? s.dressType : undefined);
+    if (s.color) setColor(s.color);
+    if (s.material) setMaterial(s.material);
+    setSeason(s.season);
+    if (s.tags.length > 0) setTagsStr(s.tags.join(', '));
+    setShowSuggestionSheet(false);
+  };
 
   const handleTakePhoto = async () => {
     setShowPhotoSheet(false);
@@ -163,6 +210,7 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
       const input: ClothingItemInput = {
         name: name.trim(),
         category,
+        dressType: category === 'dresses' ? dressType : undefined,
         color: color.trim() || t('style_pantry.not_specified'),
         brand: brand.trim() || undefined,
         season,
@@ -244,7 +292,25 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
                 <Text style={styles.photoUploadTitle}>
                   {pickedPhoto ? t('style_pantry.photo_selected') : t('style_pantry.take_photo')}
                 </Text>
+                {!pickedPhoto ? (
+                  <View style={styles.autoFillHint}>
+                    <WandSparkles size={12} color={styles.iconTint.color} />
+                    <Text style={styles.autoFillHintText}>{t('style_pantry.auto_fill_hint')}</Text>
+                  </View>
+                ) : null}
               </Pressable>
+
+              {pickedPhoto ? (
+                <Pressable
+                  style={styles.rescanRow}
+                  onPress={() => analyzePhoto(pickedPhoto)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('style_pantry.photo_scan_title')}
+                >
+                  <WandSparkles size={14} color={styles.iconTint.color} />
+                  <Text style={styles.rescanText}>{t('style_pantry.photo_scan_title')}</Text>
+                </Pressable>
+              ) : null}
 
               <View style={styles.card}>
                 <Text style={styles.inputLabel}>{t('style_pantry.item_name_label')}</Text>
@@ -265,7 +331,10 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
                       <Pressable
                         key={c}
                         style={[styles.chip, active && styles.chipActive]}
-                        onPress={() => setCategory(c)}
+                        onPress={() => {
+                          setCategory(c);
+                          if (c !== 'dresses') setDressType(undefined);
+                        }}
                         accessibilityRole="radio"
                         accessibilityState={{ selected: active }}
                       >
@@ -275,6 +344,28 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
                     );
                   })}
                 </View>
+
+                {category === 'dresses' ? (
+                  <>
+                    <Text style={styles.inputLabel}>{t('style_pantry.dress_type_label')}</Text>
+                    <View style={styles.chipWrap}>
+                      {DRESS_TYPES.map(dt => {
+                        const active = dressType === dt;
+                        return (
+                          <Pressable
+                            key={dt}
+                            style={[styles.chip, active && styles.chipActive]}
+                            onPress={() => setDressType(dt)}
+                            accessibilityRole="radio"
+                            accessibilityState={{ selected: active }}
+                          >
+                            <Text style={[styles.chipText, active && styles.chipTextActive]}>{dressTypeLabel(dt)}</Text>
+                          </Pressable>
+                        );
+                      })}
+                    </View>
+                  </>
+                ) : null}
 
                 <Text style={styles.inputLabel}>{t('style_pantry.color_label')}</Text>
                 <TextInput
@@ -370,6 +461,24 @@ export default function AddEditClothingScreen({ navigation, route }: Props) {
           <Text style={styles.photoOptionText}>{t('style_pantry.choose_gallery_option')}</Text>
         </Pressable>
       </BottomSheet>
+
+      <PhotoSuggestionSheet
+        visible={showSuggestionSheet}
+        photoUri={pickedPhoto?.uri}
+        status={suggestionStatus}
+        suggestion={suggestion}
+        errorMessage={suggestionError}
+        onUseDetails={applySuggestion}
+        onEnterManually={() => setShowSuggestionSheet(false)}
+        onRetake={() => {
+          setShowSuggestionSheet(false);
+          setShowPhotoSheet(true);
+        }}
+        onRetry={() => {
+          if (lastAnalyzedPhoto) analyzePhoto(lastAnalyzedPhoto);
+        }}
+        onClose={() => setShowSuggestionSheet(false)}
+      />
     </View>
   );
 }
@@ -413,6 +522,22 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: spacing.xs,
     },
     photoUploadTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.primary },
+    autoFillHint: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      marginTop: 4,
+    },
+    autoFillHintText: { fontFamily: fonts.sans, fontSize: 11, color: colors.textSecondary },
+    rescanRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: spacing.sm,
+      marginBottom: spacing.md,
+    },
+    rescanText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.primary },
     card: {
       backgroundColor: colors.glassSurface,
       borderRadius: radius.lg,

@@ -1,5 +1,36 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { Dimensions, Keyboard, Platform, type KeyboardEvent } from 'react-native';
 import { useFocusEffect } from '@react-navigation/native';
+
+/**
+ * Height of the on-screen keyboard (0 when hidden). The app targets SDK 36, where
+ * Android enforces edge-to-edge and ignores `windowSoftInputMode="adjustResize"`, so
+ * `KeyboardAvoidingView` never moves anything — pad the composer by this instead
+ * (same approach as `components/BottomSheet.tsx`).
+ */
+export function useKeyboardHeight(): number {
+  const [height, setHeight] = useState(0);
+  useEffect(() => {
+    const showEvent = Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow';
+    const hideEvent = Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide';
+    // Under edge-to-edge the window extends beneath the navigation bar, so the space the
+    // keyboard actually covers is (window bottom − keyboard top), which can exceed the
+    // reported keyboard height by the nav-bar inset.
+    const overlap = (e: KeyboardEvent) => {
+      const { height: windowHeight } = Dimensions.get('window');
+      const top = e.endCoordinates.screenY;
+      const measured = typeof top === 'number' && top > 0 ? windowHeight - top : e.endCoordinates.height;
+      return Math.max(0, Math.round(measured));
+    };
+    const show = Keyboard.addListener(showEvent, e => setHeight(overlap(e)));
+    const hide = Keyboard.addListener(hideEvent, () => setHeight(0));
+    return () => {
+      show.remove();
+      hide.remove();
+    };
+  }, []);
+  return height;
+}
 import { subscribeToLanguageChanges } from '../../i18n';
 
 /** Re-renders the component whenever the app language changes. */

@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { View, Text, ScrollView, StyleSheet, Pressable, Alert, useWindowDimensions } from 'react-native';
+import React, { useRef, useState } from 'react';
+import { View, Text, Animated, StyleSheet, Pressable, Alert, useWindowDimensions } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
@@ -13,7 +13,7 @@ import Button from '../../../components/Button';
 import { saveOutfit, unsaveOutfit, wearOutfit } from '../stylePantryStore';
 import { showStoreErrorAlert } from '../errors';
 import { useBusy, useLocaleRerender } from '../hooks';
-import { categoryLabel, eventTypeLabel } from '../format';
+import { eventTypeLabel, itemCategoryLabel } from '../format';
 import ItemThumb from '../components/ItemThumb';
 import OutfitShowcase, { MatchRow, StylistQuote, orderForHero } from '../components/OutfitShowcase';
 import type { OutfitRecommendation } from '../types';
@@ -75,12 +75,25 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
   const saveLabel = outfit.isSaved ? t('style_pantry.unsave_outfit') : t('style_pantry.save_outfit');
   const actionBarHeight = readOnly ? 0 : 84 + insets.bottom;
 
+  // The pinned header is transparent over the hero and gains a solid background
+  // (plus the title) once the hero has scrolled away.
+  const scrollY = useRef(new Animated.Value(0)).current;
+  const headerBarHeight = insets.top + 8 + 44 + 8;
+  const solidAt = Math.max(1, heroHeight - insets.top - 56);
+  const headerBgOpacity = scrollY.interpolate({
+    inputRange: [solidAt - 40, solidAt],
+    outputRange: [0, 1],
+    extrapolate: 'clamp',
+  });
+
   return (
     <View style={styles.root}>
-      <ScrollView
+      <Animated.ScrollView
         contentContainerStyle={{ paddingBottom: actionBarHeight + 16 }}
         showsVerticalScrollIndicator={false}
         bounces={false}
+        scrollEventThrottle={16}
+        onScroll={Animated.event([{ nativeEvent: { contentOffset: { y: scrollY } } }], { useNativeDriver: true })}
       >
         {/* Full-bleed hero */}
         <View style={[styles.hero, { height: heroHeight }]}>
@@ -104,25 +117,6 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
                 {t('style_pantry.outfit_pieces', { count: outfit.items.length })}
               </Text>
             </View>
-          </View>
-
-          {/* Header controls live inside the hero so they scroll away with it */}
-          <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
-            <Pressable style={styles.floatBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel={t('style_pantry.go_back')} hitSlop={8}>
-              <ArrowLeft size={20} color={styles.floatIcon.color} />
-            </Pressable>
-            {!readOnly ? (
-              <Pressable
-                style={[styles.floatBtn, outfit.isSaved && styles.floatBtnOn, saving && styles.disabled]}
-                onPress={handleToggleSave}
-                disabled={saving}
-                accessibilityRole="button"
-                accessibilityLabel={saveLabel}
-                hitSlop={8}
-              >
-                <SaveIcon size={20} color={outfit.isSaved ? styles.onPrimary.color : styles.floatIcon.color} />
-              </Pressable>
-            ) : null}
           </View>
         </View>
 
@@ -150,7 +144,7 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
                   {item.name}
                 </Text>
                 <Text style={styles.gridSub} numberOfLines={1}>
-                  {categoryLabel(item.category)} · {item.color}
+                  {itemCategoryLabel(item)} · {item.color}
                 </Text>
               </Pressable>
             ))}
@@ -158,7 +152,33 @@ export default function OutfitDetailsScreen({ navigation, route }: Props) {
 
           <StylistQuote note={outfit.stylistNote} />
         </View>
-      </ScrollView>
+      </Animated.ScrollView>
+
+      {/* Pinned header: transparent over the hero, solid once the hero has scrolled away */}
+      <View style={[styles.headerBar, { height: headerBarHeight }]} pointerEvents="box-none">
+        <Animated.View style={[styles.headerBg, { opacity: headerBgOpacity }]} pointerEvents="none">
+          <Text style={[styles.headerTitle, { marginTop: insets.top + 8 }]} numberOfLines={1}>
+            {outfit.title}
+          </Text>
+        </Animated.View>
+        <View style={[styles.floatingHeader, { top: insets.top + 8 }]} pointerEvents="box-none">
+          <Pressable style={styles.floatBtn} onPress={() => navigation.goBack()} accessibilityRole="button" accessibilityLabel={t('style_pantry.go_back')} hitSlop={8}>
+            <ArrowLeft size={20} color={styles.floatIcon.color} />
+          </Pressable>
+          {!readOnly ? (
+            <Pressable
+              style={[styles.floatBtn, outfit.isSaved && styles.floatBtnOn, saving && styles.disabled]}
+              onPress={handleToggleSave}
+              disabled={saving}
+              accessibilityRole="button"
+              accessibilityLabel={saveLabel}
+              hitSlop={8}
+            >
+              <SaveIcon size={20} color={outfit.isSaved ? styles.onPrimary.color : styles.floatIcon.color} />
+            </Pressable>
+          ) : null}
+        </View>
+      </View>
 
       {!readOnly ? (
         <View style={[styles.actionBar, { paddingBottom: insets.bottom + 12 }]}>
@@ -234,6 +254,31 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     grid: { flexDirection: 'row', flexWrap: 'wrap' },
     gridName: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary, marginTop: spacing.sm },
     gridSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginTop: 2, marginBottom: spacing.xs },
+    headerBar: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+    },
+    headerBg: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      backgroundColor: colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      alignItems: 'center',
+    },
+    headerTitle: {
+      fontFamily: fonts.sansBold,
+      fontSize: 16,
+      color: colors.textPrimary,
+      textAlign: 'center',
+      lineHeight: 44,
+      paddingHorizontal: 72,
+    },
     floatingHeader: {
       position: 'absolute',
       left: spacing.lg,

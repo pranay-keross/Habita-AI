@@ -36,8 +36,12 @@ export function stableImageUri(uri: string | undefined): string | undefined {
   return uri;
 }
 
-function rememberLoaded(uri: string): void {
+export function rememberLoaded(uri: string): void {
   loadedByPath.set(pathOf(uri), { uri, at: Date.now() });
+}
+
+export function forgetLoaded(uri: string): void {
+  loadedByPath.delete(pathOf(uri));
 }
 
 /**

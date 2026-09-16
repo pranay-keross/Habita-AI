@@ -20,6 +20,7 @@ import type {
   TripOutfitEntry,
   TripOutfitInput,
   WardrobeCollection,
+  WardrobeItemSuggestion,
   WardrobeTrip,
   WeatherContext,
   WornOutfitEntry,
@@ -131,6 +132,11 @@ export function loadClothingItems(token: Token): Promise<ReadResult<ClothingItem
 export async function getClothingItem(id: string, token: Token): Promise<ReadResult<ClothingItem | undefined>> {
   const r = await loadClothingItems(token);
   return { ...r, data: r.data.find(i => i.id === id) };
+}
+
+/** Vision auto-fill suggestion for a just-picked photo — reviewed by the user, never cached. */
+export function analyzeItemPhoto(photo: PickedFile, token: Token): Promise<WriteResult<WardrobeItemSuggestion>> {
+  return write('analyzeItemPhoto', token, tk => api.analyzeWardrobeItemPhoto(photo, tk));
 }
 
 export function addClothingItem(input: ClothingItemInput, photo: PickedFile | null, token: Token): Promise<WriteResult<ClothingItem>> {

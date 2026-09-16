@@ -39,6 +39,9 @@ const KNOWN_CODES = new Set([
   'UNSUPPORTED_FILE_TYPE',
   'FILE_TOO_LARGE',
   'MALFORMED_REQUEST_BODY',
+  'VISION_UNAVAILABLE',
+  'VISION_FAILED',
+  'NO_IMAGE_PROVIDED',
 ]);
 
 export function toStoreError(err: unknown): StoreError {

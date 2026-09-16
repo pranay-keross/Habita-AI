@@ -10,13 +10,14 @@ import CloudRain from 'lucide-react-native/icons/cloud-rain';
 import Cloud from 'lucide-react-native/icons/cloud';
 import type { ClothingCategory, WeatherContext } from './types';
 
-export const CLOTHING_ICON_KEYS = ['shirt', 'pants', 'shoes', 'jacket', 'watch'] as const;
+export const CLOTHING_ICON_KEYS = ['shirt', 'pants', 'dress', 'shoes', 'jacket', 'watch'] as const;
 
 export type ClothingIconKey = (typeof CLOTHING_ICON_KEYS)[number];
 
 export const CLOTHING_ICON_COMPONENTS: Record<ClothingIconKey, ComponentType<LucideProps>> = {
   shirt: Shirt,
   pants: Columns2,
+  dress: Shirt,
   shoes: SportShoe,
   jacket: Snowflake,
   watch: Watch,
@@ -34,6 +35,7 @@ export function getClothingIconComponent(key?: string | null): ComponentType<Luc
 export const CATEGORY_ICON_KEYS: Record<ClothingCategory, ClothingIconKey> = {
   tops: 'shirt',
   bottoms: 'pants',
+  dresses: 'dress',
   shoes: 'shoes',
   jackets: 'jacket',
   accessories: 'watch',

@@ -1,9 +1,12 @@
 import { apiFetch, postMultipart } from '../auth/api';
 import type {
   CalendarEvent,
+  ClothingCategory,
   ClothingItem,
   ClothingItemInput,
+  ClothingSeason,
   CollectionInput,
+  DressType,
   EventType,
   GenerateOutfitInput,
   OccasionInput,
@@ -17,6 +20,7 @@ import type {
   TripOutfitEntry,
   TripOutfitInput,
   WardrobeCollection,
+  WardrobeItemSuggestion,
   WardrobeTrip,
   WeatherContext,
   WornOutfitEntry,
@@ -49,6 +53,7 @@ function toItem(raw: Nullable<ClothingItem>): ClothingItem {
     id: raw.id ?? '',
     name: raw.name ?? '',
     category: raw.category ?? 'tops',
+    dressType: orUndef(raw.dressType),
     color: raw.color ?? '',
     brand: orUndef(raw.brand),
     season: raw.season ?? 'all-year',
@@ -168,6 +173,7 @@ function itemForm(input: ClothingItemInput, photo: PickedFile | null): FormData 
   const metadata: ClothingItemInput = {
     name: input.name,
     category: input.category,
+    dressType: input.category === 'dresses' ? input.dressType : undefined,
     color: input.color,
     brand: input.brand,
     season: input.season,
@@ -190,6 +196,46 @@ function itemForm(input: ClothingItemInput, photo: PickedFile | null): FormData 
     } as unknown as Blob);
   }
   return form;
+}
+
+/**
+ * POST /api/style/items/analyze-photo (multipart: `file`) — vision-based auto-fill.
+ * Nothing is persisted; the caller reviews/edits the suggestion, then calls
+ * `createWardrobeItem` itself.
+ */
+export async function analyzeWardrobeItemPhoto(photo: PickedFile, token: string): Promise<WardrobeItemSuggestion> {
+  const form = new FormData();
+  form.append('file', {
+    uri: photo.uri,
+    name: photo.name || 'item.jpg',
+    type: photo.type || 'image/jpeg',
+  } as unknown as Blob);
+
+  const raw = await postMultipart<{
+    looksLikeClothing: boolean;
+    name: string | null;
+    category: string | null;
+    dressType: string | null;
+    color: string | null;
+    material: string | null;
+    season: string | null;
+    tags: string[] | null;
+    emoji: string | null;
+    note: string | null;
+  }>('/style/items/analyze-photo', form, token, 'POST');
+
+  return {
+    looksLikeClothing: raw.looksLikeClothing,
+    name: orUndef(raw.name),
+    category: orUndef(raw.category) as ClothingCategory | undefined,
+    dressType: orUndef(raw.dressType) as DressType | undefined,
+    color: orUndef(raw.color),
+    material: orUndef(raw.material),
+    season: (raw.season ?? 'all-year') as ClothingSeason,
+    tags: raw.tags ?? [],
+    emoji: raw.emoji ?? 'shirt',
+    note: orUndef(raw.note),
+  };
 }
 
 /** GET /api/style/items */

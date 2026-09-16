@@ -7,8 +7,9 @@ import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import Button from '../../../components/Button';
 import { t } from '../../../i18n';
-import { categoryLabel, eventTypeLabel } from '../format';
+import { eventTypeLabel, itemCategoryLabel } from '../format';
 import ItemThumb from './ItemThumb';
+import PhotoCard from './PhotoCard';
 import type { ClothingItem, OutfitRecommendation } from '../types';
 
 interface Props {
@@ -28,11 +29,11 @@ interface Props {
   heroHeight?: number;
   /** Horizontal padding the card sits inside; used to size the mosaic. */
   horizontalInset?: number;
-  /** Hide the overlaid occasion/save chips on the hero. */
+  /** Hide the overlaid save button and the frosted title strip on the hero. */
   hideHeroChips?: boolean;
 }
 
-const CATEGORY_ORDER = ['tops', 'jackets', 'bottoms', 'shoes', 'accessories'];
+const CATEGORY_ORDER = ['tops', 'dresses', 'jackets', 'bottoms', 'shoes', 'accessories'];
 
 export function orderForHero(items: ClothingItem[]): ClothingItem[] {
   return [...items].sort(
@@ -49,16 +50,30 @@ export function splitSuitability(text: string | undefined): { percent: number | 
 }
 
 const GAP = 8;
+const TILE_RADIUS = 20;
 
 interface MosaicProps {
   items: ClothingItem[];
   width: number;
   height: number;
   onItemPress?: (item: ClothingItem) => void;
+  /** Drawn on the main tile's frosted strip. */
+  mainCaption?: React.ReactNode;
+  /** Drawn over the main tile's photo (chips, buttons). */
+  mainOverlay?: React.ReactNode;
+  mainStripHeight?: number;
 }
 
-/** Big main tile on the left, two stacked squares on the right, "+N" on the last. */
-export function OutfitMosaic({ items, width, height, onItemPress }: MosaicProps) {
+/** Big main photo tile on the left (info on its frosted strip), two stacked squares on the right, "+N" on the last. */
+export function OutfitMosaic({
+  items,
+  width,
+  height,
+  onItemPress,
+  mainCaption,
+  mainOverlay,
+  mainStripHeight,
+}: MosaicProps) {
   const styles = useThemedStyles(makeStyles);
   const ordered = orderForHero(items);
   const [main, second, third] = ordered;
@@ -68,33 +83,45 @@ export function OutfitMosaic({ items, width, height, onItemPress }: MosaicProps)
   const sideWidth = width - mainWidth - (hasSide ? GAP : 0);
   const sideHeight = third ? (height - GAP) / 2 : height;
 
-  const tile = (item: ClothingItem, w: number, h: number, badge?: number) => (
-    <Pressable
+  const sideTile = (item: ClothingItem, w: number, h: number, badge?: number) => (
+    <PhotoCard
       key={item.id}
-      style={[styles.mosaicTile, { width: w, height: h }]}
+      item={item}
+      width={w}
+      height={h}
+      radius={TILE_RADIUS}
       onPress={onItemPress ? () => onItemPress(item) : undefined}
-      disabled={!onItemPress}
-      accessibilityRole={onItemPress ? 'button' : undefined}
       accessibilityLabel={item.name}
-    >
-      <ItemThumb item={item} fill radius={20} />
-      {badge ? (
-        <View style={styles.moreOverlay}>
-          <View style={styles.moreScrim} />
-          <Text style={styles.moreText}>+{badge}</Text>
-        </View>
-      ) : null}
-    </Pressable>
+      overlay={
+        badge ? (
+          <View style={styles.moreOverlay} pointerEvents="none">
+            <View style={styles.moreScrim} />
+            <Text style={styles.moreText}>+{badge}</Text>
+          </View>
+        ) : undefined
+      }
+    />
   );
 
   if (!main) return null;
   return (
     <View style={[styles.mosaic, { width, height }]}>
-      {tile(main, mainWidth, height)}
+      <PhotoCard
+        item={main}
+        width={mainWidth}
+        height={height}
+        radius={TILE_RADIUS}
+        stripHeight={mainStripHeight ?? Math.round(height * 0.34)}
+        overlay={mainOverlay}
+        onPress={onItemPress ? () => onItemPress(main) : undefined}
+        accessibilityLabel={main.name}
+      >
+        {mainCaption}
+      </PhotoCard>
       {hasSide ? (
         <View style={[styles.mosaicSide, { width: sideWidth }]}>
-          {tile(second, sideWidth, sideHeight, !third && extra ? extra : undefined)}
-          {third ? tile(third, sideWidth, sideHeight, extra || undefined) : null}
+          {sideTile(second, sideWidth, sideHeight, !third && extra ? extra : undefined)}
+          {third ? sideTile(third, sideWidth, sideHeight, extra || undefined) : null}
         </View>
       ) : null}
     </View>
@@ -140,7 +167,7 @@ export function StylistQuote({ note }: { note: string | undefined }) {
   );
 }
 
-/** Magazine-style presentation of an outfit: mosaic hero, serif title, match meters, note, pieces. */
+/** Magazine-style presentation of an outfit: photo mosaic with the title on a frosted strip, match meters, note, pieces. */
 export default function OutfitShowcase({
   outfit,
   layout = 'chat',
@@ -161,28 +188,43 @@ export default function OutfitShowcase({
   const height = heroHeight ?? Math.round(width * 0.62 * (4 / 3));
   const SaveIcon = outfit.isSaved ? BookmarkCheck : Bookmark;
 
+  const caption = !hideHeroChips ? (
+    <View>
+      <Text style={styles.stripKicker}>{eventTypeLabel(outfit.occasion)}</Text>
+      <Text style={styles.stripTitle} numberOfLines={2}>
+        {outfit.title}
+      </Text>
+      <Text style={styles.stripSub} numberOfLines={1}>
+        {outfit.eventTitle ? `${outfit.eventTitle} · ` : ''}
+        {t('style_pantry.outfit_pieces', { count: outfit.items.length })}
+      </Text>
+    </View>
+  ) : undefined;
+
+  const overlay =
+    !hideHeroChips && onToggleSave ? (
+      <Pressable
+        style={[styles.saveFab, outfit.isSaved && styles.saveFabOn, busy && styles.disabled]}
+        onPress={onToggleSave}
+        disabled={busy}
+        accessibilityRole="button"
+        accessibilityLabel={outfit.isSaved ? t('style_pantry.unsave_outfit') : t('style_pantry.save_outfit')}
+        hitSlop={8}
+      >
+        <SaveIcon size={18} color={outfit.isSaved ? styles.onPrimary.color : styles.accent.color} />
+      </Pressable>
+    ) : undefined;
+
   const hero = (
     <View style={{ width, height }}>
-      <OutfitMosaic items={outfit.items} width={width} height={height} onItemPress={onItemPress} />
-      {!hideHeroChips ? (
-        <>
-          <View style={styles.occasionChip} pointerEvents="none">
-            <Text style={styles.occasionChipText}>{eventTypeLabel(outfit.occasion)}</Text>
-          </View>
-          {onToggleSave ? (
-            <Pressable
-              style={[styles.saveFab, outfit.isSaved && styles.saveFabOn, busy && styles.disabled]}
-              onPress={onToggleSave}
-              disabled={busy}
-              accessibilityRole="button"
-              accessibilityLabel={outfit.isSaved ? t('style_pantry.unsave_outfit') : t('style_pantry.save_outfit')}
-              hitSlop={8}
-            >
-              <SaveIcon size={18} color={outfit.isSaved ? styles.onPrimary.color : styles.accent.color} />
-            </Pressable>
-          ) : null}
-        </>
-      ) : null}
+      <OutfitMosaic
+        items={outfit.items}
+        width={width}
+        height={height}
+        onItemPress={onItemPress}
+        mainCaption={caption}
+        mainOverlay={overlay}
+      />
     </View>
   );
 
@@ -193,12 +235,6 @@ export default function OutfitShowcase({
       {hero}
 
       <View style={styles.body}>
-        <Text style={styles.title}>{outfit.title}</Text>
-        <Text style={styles.subtitle} numberOfLines={1}>
-          {outfit.eventTitle ? `${outfit.eventTitle} · ` : ''}
-          {t('style_pantry.outfit_pieces', { count: outfit.items.length })}
-        </Text>
-
         {!hideMeta ? (
           <>
             {outfit.weatherSuitability || outfit.occasionSuitability ? (
@@ -226,7 +262,7 @@ export default function OutfitShowcase({
                       {item.name}
                     </Text>
                     <Text style={styles.itemSub} numberOfLines={1}>
-                      {categoryLabel(item.category)} · {item.color}
+                      {itemCategoryLabel(item)} · {item.color}
                     </Text>
                   </View>
                   {onItemPress ? <ChevronRight size={16} color={styles.muted.color} /> : null}
@@ -281,7 +317,6 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     disabled: { opacity: 0.55 },
     mosaic: { flexDirection: 'row', gap: GAP },
     mosaicSide: { gap: GAP },
-    mosaicTile: { borderRadius: 20, overflow: 'hidden', backgroundColor: colors.blush },
     moreOverlay: {
       position: 'absolute', top: 0, left: 0, right: 0, bottom: 0,
       alignItems: 'center',
@@ -289,22 +324,15 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     moreScrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, backgroundColor: colors.primary, opacity: 0.55 },
     moreText: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.textOnPrimary },
-    occasionChip: {
-      position: 'absolute',
-      top: spacing.sm + 4,
-      left: spacing.sm + 4,
-      backgroundColor: colors.primary,
-      paddingHorizontal: spacing.sm + 2,
-      paddingVertical: 5,
-      borderRadius: radius.pill,
-    },
-    occasionChipText: {
+    stripKicker: {
       fontFamily: fonts.sansBold,
-      fontSize: 11,
-      letterSpacing: 0.6,
-      color: colors.textOnPrimary,
+      fontSize: 10,
+      letterSpacing: 1.2,
       textTransform: 'uppercase',
+      color: colors.textOnPrimaryMuted,
     },
+    stripTitle: { fontFamily: fonts.serif, fontSize: 21, lineHeight: 26, color: colors.textOnPrimary, marginTop: 2 },
+    stripSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textOnPrimaryMuted, marginTop: 3 },
     saveFab: {
       position: 'absolute',
       top: spacing.sm + 4,
@@ -318,10 +346,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       ...shadow.soft,
     },
     saveFabOn: { backgroundColor: colors.primary },
-    body: { padding: spacing.lg, paddingTop: spacing.md },
-    title: { fontFamily: fonts.serif, fontSize: 24, lineHeight: 30, color: colors.textPrimary },
-    subtitle: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary, marginTop: 4 },
-    matchGroup: { marginTop: spacing.md, gap: spacing.sm + 2 },
+    body: { padding: spacing.lg, paddingTop: spacing.sm },
+    matchGroup: { marginTop: spacing.sm, gap: spacing.sm + 2 },
     matchRow: {},
     matchHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between' },
     matchLabel: {

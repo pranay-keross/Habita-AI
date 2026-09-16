@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -26,7 +26,7 @@ import {
   unsaveOutfit,
 } from '../stylePantryStore';
 import { describeStoreError, showStoreErrorAlert } from '../errors';
-import { useBusy, useLocaleRerender } from '../hooks';
+import { useBusy, useKeyboardHeight, useLocaleRerender } from '../hooks';
 import WardrobeHeader from '../components/WardrobeHeader';
 import OutfitShowcase from '../components/OutfitShowcase';
 import type { OutfitRecommendation, StyleChatTurn } from '../types';
@@ -74,6 +74,15 @@ export default function StyleChatScreen({ navigation }: Props) {
 
   const scrollToEnd = () =>
     setTimeout(() => listRef.current?.scrollToEnd({ animated: true }), 80);
+
+  // Android (SDK 36, edge-to-edge) ignores adjustResize, so pad the composer by the
+  // keyboard height ourselves; iOS keeps the KeyboardAvoidingView root.
+  const keyboardHeight = useKeyboardHeight();
+  const composerBottomPad =
+    (Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight : insets.bottom) + 10;
+  useEffect(() => {
+    if (keyboardHeight > 0) scrollToEnd();
+  }, [keyboardHeight]);
 
   const handleSend = (raw?: string) => {
     const message = (raw ?? composerText).trim();
@@ -198,11 +207,10 @@ export default function StyleChatScreen({ navigation }: Props) {
     );
   };
 
+  const Root = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+
   return (
-    <KeyboardAvoidingView
-      style={styles.root}
-      behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-    >
+    <Root style={styles.root} behavior="padding">
       <WardrobeHeader
         title={t('style_chat.title')}
         subtitle={t('style_chat.subtitle')}
@@ -256,7 +264,7 @@ export default function StyleChatScreen({ navigation }: Props) {
         }
       />
 
-      <View style={[styles.composer, { paddingBottom: insets.bottom + 10 }]}>
+      <View style={[styles.composer, { paddingBottom: composerBottomPad }]}>
         <TextInput
           style={styles.input}
           value={composerText}
@@ -283,7 +291,7 @@ export default function StyleChatScreen({ navigation }: Props) {
           <Send size={18} color={styles.sendIcon.color} />
         </Pressable>
       </View>
-    </KeyboardAvoidingView>
+    </Root>
   );
 }
 

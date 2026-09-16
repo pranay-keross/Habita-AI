@@ -5,6 +5,7 @@
 export type ClothingCategory =
   | 'tops'
   | 'bottoms'
+  | 'dresses'
   | 'shoes'
   | 'jackets'
   | 'accessories';
@@ -12,9 +13,35 @@ export type ClothingCategory =
 export const CLOTHING_CATEGORIES: ClothingCategory[] = [
   'tops',
   'bottoms',
+  'dresses',
   'shoes',
   'jackets',
   'accessories',
+];
+
+// Only meaningful when category is 'dresses' — the specific silhouette, shown in place
+// of the generic "Dresses" label so a one-piece garment reads as its exact type.
+export type DressType =
+  | 'gown'
+  | 'maxi_dress'
+  | 'cocktail_dress'
+  | 'sundress'
+  | 'wrap_dress'
+  | 'bodycon'
+  | 'a_line'
+  | 'shirt_dress'
+  | 'jumpsuit';
+
+export const DRESS_TYPES: DressType[] = [
+  'gown',
+  'maxi_dress',
+  'cocktail_dress',
+  'sundress',
+  'wrap_dress',
+  'bodycon',
+  'a_line',
+  'shirt_dress',
+  'jumpsuit',
 ];
 
 export type ClothingSeason =
@@ -62,6 +89,8 @@ export interface ClothingItem {
   id: string;
   name: string;
   category: ClothingCategory;
+  /** Only set when category is 'dresses'. */
+  dressType?: DressType;
   color: string;
   brand?: string;
   season: ClothingSeason;
@@ -81,6 +110,8 @@ export interface ClothingItem {
 export interface ClothingItemInput {
   name: string;
   category: ClothingCategory;
+  /** Only meaningful when category is 'dresses'. */
+  dressType?: DressType;
   color: string;
   brand?: string;
   season: ClothingSeason;
@@ -168,6 +199,27 @@ export interface StyleChatReply {
   reply: string;
   /** Present when the stylist proposed an outfit from the closet. */
   outfit?: OutfitRecommendation;
+}
+
+// ---------------------------------------------------------------------------
+// Photo auto-fill (POST /api/style/items/analyze-photo) — a suggestion only,
+// nothing is saved until the caller confirms and calls createWardrobeItem.
+// ---------------------------------------------------------------------------
+
+export interface WardrobeItemSuggestion {
+  /** false when the photo doesn't clearly show a wearable item — see `note`. */
+  looksLikeClothing: boolean;
+  name?: string;
+  category?: ClothingCategory;
+  /** Only set when category is 'dresses'. */
+  dressType?: DressType;
+  color?: string;
+  material?: string;
+  season: ClothingSeason;
+  tags: string[];
+  emoji: string;
+  /** Set mainly when `looksLikeClothing` is false, explaining what the photo shows instead. */
+  note?: string;
 }
 
 export interface WornOutfitEntry {

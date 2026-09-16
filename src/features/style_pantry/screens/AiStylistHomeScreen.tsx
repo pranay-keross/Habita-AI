@@ -40,10 +40,11 @@ import {
 } from '../stylePantryStore';
 import { showStoreErrorAlert, type StoreError } from '../errors';
 import { useBusy, useFocusLoad, useLocaleRerender } from '../hooks';
-import { categoryLabel } from '../format';
+import { itemCategoryLabel } from '../format';
 import { getWeatherIconComponent } from '../clothingIcons';
 import WardrobeHeader from '../components/WardrobeHeader';
 import ItemThumb from '../components/ItemThumb';
+import PhotoCard from '../components/PhotoCard';
 import OfflineBanner from '../components/OfflineBanner';
 import { addDays, todayString } from '../../../utils/date';
 import type {
@@ -55,7 +56,7 @@ import { t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'AiStylistHome'>;
 
-const HERO_ORDER = ['tops', 'jackets', 'bottoms', 'shoes', 'accessories'];
+const HERO_ORDER = ['tops', 'dresses', 'jackets', 'bottoms', 'shoes', 'accessories'];
 
 function greetingKey(): string {
   const hour = new Date().getHours();
@@ -157,10 +158,12 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
     .slice(0, 8);
   const hasOwnedItems = owned.length > 0;
   const WeatherIcon = getWeatherIconComponent(weather?.condition);
-  const heroPhotoWidth = Math.round((width - 2 * 24 - 2 * 20) * 0.44);
+  const heroWidth = width - 2 * 24;
+  const heroCardHeight = Math.min(440, Math.round(heroWidth * 1.15));
+  const heroStripHeight = Math.round(heroCardHeight * 0.46);
 
   const renderHero = () => {
-    if (loading) {
+    if (loading || regenerating) {
       return (
         <View style={styles.hero}>
           <SkeletonText width="40%" height={12} dark />
@@ -184,32 +187,53 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
     if (recommendation) {
       const ordered = heroItems(recommendation);
       const [main, ...others] = ordered;
-      return (
-        <Pressable
-          style={styles.hero}
-          onPress={() =>
-            navigation.navigate('OutfitDetails', { outfit: recommendation })
-          }
-          accessibilityRole="button"
-          accessibilityLabel={recommendation.title}
-        >
-          <View style={styles.heroTopRow}>
-            <Text style={styles.heroKicker}>{t('ai_stylist.hero_kicker')}</Text>
-            {weatherPill}
-          </View>
-          <View style={styles.heroBody}>
-            <View style={styles.heroTextCol}>
-              <Text style={styles.heroTitle} numberOfLines={3}>
+      if (main) {
+        return (
+          <View style={styles.heroPhotoCardWrap}>
+            <PhotoCard
+              item={main}
+              width={heroWidth}
+              height={heroCardHeight}
+              radius={28}
+              stripHeight={heroStripHeight}
+              onPress={() =>
+                navigation.navigate('OutfitDetails', { outfit: recommendation })
+              }
+              accessibilityLabel={recommendation.title}
+              overlay={
+                <View style={styles.heroOverlayTop} pointerEvents="box-none">
+                  <View style={styles.heroKickerPill}>
+                    <Text style={styles.heroKicker}>{t('ai_stylist.hero_kicker')}</Text>
+                  </View>
+                  {weatherPill}
+                </View>
+              }
+            >
+              <Text style={styles.heroTitle} numberOfLines={2}>
                 {recommendation.title}
               </Text>
-              <Text style={styles.heroMeta}>
-                {t('style_pantry.outfit_pieces', {
-                  count: recommendation.items.length,
-                })}
-              </Text>
+              <View style={styles.heroMetaRow}>
+                <Text style={styles.heroMeta}>
+                  {t('style_pantry.outfit_pieces', {
+                    count: recommendation.items.length,
+                  })}
+                </Text>
+                {others.length > 0 ? (
+                  <View style={styles.heroThumbRow}>
+                    {others.slice(0, 4).map((item, i) => (
+                      <View
+                        key={item.id}
+                        style={[styles.heroThumbWrap, i > 0 && styles.heroThumbOverlap]}
+                      >
+                        <ItemThumb item={item} size={32} radius={16} />
+                      </View>
+                    ))}
+                  </View>
+                ) : null}
+              </View>
               <View style={styles.heroActions}>
                 <Pressable
-                  style={styles.heroPrimaryBtn}
+                  style={[styles.heroPrimaryBtn, styles.heroBtnFlex]}
                   onPress={handleWear}
                   disabled={wearing}
                   accessibilityRole="button"
@@ -220,44 +244,22 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
                   </Text>
                 </Pressable>
                 <Pressable
-                  style={styles.heroGhostBtn}
+                  style={[styles.heroGhostBtn, styles.heroBtnFlex]}
                   onPress={handleRegenerate}
                   disabled={regenerating}
                   accessibilityRole="button"
                   accessibilityLabel={t('ai_stylist.regenerate')}
                 >
                   <RefreshCw size={14} color={styles.heroOnPrimary.color} />
-                  <Text style={styles.heroGhostBtnText}>
+                  <Text style={styles.heroGhostBtnText} numberOfLines={1}>
                     {t('ai_stylist.regenerate')}
                   </Text>
                 </Pressable>
               </View>
-            </View>
-            <View style={[styles.heroPhotoCol, { width: heroPhotoWidth }]}>
-              <View
-                style={[
-                  styles.heroPhoto,
-                  { width: heroPhotoWidth, height: Math.round(heroPhotoWidth * 4 / 3) },
-                ]}
-              >
-                {main ? <ItemThumb item={main} fill radius={20} /> : null}
-              </View>
-              {others.length > 0 ? (
-                <View style={styles.heroThumbRow}>
-                  {others.slice(0, 4).map((item, i) => (
-                    <View
-                      key={item.id}
-                      style={[styles.heroThumbWrap, i > 0 && styles.heroThumbOverlap]}
-                    >
-                      <ItemThumb item={item} size={36} radius={18} />
-                    </View>
-                  ))}
-                </View>
-              ) : null}
-            </View>
+            </PhotoCard>
           </View>
-        </Pressable>
-      );
+        );
+      }
     }
 
     if (!hasOwnedItems || outfitError?.code === 'INSUFFICIENT_WARDROBE') {
@@ -437,25 +439,25 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
                 <SkeletonBox key={i} width={150} height={200} borderRadius={20} />
               ))
             : recentItems.map(item => (
-                <Pressable
+                <PhotoCard
                   key={item.id}
-                  style={styles.recentCard}
+                  item={item}
+                  width={150}
+                  height={200}
+                  radius={20}
+                  stripHeight={64}
                   onPress={() =>
                     navigation.navigate('ClothingDetails', { itemId: item.id })
                   }
-                  accessibilityRole="button"
                   accessibilityLabel={item.name}
                 >
-                  <View style={styles.recentPhoto}>
-                    <ItemThumb item={item} fill radius={20} />
-                  </View>
                   <Text style={styles.recentName} numberOfLines={1}>
                     {item.name}
                   </Text>
                   <Text style={styles.recentCategory} numberOfLines={1}>
-                    {categoryLabel(item.category)}
+                    {itemCategoryLabel(item)}
                   </Text>
-                </Pressable>
+                </PhotoCard>
               ))}
           {!loading ? (
             <Pressable
@@ -540,6 +542,33 @@ const makeStyles = ({ colors, fonts, radius, spacing, shadow }: ThemeTokens) =>
       ...shadow.medium,
     },
     heroSkeleton: { marginTop: spacing.md },
+    // Elevation needs a rounded, opaque background of its own, otherwise Android
+    // paints a square shadow behind the rounded card.
+    heroPhotoCardWrap: { marginBottom: spacing.lg, borderRadius: 28, backgroundColor: colors.surface, ...shadow.medium },
+    heroOverlayTop: {
+      position: 'absolute',
+      top: spacing.md,
+      left: spacing.md,
+      right: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      gap: spacing.sm,
+    },
+    heroKickerPill: {
+      backgroundColor: colors.primary,
+      opacity: 0.75,
+      borderRadius: radius.pill,
+      paddingHorizontal: spacing.sm + 2,
+      paddingVertical: 6,
+    },
+    heroMetaRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      marginTop: spacing.xs,
+    },
+    heroBtnFlex: { flex: 1 },
     heroTopRow: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -558,7 +587,8 @@ const makeStyles = ({ colors, fonts, radius, spacing, shadow }: ThemeTokens) =>
       flexDirection: 'row',
       alignItems: 'center',
       gap: 6,
-      backgroundColor: colors.primaryDark,
+      backgroundColor: colors.primary,
+      opacity: 0.75,
       borderRadius: radius.pill,
       paddingHorizontal: spacing.sm + 2,
       paddingVertical: 6,
@@ -584,7 +614,7 @@ const makeStyles = ({ colors, fonts, radius, spacing, shadow }: ThemeTokens) =>
       color: colors.textOnPrimaryMuted,
       marginTop: spacing.xs,
     },
-    heroActions: { marginTop: spacing.md, gap: spacing.sm },
+    heroActions: { marginTop: spacing.sm + 4, flexDirection: 'row', gap: spacing.sm },
     heroPrimaryBtn: {
       backgroundColor: colors.textOnPrimary,
       borderRadius: radius.pill,
@@ -614,23 +644,16 @@ const makeStyles = ({ colors, fonts, radius, spacing, shadow }: ThemeTokens) =>
       fontSize: 12,
       color: colors.textOnPrimary,
     },
-    heroPhotoCol: { alignItems: 'flex-end' },
-    heroPhoto: {
-      borderRadius: 20,
-      overflow: 'hidden',
-      backgroundColor: colors.primaryDark,
-    },
     heroThumbRow: {
       flexDirection: 'row',
-      marginTop: spacing.sm,
-      paddingLeft: 10,
+      paddingLeft: 8,
     },
     heroThumbWrap: {
       borderRadius: 18,
       borderWidth: 2,
-      borderColor: colors.primary,
+      borderColor: colors.textOnPrimary,
     },
-    heroThumbOverlap: { marginLeft: -10 },
+    heroThumbOverlap: { marginLeft: -8 },
     heroEmptyIcon: {
       width: 52,
       height: 52,
@@ -746,23 +769,15 @@ const makeStyles = ({ colors, fonts, radius, spacing, shadow }: ThemeTokens) =>
       color: colors.primary,
     },
     recentScroll: { gap: spacing.sm + 4, paddingBottom: spacing.xs },
-    recentCard: { width: 150 },
-    recentPhoto: {
-      width: 150,
-      height: 200,
-      borderRadius: 20,
-      overflow: 'hidden',
-    },
     recentName: {
-      fontFamily: fonts.sansMedium,
+      fontFamily: fonts.sansBold,
       fontSize: 13,
-      color: colors.textPrimary,
-      marginTop: spacing.sm,
+      color: colors.textOnPrimary,
     },
     recentCategory: {
       fontFamily: fonts.sans,
       fontSize: 11,
-      color: colors.textMuted,
+      color: colors.textOnPrimaryMuted,
       marginTop: 1,
     },
     addRecentCard: {

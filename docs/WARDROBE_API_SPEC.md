@@ -39,7 +39,7 @@ AI "Style Mirror" that recommends a full outfit for an upcoming occasion, factor
 today's weather and what's actually in the user's closet.
 
 ### Core Business Capabilities:
-1. **Digital Closet:** CRUD for wardrobe items (tops, bottoms, shoes, jackets,
+1. **Digital Closet:** CRUD for wardrobe items (tops, bottoms, dresses, shoes, jackets,
    accessories) with an optional photo, brand, season, material, and free-form style
    tags (`office`, `formal`, `party`, `casual`, `workout`, `meeting`, ...).
 2. **Wear Tracking:** Recording that a set of items was worn on a given date, bumping
@@ -52,7 +52,7 @@ today's weather and what's actually in the user's closet.
    **not** integrated with any external/shared calendar system — no such module exists
    elsewhere in Habita AI today, so Wardrobe owns this data outright.
 5. **AI Outfit Recommendation:** Given an occasion, the server picks a coherent outfit
-   (top + bottom + shoes, plus a jacket/accessory when relevant) from the caller's
+   (shoes, plus either a top + bottom or a dress, plus a jacket/accessory when relevant) from the caller's
    closet, scored against the occasion type and today's weather. The contract is stable
    whether this is implemented as a rule-based matcher today or backed by
    `LlmClientService` later (`docs/BACKLOG.md` M8-T4) — the response shape does not
@@ -126,7 +126,16 @@ or returns another user's wardrobe data.
 
 ### 3.1 Clothing Category
 ```typescript
-type ClothingCategory = 'tops' | 'bottoms' | 'shoes' | 'jackets' | 'accessories';
+type ClothingCategory = 'tops' | 'bottoms' | 'dresses' | 'shoes' | 'jackets' | 'accessories';
+```
+
+### 3.1a Dress Type
+Only meaningful (and only sent/returned) when `category` is `'dresses'` — the exact
+one-piece silhouette, shown in the UI in place of the generic "Dresses" label so a gown
+reads as "Gown" rather than a vague plural bucket.
+```typescript
+type DressType = 'gown' | 'maxi_dress' | 'cocktail_dress' | 'sundress' | 'wrap_dress'
+  | 'bodycon' | 'a_line' | 'shirt_dress' | 'jumpsuit';
 ```
 
 ### 3.2 Clothing Season
@@ -454,10 +463,12 @@ existed. Both `mood` and `refinementNote` may be sent together.
 - **Response (400 Bad Request):** `INVALID_MOOD` if `mood` is present but not one of the
   §3.6 values.
 - **Response (422 Unprocessable Entity):** `INSUFFICIENT_WARDROBE` if the caller has too
-  few items to assemble a coherent outfit (fewer than one top, one bottom, and one pair
-  of shoes) — the client falls back to its own local rule-based matcher on any failure
-  here, so this is safe to return rather than forcing a degraded recommendation. Wishlist
-  items (`isWishlist: true`) never count toward this check or toward the picked outfit.
+  few items to assemble a coherent outfit (no pair of shoes, or neither a top+bottom pair
+  nor a dress) — a one-piece dress satisfies the top+bottom requirement on its own, so a
+  closet with only dresses and shoes is sufficient. The client falls back to its own local
+  rule-based matcher on any failure here, so this is safe to return rather than forcing a
+  degraded recommendation. Wishlist items (`isWishlist: true`) never count toward this
+  check or toward the picked outfit.
 - **Implementation note (M8-T4):** Ship this first as a rule-based matcher — pick items
   whose `tags` include the occasion's `eventType`, preferring (not requiring) one whose
   `tags` also include one of `mood`'s preferred tags (§3.6 table) when `mood` was sent;

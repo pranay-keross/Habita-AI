@@ -1,4 +1,4 @@
-import React, { useCallback, useRef, useState } from 'react';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import {
   View,
   Text,
@@ -41,7 +41,8 @@ import {
 } from '../stylePantryStore';
 import OutfitShowcase from '../components/OutfitShowcase';
 import { describeStoreError, showStoreErrorAlert } from '../errors';
-import { useBusy, useFocusLoad, useLocaleRerender } from '../hooks';
+import { useBusy, useFocusLoad, useKeyboardHeight, useLocaleRerender } from '../hooks';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { dateLabel, eventTypeLabel, moodLabel } from '../format';
 import WardrobeHeader from '../components/WardrobeHeader';
 import OfflineBanner from '../components/OfflineBanner';
@@ -98,6 +99,7 @@ export default function StyleMirrorScreen({ navigation }: Props) {
   const { getAccessToken } = useAuth();
   useLocaleRerender();
 
+  const insets = useSafeAreaInsets();
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [weather, setWeather] = useState<WeatherContext | null>(null);
   const [events, setEvents] = useState<CalendarEvent[]>([]);
@@ -125,6 +127,14 @@ export default function StyleMirrorScreen({ navigation }: Props) {
   const hasOwnedItems = ownedItems(items).length > 0;
 
   const scrollToEnd = () => setTimeout(() => scrollRef.current?.scrollToEnd({ animated: true }), 80);
+
+  // Android (SDK 36, edge-to-edge) ignores adjustResize, so pad the fixed refine bar
+  // by the keyboard height ourselves; iOS keeps the KeyboardAvoidingView below.
+  const keyboardHeight = useKeyboardHeight();
+  const composerBottomPad = (Platform.OS === 'android' && keyboardHeight > 0 ? keyboardHeight : insets.bottom) + 10;
+  useEffect(() => {
+    if (keyboardHeight > 0) scrollToEnd();
+  }, [keyboardHeight]);
 
   const generateFor = useCallback(
     async (evt: CalendarEvent, mood: Mood | undefined) => {
@@ -415,8 +425,10 @@ export default function StyleMirrorScreen({ navigation }: Props) {
     }
   };
 
+  const Root = Platform.OS === 'ios' ? KeyboardAvoidingView : View;
+
   return (
-    <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+    <Root style={styles.flex} behavior="padding">
       <View style={styles.root}>
         <WardrobeHeader
           title={t('style_pantry.mirror_title')}
@@ -541,47 +553,48 @@ export default function StyleMirrorScreen({ navigation }: Props) {
             </View>
           ) : null}
 
-          {/* Refine */}
-          {hasLook ? (
-            <View style={styles.refineWrap}>
-              <Text style={styles.sectionTitle}>{t('style_pantry.refine_title')}</Text>
-              <View style={styles.chipWrap}>
-                {REFINE_CHIPS.map(chip => (
-                  <Pressable
-                    key={chip.key}
-                    style={[styles.refineChip, generating && styles.disabled]}
-                    onPress={() => handleRefine(t(chip.labelKey))}
-                    disabled={generating}
-                    accessibilityRole="button"
-                  >
-                    <Text style={styles.refineChipText}>{t(chip.labelKey)}</Text>
-                  </Pressable>
-                ))}
-              </View>
-              <View style={styles.refineRow}>
-                <TextInput
-                  style={styles.refineInput}
-                  value={refineText}
-                  onChangeText={setRefineText}
-                  placeholder={t('style_pantry.refine_placeholder')}
-                  placeholderTextColor={styles.placeholder.color}
-                  onSubmitEditing={() => handleRefine(refineText)}
-                  returnKeyType="send"
-                  editable={!generating}
-                />
-                <Pressable
-                  style={[styles.sendBtn, (generating || !refineText.trim()) && styles.disabled]}
-                  onPress={() => handleRefine(refineText)}
-                  disabled={generating || !refineText.trim()}
-                  accessibilityRole="button"
-                  accessibilityLabel={t('style_pantry.sending')}
-                >
-                  <Send size={18} color={styles.onPrimary.color} />
-                </Pressable>
-              </View>
-            </View>
-          ) : null}
         </ScrollView>
+
+        {/* Refine bar: fixed below the feed so it rides above the keyboard like a chat composer */}
+        {hasLook ? (
+          <View style={[styles.refineBar, { paddingBottom: composerBottomPad }]}>
+            <Text style={styles.refineTitle}>{t('style_pantry.refine_title')}</Text>
+            <ScrollView horizontal showsHorizontalScrollIndicator={false} keyboardShouldPersistTaps="handled" contentContainerStyle={styles.refineChipScroll}>
+              {REFINE_CHIPS.map(chip => (
+                <Pressable
+                  key={chip.key}
+                  style={[styles.refineChip, generating && styles.disabled]}
+                  onPress={() => handleRefine(t(chip.labelKey))}
+                  disabled={generating}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.refineChipText}>{t(chip.labelKey)}</Text>
+                </Pressable>
+              ))}
+            </ScrollView>
+            <View style={styles.refineRow}>
+              <TextInput
+                style={styles.refineInput}
+                value={refineText}
+                onChangeText={setRefineText}
+                placeholder={t('style_pantry.refine_placeholder')}
+                placeholderTextColor={styles.placeholder.color}
+                onSubmitEditing={() => handleRefine(refineText)}
+                returnKeyType="send"
+                editable={!generating}
+              />
+              <Pressable
+                style={[styles.sendBtn, (generating || !refineText.trim()) && styles.disabled]}
+                onPress={() => handleRefine(refineText)}
+                disabled={generating || !refineText.trim()}
+                accessibilityRole="button"
+                accessibilityLabel={t('style_pantry.sending')}
+              >
+                <Send size={18} color={styles.onPrimary.color} />
+              </Pressable>
+            </View>
+          </View>
+        ) : null}
       </View>
 
       <BottomSheet
@@ -616,7 +629,7 @@ export default function StyleMirrorScreen({ navigation }: Props) {
         <TextInput style={styles.textInput} value={newLocation} onChangeText={setNewLocation} placeholder={t('style_pantry.occasion_location_placeholder')} placeholderTextColor={styles.placeholder.color} />
         <Button title={t('style_pantry.save_occasion')} onPress={handleSaveOccasion} loading={savingOccasion} style={styles.emptyBtn} />
       </BottomSheet>
-    </KeyboardAvoidingView>
+    </Root>
   );
 }
 
@@ -630,7 +643,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     iconTint: { color: colors.primary },
     weatherIcon: { color: colors.turmeric },
     disabled: { opacity: 0.55 },
-    content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+    content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl + spacing.lg },
     skeletonGap: { marginRight: spacing.sm + 4, marginBottom: spacing.sm + 4 },
     skeletonLine: { marginBottom: 6 },
     weatherCard: { marginBottom: spacing.md, padding: spacing.md },
@@ -741,7 +754,15 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     errorText: { fontFamily: fonts.sans, fontSize: 13, color: colors.danger, lineHeight: 18 },
     typingRow: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingVertical: spacing.sm, marginBottom: spacing.sm },
     typingText: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginLeft: spacing.xs },
-    refineWrap: { marginTop: spacing.sm },
+    refineBar: {
+      paddingHorizontal: spacing.lg,
+      paddingTop: spacing.sm,
+      backgroundColor: colors.background,
+      borderTopWidth: 1,
+      borderTopColor: colors.border,
+    },
+    refineTitle: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary, marginBottom: spacing.xs },
+    refineChipScroll: { gap: spacing.xs, paddingRight: spacing.lg },
     chipWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
     refineChip: {
       paddingHorizontal: spacing.md,

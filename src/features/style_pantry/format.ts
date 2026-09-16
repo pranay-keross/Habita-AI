@@ -1,6 +1,6 @@
 import { getCurrentLanguage, t } from '../../i18n';
 import { formatDateLabel, formatDateRangeLabel } from '../../utils/date';
-import type { ClothingCategory, ClothingSeason, EventType, Mood } from './types';
+import type { ClothingCategory, ClothingSeason, DressType, EventType, Mood } from './types';
 
 // Localized labels for every wardrobe enum — screens must never render the raw wire value.
 
@@ -10,6 +10,15 @@ export function eventTypeLabel(type: EventType | string): string {
 
 export function categoryLabel(category: ClothingCategory | string): string {
   return t(`style_pantry.cat_${category}`);
+}
+
+export function dressTypeLabel(dressType: DressType | string): string {
+  return t(`style_pantry.dress_${dressType}`);
+}
+
+/** The category label, swapped for the exact dress type (e.g. "Gown") when the item is a dress. */
+export function itemCategoryLabel(item: { category: ClothingCategory; dressType?: DressType }): string {
+  return item.category === 'dresses' && item.dressType ? dressTypeLabel(item.dressType) : categoryLabel(item.category);
 }
 
 export function seasonLabel(season: ClothingSeason | string): string {

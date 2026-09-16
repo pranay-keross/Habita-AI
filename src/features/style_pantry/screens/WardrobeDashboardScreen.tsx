@@ -9,6 +9,7 @@ import {
   Alert,
   Share,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
@@ -23,10 +24,9 @@ import Share2 from 'lucide-react-native/icons/share-2';
 import FolderOpen from 'lucide-react-native/icons/folder-open';
 import Pencil from 'lucide-react-native/icons/pencil';
 import Trash2 from 'lucide-react-native/icons/trash';
-import GlassCard from '../../../components/GlassCard';
 import BottomSheet from '../../../components/BottomSheet';
 import Button from '../../../components/Button';
-import { SkeletonBox, SkeletonText } from '../../../components/Skeleton';
+import { SkeletonBox } from '../../../components/Skeleton';
 import {
   loadClothingItems,
   loadCollections,
@@ -39,6 +39,7 @@ import { showStoreErrorAlert } from '../errors';
 import { useBusy, useFocusLoad, useLocaleRerender } from '../hooks';
 import WardrobeHeader from '../components/WardrobeHeader';
 import ItemThumb from '../components/ItemThumb';
+import PhotoCard from '../components/PhotoCard';
 import OfflineBanner from '../components/OfflineBanner';
 import ItemPickerSheet from '../components/ItemPickerSheet';
 import {
@@ -63,7 +64,10 @@ interface FolderCard {
 export default function WardrobeDashboardScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
   const { getAccessToken } = useAuth();
+  const { width } = useWindowDimensions();
   useLocaleRerender();
+  const folderWidth = Math.floor((width - 2 * 24 - 12) / 2);
+  const folderHeight = Math.round(folderWidth * 1.1);
 
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [collections, setCollections] = useState<WardrobeCollection[]>([]);
@@ -278,47 +282,66 @@ export default function WardrobeDashboardScreen({ navigation }: Props) {
         {loading ? (
           <View style={styles.gridWrap}>
             {[0, 1].map(i => (
-              <View key={i} style={styles.folderCard}>
-                <SkeletonBox width="100%" height={90} borderRadius={12} />
-                <SkeletonText width="60%" style={styles.skeletonGap} />
-              </View>
+              <SkeletonBox key={i} width={folderWidth} height={folderHeight} borderRadius={20} style={styles.folderCardWrap} />
             ))}
           </View>
         ) : (
           <View style={styles.gridWrap}>
             {folders.map(folder => {
               const FolderIcon = getCollectionIconComponent(folder.iconKey);
-              return (
-                <Pressable
-                  key={folder.key}
-                  style={styles.folderCardWrap}
-                  onPress={folder.onPress}
-                  onLongPress={folder.collection ? () => setOptionsFor(folder.collection ?? null) : undefined}
-                  delayLongPress={350}
-                >
-                  <GlassCard variant="default" style={styles.folderCard}>
-                    <View style={styles.folderCover}>
-                      {folder.coverItems.length > 0 ? (
-                        folder.coverItems.map(item => (
-                          <ItemThumb key={item.id} item={item} size={40} radius={6} style={styles.folderCoverTile} />
-                        ))
-                      ) : (
-                        <View style={styles.folderCoverEmpty}>
-                          <FolderIcon size={26} color={styles.iconTint.color} />
-                        </View>
-                      )}
-                    </View>
+              const cover = folder.coverItems[0];
+              const onLongPress = folder.collection ? () => setOptionsFor(folder.collection ?? null) : undefined;
+              if (cover) {
+                return (
+                  <PhotoCard
+                    key={folder.key}
+                    item={cover}
+                    width={folderWidth}
+                    height={folderHeight}
+                    radius={20}
+                    stripHeight={66}
+                    style={styles.folderCardWrap}
+                    onPress={folder.onPress}
+                    onLongPress={onLongPress}
+                    accessibilityLabel={folder.title}
+                    overlay={
+                      <View style={styles.folderIconChip} pointerEvents="none">
+                        <FolderIcon size={14} color={styles.iconTint.color} />
+                      </View>
+                    }
+                  >
                     <Text style={styles.folderTitle} numberOfLines={1}>
                       {folder.title}
                     </Text>
                     <Text style={styles.folderCount}>
                       {t('closet.folder_item_count', { count: folder.count })}
                     </Text>
-                  </GlassCard>
+                  </PhotoCard>
+                );
+              }
+              return (
+                <Pressable
+                  key={folder.key}
+                  style={[styles.folderCardWrap, styles.folderEmptyCard, { width: folderWidth, height: folderHeight }]}
+                  onPress={folder.onPress}
+                  onLongPress={onLongPress}
+                  delayLongPress={350}
+                  accessibilityRole="button"
+                  accessibilityLabel={folder.title}
+                >
+                  <View style={styles.folderCoverEmpty}>
+                    <FolderIcon size={26} color={styles.iconTint.color} />
+                  </View>
+                  <Text style={styles.folderEmptyTitle} numberOfLines={1}>
+                    {folder.title}
+                  </Text>
+                  <Text style={styles.folderEmptyCount}>
+                    {t('closet.folder_item_count', { count: folder.count })}
+                  </Text>
                 </Pressable>
               );
             })}
-            <Pressable style={styles.createFolderCard} onPress={openCreate}>
+            <Pressable style={[styles.createFolderCard, { width: folderWidth, height: folderHeight }]} onPress={openCreate}>
               <FolderOpen size={26} color={styles.iconTint.color} />
               <Text style={styles.createFolderText}>{t('closet.create_closet')}</Text>
             </Pressable>
@@ -443,32 +466,47 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     },
     actionLabel: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary, textAlign: 'center' },
     gridWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-    folderCardWrap: { width: '48%', marginBottom: spacing.md },
-    folderCard: { width: '100%', padding: spacing.md },
-    skeletonGap: { marginTop: 10 },
-    folderCover: { flexDirection: 'row', flexWrap: 'wrap', gap: 4, height: 90 },
-    folderCoverTile: { width: '47%', height: '47%' },
+    folderCardWrap: { marginBottom: spacing.sm + 4 },
+    folderIconChip: {
+      position: 'absolute',
+      top: spacing.sm + 2,
+      left: spacing.sm + 2,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    folderTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textOnPrimary },
+    folderCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.textOnPrimaryMuted, marginTop: 2 },
+    folderEmptyCard: {
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.md,
+      justifyContent: 'flex-end',
+    },
     folderCoverEmpty: {
-      width: '100%',
-      height: '100%',
+      flex: 1,
       borderRadius: radius.md,
       backgroundColor: colors.surfaceElevated,
       alignItems: 'center',
       justifyContent: 'center',
+      marginBottom: spacing.sm,
     },
-    folderTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary, marginTop: spacing.sm },
-    folderCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    folderEmptyTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary },
+    folderEmptyCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
     createFolderCard: {
-      width: '48%',
-      marginBottom: spacing.md,
+      marginBottom: spacing.sm + 4,
       padding: spacing.md,
-      borderRadius: radius.card,
+      borderRadius: 20,
       borderWidth: 1,
       borderStyle: 'dashed',
       borderColor: colors.border,
       alignItems: 'center',
       justifyContent: 'center',
-      minHeight: 154,
     },
     createFolderText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.primary, marginTop: spacing.sm, textAlign: 'center' },
     inputLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.sm },

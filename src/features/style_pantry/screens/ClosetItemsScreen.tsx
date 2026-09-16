@@ -7,6 +7,7 @@ import {
   Pressable,
   TextInput,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
@@ -16,13 +17,12 @@ import useAuth from '../../../hooks/useAuth';
 import Plus from 'lucide-react-native/icons/plus';
 import Search from 'lucide-react-native/icons/search';
 import Shirt from 'lucide-react-native/icons/shirt';
-import GlassCard from '../../../components/GlassCard';
-import { SkeletonCircle, SkeletonText } from '../../../components/Skeleton';
+import { SkeletonBox } from '../../../components/Skeleton';
 import { loadClothingItems, loadCollections } from '../stylePantryStore';
 import { useFocusLoad, useLocaleRerender } from '../hooks';
 import { categoryLabel } from '../format';
 import WardrobeHeader from '../components/WardrobeHeader';
-import ItemThumb from '../components/ItemThumb';
+import PhotoCard from '../components/PhotoCard';
 import OfflineBanner from '../components/OfflineBanner';
 import { CATEGORY_ICON_KEYS, getClothingIconComponent } from '../clothingIcons';
 import { CLOTHING_CATEGORIES, type ClothingCategory, type ClothingItem } from '../types';
@@ -33,8 +33,11 @@ type Props = StackScreenProps<RootStackParamList, 'ClosetItems'>;
 export default function ClosetItemsScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
   const { getAccessToken } = useAuth();
+  const { width } = useWindowDimensions();
   useLocaleRerender();
   const { title, collectionId, seasonFilter, wishlistOnly } = route.params ?? {};
+  const tileWidth = Math.floor((width - 2 * 24 - 12) / 2);
+  const tileHeight = Math.round(tileWidth * 1.25);
 
   const [items, setItems] = useState<ClothingItem[]>([]);
   const [collectionItemIds, setCollectionItemIds] = useState<string[] | null>(null);
@@ -148,11 +151,7 @@ export default function ClosetItemsScreen({ navigation, route }: Props) {
         {loading ? (
           <View style={styles.gridWrap}>
             {[0, 1, 2, 3].map(i => (
-              <View key={i} style={[styles.clothingCard, styles.skeletonCard]}>
-                <SkeletonCircle size={56} style={styles.skeletonThumb} />
-                <SkeletonText width="80%" />
-                <SkeletonText width="50%" style={styles.skeletonLine} />
-              </View>
+              <SkeletonBox key={i} width={tileWidth} height={tileHeight} borderRadius={20} style={styles.tile} />
             ))}
           </View>
         ) : filteredItems.length === 0 ? (
@@ -166,13 +165,24 @@ export default function ClosetItemsScreen({ navigation, route }: Props) {
         ) : (
           <View style={styles.gridWrap}>
             {filteredItems.map(item => (
-              <GlassCard
+              <PhotoCard
                 key={item.id}
-                variant="default"
-                style={styles.clothingCard}
+                item={item}
+                width={tileWidth}
+                height={tileHeight}
+                radius={20}
+                stripHeight={item.wearCount > 0 && !item.isWishlist ? 78 : 64}
+                style={styles.tile}
                 onPress={() => navigation.navigate('ClothingDetails', { itemId: item.id })}
+                accessibilityLabel={item.name}
+                overlay={
+                  item.isWishlist ? (
+                    <View style={styles.wishlistBadge} pointerEvents="none">
+                      <Text style={styles.wishlistBadgeText}>{t('style_pantry.wishlist_badge')}</Text>
+                    </View>
+                  ) : undefined
+                }
               >
-                <ItemThumb item={item} size={64} style={styles.thumb} muted={item.isWishlist} />
                 <Text style={styles.cardItemName} numberOfLines={1}>
                   {item.name}
                 </Text>
@@ -180,18 +190,12 @@ export default function ClosetItemsScreen({ navigation, route }: Props) {
                   {item.color}
                   {item.brand ? ` · ${item.brand}` : ''}
                 </Text>
-                <View style={styles.cardFooter}>
-                  {item.isWishlist ? (
-                    <View style={styles.wishlistBadge}>
-                      <Text style={styles.wishlistBadgeText}>{t('style_pantry.wishlist_badge')}</Text>
-                    </View>
-                  ) : (
-                    <Text style={styles.wearCountText}>
-                      {t('style_pantry.item_worn_times', { count: item.wearCount })}
-                    </Text>
-                  )}
-                </View>
-              </GlassCard>
+                {item.wearCount > 0 && !item.isWishlist ? (
+                  <Text style={styles.wearCountText} numberOfLines={1}>
+                    {t('style_pantry.item_worn_times', { count: item.wearCount })}
+                  </Text>
+                ) : null}
+              </PhotoCard>
             ))}
           </View>
         )}
@@ -250,21 +254,18 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     emptyTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.textPrimary, marginTop: spacing.md },
     emptySub: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
     gridWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
-    clothingCard: { width: '48%', marginBottom: spacing.md, padding: spacing.md },
-    skeletonCard: { backgroundColor: colors.surface, borderRadius: radius.card, alignItems: 'center' },
-    skeletonThumb: { marginBottom: spacing.sm },
-    skeletonLine: { marginTop: spacing.xs },
-    thumb: { alignSelf: 'center', marginBottom: spacing.sm },
-    cardItemName: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary },
-    cardSubText: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
-    cardFooter: { marginTop: spacing.sm, paddingTop: spacing.xs, borderTopWidth: 1, borderTopColor: colors.border },
-    wearCountText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.primary },
+    tile: { marginBottom: spacing.sm + 4 },
+    cardItemName: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textOnPrimary },
+    cardSubText: { fontFamily: fonts.sans, fontSize: 12, color: colors.textOnPrimaryMuted, marginTop: 2 },
+    wearCountText: { fontFamily: fonts.sans, fontSize: 10, color: colors.textOnPrimaryMuted, marginTop: 3 },
     wishlistBadge: {
-      alignSelf: 'flex-start',
-      backgroundColor: colors.blush,
+      position: 'absolute',
+      top: spacing.sm + 2,
+      left: spacing.sm + 2,
+      backgroundColor: colors.surface,
       borderRadius: radius.full,
       paddingHorizontal: spacing.sm,
-      paddingVertical: 2,
+      paddingVertical: 3,
     },
     wishlistBadgeText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.primary },
   });
