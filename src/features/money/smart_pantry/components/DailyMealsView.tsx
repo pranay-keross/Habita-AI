@@ -13,6 +13,7 @@ import { DailyMeal, MealIngredient } from '../types';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
+import { makePantryTokens } from '../constants/colors';
 import ChefHat from 'lucide-react-native/icons/chef-hat';
 import Timer from 'lucide-react-native/icons/timer';
 import Flame from 'lucide-react-native/icons/flame';
@@ -655,7 +656,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginTop: 6,
     },
     stateBtnText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textOnPrimary },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalOverlay: { flex: 1, backgroundColor: makePantryTokens(colors).scrim, justifyContent: 'flex-end' },
     modalSheet: {
       maxHeight: '88%',
       backgroundColor: colors.surface,

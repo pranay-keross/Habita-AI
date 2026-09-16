@@ -1356,7 +1356,7 @@ export const AddScanView: React.FC<Props> = ({
                   <Pressable
                     style={[styles.checkbox, item.selected && styles.checkboxActive]}
                     onPress={() => handleToggleSelectItem(item.id)}>
-                    {item.selected && <Check size={12} color="#FFFFFF" strokeWidth={3} />}
+                    {item.selected && <Check size={12} color={styles.iconOnPrimary.color} strokeWidth={3} />}
                   </Pressable>
 
                   <View style={{ flex: 1, marginHorizontal: 8 }}>
@@ -1511,7 +1511,7 @@ export const AddScanView: React.FC<Props> = ({
                           {selected && (
                             <Check
                               size={10}
-                              color="#FFFFFF"
+                              color={styles.iconOnPrimary.color}
                               strokeWidth={3}
                               style={{ marginRight: 3 }}
                             />
@@ -1615,6 +1615,8 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     modeBtnActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     modeBtnText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary },
     modeBtnTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
+    // Read back for lucide ticks sitting on a colors.primary fill.
+    iconOnPrimary: { color: colors.textOnPrimary },
     scannerBox: {
       backgroundColor: colors.surface,
       borderRadius: radius.xl,

@@ -5,14 +5,16 @@ import type { ThemeTokens } from '../theme';
 import useThemedStyles from '../hooks/useThemedStyles';
 
 interface AvatarProps {
-  name: string;
+  /** Server-supplied names can come back null/absent; the icon fallback covers it. */
+  name?: string | null;
   avatarUrl?: string | null;
   size?: number;
   isOwner?: boolean;
   style?: StyleProp<ViewStyle>;
 }
 
-function getInitials(name: string): string {
+function getInitials(name: string | null | undefined): string {
+  if (typeof name !== 'string') return '';
   const words = name
     .replace(/\(.*?\)/g, '')
     .trim()
@@ -33,7 +35,8 @@ function hashString(value: string): number {
 
 export default function Avatar({ name, avatarUrl, size = 42, isOwner, style }: AvatarProps) {
   const styles = useThemedStyles(makeStyles);
-  const initials = getInitials(name);
+  const safeName = typeof name === 'string' ? name : '';
+  const initials = getInitials(safeName);
 
   const circleStyle: ViewStyle = {
     width: size,
@@ -51,7 +54,7 @@ export default function Avatar({ name, avatarUrl, size = 42, isOwner, style }: A
 
   if (initials) {
     const palette = styles.initialPalette;
-    const bg = palette[hashString(name) % palette.length];
+    const bg = palette[hashString(safeName) % palette.length];
     return (
       <View
         style={[

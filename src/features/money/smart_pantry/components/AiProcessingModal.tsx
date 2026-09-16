@@ -16,6 +16,9 @@ import ScanBarcode from 'lucide-react-native/icons/scan-barcode';
 import Salad from 'lucide-react-native/icons/salad';
 import X from 'lucide-react-native/icons/x';
 import { t } from '../../../../i18n';
+import type { ThemeTokens } from '../../../../theme';
+import useThemedStyles from '../../../../hooks/useThemedStyles';
+import { makePantryTokens } from '../constants/colors';
 
 interface Props {
   visible: boolean;
@@ -81,6 +84,7 @@ export const AiProcessingModal: React.FC<Props> = ({
   previewUri,
   onCancel,
 }) => {
+  const styles = useThemedStyles(makeStyles);
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
 
   // Animation values
@@ -220,14 +224,14 @@ export const AiProcessingModal: React.FC<Props> = ({
           {/* Close button if user wants to cancel */}
           {onCancel && (
             <Pressable style={styles.cancelBtn} onPress={onCancel}>
-              <X size={18} color="#94A3B8" />
+              <X size={18} color={styles.cancelIcon.color} />
             </Pressable>
           )}
 
           {/* AI Status Badge */}
           <View style={styles.aiBadgeRow}>
             <Animated.View style={[styles.aiPulsePill, { transform: [{ scale: pulseAnim }] }]}>
-              <Sparkles size={13} color="#00F0FF" strokeWidth={2.4} />
+              <Sparkles size={13} color={styles.accentIcon.color} strokeWidth={2.4} />
             </Animated.View>
             <Text style={styles.aiBadgeText}>
               {mode === 'receipt'
@@ -279,11 +283,11 @@ export const AiProcessingModal: React.FC<Props> = ({
               <View style={styles.hologramPlaceholder}>
                 <View style={styles.hologramIconBox}>
                   {mode === 'receipt' ? (
-                    <Receipt size={52} color="#00F0FF" strokeWidth={1.3} />
+                    <Receipt size={52} color={styles.accentIcon.color} strokeWidth={1.3} />
                   ) : mode === 'basket' ? (
-                    <Salad size={52} color="#00F0FF" strokeWidth={1.3} />
+                    <Salad size={52} color={styles.accentIcon.color} strokeWidth={1.3} />
                   ) : (
-                    <ScanBarcode size={52} color="#00F0FF" strokeWidth={1.3} />
+                    <ScanBarcode size={52} color={styles.accentIcon.color} strokeWidth={1.3} />
                   )}
                 </View>
                 <View style={styles.neuralDataLines}>
@@ -314,7 +318,7 @@ export const AiProcessingModal: React.FC<Props> = ({
 
           {/* Step Indicator Pill */}
           <View style={styles.stepCounterRow}>
-            <Cpu size={12} color="#38BDF8" style={{ marginRight: 4 }} />
+            <Cpu size={12} color={styles.stepIcon.color} style={styles.stepIconSpacing} />
             <Text style={styles.stepCounterText}>
               STAGE {currentStepIndex + 1} OF {stepsList.length}
             </Text>
@@ -342,258 +346,263 @@ export const AiProcessingModal: React.FC<Props> = ({
   );
 };
 
-const styles = StyleSheet.create({
-  backdrop: {
-    flex: 1,
-    backgroundColor: 'rgba(5, 10, 24, 0.88)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 24,
-  },
-  cardContainer: {
-    width: '100%',
-    maxWidth: 360,
-    backgroundColor: '#0A1124',
-    borderRadius: 24,
-    paddingVertical: 28,
-    paddingHorizontal: 20,
-    alignItems: 'center',
-    borderWidth: 1.5,
-    borderColor: 'rgba(0, 240, 255, 0.35)',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#00F0FF',
-        shadowOffset: { width: 0, height: 6 },
-        shadowOpacity: 0.35,
-        shadowRadius: 18,
-      },
-      android: {
-        elevation: 16,
-      },
-    }),
-  },
-  cancelBtn: {
-    position: 'absolute',
-    top: 16,
-    right: 16,
-    padding: 6,
-    zIndex: 10,
-  },
-  aiBadgeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0, 240, 255, 0.12)',
-    paddingHorizontal: 12,
-    paddingVertical: 5,
-    borderRadius: 20,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.4)',
-    marginBottom: 12,
-  },
-  aiPulsePill: {
-    marginRight: 6,
-  },
-  aiBadgeText: {
-    color: '#00F0FF',
-    fontSize: 11,
-    fontWeight: '800',
-    letterSpacing: 1.2,
-  },
-  liveDot: {
-    width: 6,
-    height: 6,
-    borderRadius: 3,
-    backgroundColor: '#10B981',
-    marginLeft: 8,
-  },
-  modalTitle: {
-    color: '#F8FAFC',
-    fontSize: 19,
-    fontWeight: '700',
-    marginBottom: 4,
-    textAlign: 'center',
-  },
-  modalSubtitle: {
-    color: '#94A3B8',
-    fontSize: 12,
-    textAlign: 'center',
-    marginBottom: 20,
-    paddingHorizontal: 8,
-  },
-  viewfinderBox: {
-    width: VIEWFINDER_WIDTH,
-    height: VIEWFINDER_HEIGHT,
-    borderRadius: 18,
-    backgroundColor: '#030712',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.2)',
-    position: 'relative',
-    overflow: 'hidden',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 20,
-  },
-  radarRing: {
-    position: 'absolute',
-    borderRadius: 999,
-    borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.22)',
-  },
-  radarRing1: {
-    width: 140,
-    height: 140,
-  },
-  radarRing2: {
-    width: 190,
-    height: 190,
-  },
-  previewImage: {
-    width: '100%',
-    height: '100%',
-    borderRadius: 18,
-    opacity: 0.88,
-  },
-  hologramPlaceholder: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  hologramIconBox: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    backgroundColor: 'rgba(0, 240, 255, 0.08)',
-    borderWidth: 1,
-    borderColor: 'rgba(0, 240, 255, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  neuralDataLines: {
-    alignItems: 'center',
-  },
-  dataMatrixText: {
-    color: '#38BDF8',
-    fontSize: 10,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  dataMatrixSub: {
-    color: '#64748B',
-    fontSize: 9,
-    fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
-    marginTop: 2,
-  },
-  reticleCorner: {
-    position: 'absolute',
-    width: 20,
-    height: 20,
-    borderColor: '#00F0FF',
-  },
-  reticleTopLeft: {
-    top: 10,
-    left: 10,
-    borderTopWidth: 3,
-    borderLeftWidth: 3,
-    borderTopLeftRadius: 4,
-  },
-  reticleTopRight: {
-    top: 10,
-    right: 10,
-    borderTopWidth: 3,
-    borderRightWidth: 3,
-    borderTopRightRadius: 4,
-  },
-  reticleBottomLeft: {
-    bottom: 10,
-    left: 10,
-    borderBottomWidth: 3,
-    borderLeftWidth: 3,
-    borderBottomLeftRadius: 4,
-  },
-  reticleBottomRight: {
-    bottom: 10,
-    right: 10,
-    borderBottomWidth: 3,
-    borderRightWidth: 3,
-    borderBottomRightRadius: 4,
-  },
-  laserBeamContainer: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    alignItems: 'center',
-    zIndex: 10,
-  },
-  laserAura: {
-    width: '100%',
-    height: 18,
-    backgroundColor: 'rgba(0, 240, 255, 0.18)',
-    borderBottomWidth: 1,
-    borderBottomColor: 'rgba(0, 240, 255, 0.5)',
-  },
-  laserLine: {
-    width: '100%',
-    height: 2.5,
-    backgroundColor: '#00F0FF',
-    ...Platform.select({
-      ios: {
-        shadowColor: '#00F0FF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 8,
-      },
-      android: {
-        elevation: 6,
-      },
-    }),
-  },
-  stepCounterRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  stepCounterText: {
-    color: '#38BDF8',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 0.8,
-  },
-  messageBox: {
-    minHeight: 40,
-    justifyContent: 'center',
-    alignItems: 'center',
-    paddingHorizontal: 12,
-    marginBottom: 16,
-  },
-  statusMessageText: {
-    color: '#E2E8F0',
-    fontSize: 13,
-    fontWeight: '600',
-    textAlign: 'center',
-    lineHeight: 18,
-  },
-  progressBarTrack: {
-    width: '100%',
-    height: 4,
-    backgroundColor: 'rgba(51, 65, 85, 0.6)',
-    borderRadius: 2,
-    overflow: 'hidden',
-    position: 'relative',
-  },
-  progressShimmerHighlight: {
-    width: 80,
-    height: '100%',
-    backgroundColor: '#00F0FF',
-    borderRadius: 2,
-    ...Platform.select({
-      ios: {
-        shadowColor: '#00F0FF',
-        shadowOffset: { width: 0, height: 0 },
-        shadowOpacity: 1,
-        shadowRadius: 6,
-      },
-    }),
-  },
-});
+/**
+ * A colored glow, which the `shadow` tokens can't express — they only carry the
+ * palette's own soft/medium elevation. Web gets a `boxShadow` branch so the glow
+ * survives there too, which the previous hand-rolled Platform.select did not.
+ */
+function glow(color: string, blur: number, elevation: number) {
+  if (Platform.OS === 'web') {
+    return { boxShadow: `0px 0px ${blur}px ${color}` };
+  }
+  if (Platform.OS === 'android') {
+    return { elevation };
+  }
+  return {
+    shadowColor: color,
+    shadowOffset: { width: 0, height: 0 },
+    shadowOpacity: 1,
+    shadowRadius: blur,
+  };
+}
+
+const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) => {
+  const pantry = makePantryTokens(colors);
+
+  return StyleSheet.create({
+    // Color-only entries, read back for lucide `color` props.
+    accentIcon: { color: pantry.scannerAccent },
+    cancelIcon: { color: pantry.textOnDarkFaint },
+    stepIcon: { color: pantry.scannerAccent },
+    stepIconSpacing: { marginRight: spacing.xs },
+
+    backdrop: {
+      flex: 1,
+      backgroundColor: pantry.scannerScrim,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: spacing.lg,
+    },
+    cardContainer: {
+      width: '100%',
+      maxWidth: 360,
+      backgroundColor: pantry.scannerSurface,
+      borderRadius: radius.xxl,
+      paddingVertical: spacing.lg + 4,
+      paddingHorizontal: spacing.md + 4,
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: pantry.scannerBorder,
+      ...glow(pantry.scannerAccent, 18, 16),
+    },
+    cancelBtn: {
+      position: 'absolute',
+      top: spacing.md,
+      right: spacing.md,
+      padding: spacing.xs + 2,
+      zIndex: 10,
+    },
+    aiBadgeRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: pantry.scannerAccentFill,
+      paddingHorizontal: spacing.sm + 4,
+      paddingVertical: spacing.xs + 1,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: pantry.scannerAccentLine,
+      marginBottom: spacing.sm + 4,
+    },
+    aiPulsePill: {
+      marginRight: spacing.xs + 2,
+    },
+    aiBadgeText: {
+      color: pantry.scannerAccent,
+      fontSize: 11,
+      fontFamily: fonts.sansBold,
+      letterSpacing: 1.2,
+    },
+    liveDot: {
+      width: 6,
+      height: 6,
+      borderRadius: 3,
+      backgroundColor: pantry.live,
+      marginLeft: spacing.sm,
+    },
+    modalTitle: {
+      color: pantry.textOnDark,
+      fontSize: 19,
+      fontFamily: fonts.sansBold,
+      marginBottom: spacing.xs,
+      textAlign: 'center',
+    },
+    modalSubtitle: {
+      color: pantry.textOnDarkMuted,
+      fontSize: 12,
+      fontFamily: fonts.sans,
+      textAlign: 'center',
+      marginBottom: spacing.md + 4,
+      paddingHorizontal: spacing.sm,
+    },
+    viewfinderBox: {
+      width: VIEWFINDER_WIDTH,
+      height: VIEWFINDER_HEIGHT,
+      borderRadius: radius.xl,
+      backgroundColor: pantry.scannerLens,
+      borderWidth: 1,
+      borderColor: pantry.scannerAccentLine,
+      position: 'relative',
+      overflow: 'hidden',
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: spacing.md + 4,
+    },
+    radarRing: {
+      position: 'absolute',
+      borderRadius: radius.full,
+      borderWidth: 1,
+      borderColor: pantry.scannerAccentLine,
+    },
+    radarRing1: {
+      width: 140,
+      height: 140,
+    },
+    radarRing2: {
+      width: 190,
+      height: 190,
+    },
+    previewImage: {
+      width: '100%',
+      height: '100%',
+      borderRadius: radius.xl,
+      opacity: 0.88,
+    },
+    hologramPlaceholder: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    hologramIconBox: {
+      width: 80,
+      height: 80,
+      borderRadius: 40,
+      backgroundColor: pantry.scannerAccentFill,
+      borderWidth: 1,
+      borderColor: pantry.scannerAccentLine,
+      justifyContent: 'center',
+      alignItems: 'center',
+      marginBottom: spacing.sm,
+    },
+    neuralDataLines: {
+      alignItems: 'center',
+    },
+    // The readout is deliberately monospace — it reads as instrument output, and
+    // the theme has no mono family to draw on.
+    dataMatrixText: {
+      color: pantry.scannerAccent,
+      fontSize: 10,
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+      letterSpacing: 1,
+    },
+    dataMatrixSub: {
+      color: pantry.textOnDarkFaint,
+      fontSize: 9,
+      fontFamily: Platform.OS === 'ios' ? 'Courier' : 'monospace',
+      marginTop: 2,
+    },
+    reticleCorner: {
+      position: 'absolute',
+      width: 20,
+      height: 20,
+      borderColor: pantry.scannerAccent,
+    },
+    reticleTopLeft: {
+      top: 10,
+      left: 10,
+      borderTopWidth: 3,
+      borderLeftWidth: 3,
+      borderTopLeftRadius: radius.xs,
+    },
+    reticleTopRight: {
+      top: 10,
+      right: 10,
+      borderTopWidth: 3,
+      borderRightWidth: 3,
+      borderTopRightRadius: radius.xs,
+    },
+    reticleBottomLeft: {
+      bottom: 10,
+      left: 10,
+      borderBottomWidth: 3,
+      borderLeftWidth: 3,
+      borderBottomLeftRadius: radius.xs,
+    },
+    reticleBottomRight: {
+      bottom: 10,
+      right: 10,
+      borderBottomWidth: 3,
+      borderRightWidth: 3,
+      borderBottomRightRadius: radius.xs,
+    },
+    laserBeamContainer: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      alignItems: 'center',
+      zIndex: 10,
+    },
+    laserAura: {
+      width: '100%',
+      height: 18,
+      backgroundColor: pantry.scannerAccentFill,
+      borderBottomWidth: 1,
+      borderBottomColor: pantry.scannerAccentLine,
+    },
+    laserLine: {
+      width: '100%',
+      height: 2.5,
+      backgroundColor: pantry.scannerAccent,
+      ...glow(pantry.scannerAccent, 8, 6),
+    },
+    stepCounterRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: spacing.xs + 2,
+    },
+    stepCounterText: {
+      color: pantry.scannerAccent,
+      fontSize: 10,
+      fontFamily: fonts.sansBold,
+      letterSpacing: 0.8,
+    },
+    messageBox: {
+      minHeight: 40,
+      justifyContent: 'center',
+      alignItems: 'center',
+      paddingHorizontal: spacing.sm + 4,
+      marginBottom: spacing.md,
+    },
+    statusMessageText: {
+      color: pantry.textOnDark,
+      fontSize: 13,
+      fontFamily: fonts.sansMedium,
+      textAlign: 'center',
+      lineHeight: 18,
+    },
+    progressBarTrack: {
+      width: '100%',
+      height: 4,
+      backgroundColor: pantry.scannerTrack,
+      borderRadius: 2,
+      overflow: 'hidden',
+      position: 'relative',
+    },
+    progressShimmerHighlight: {
+      width: 80,
+      height: '100%',
+      backgroundColor: pantry.scannerAccent,
+      borderRadius: 2,
+      ...glow(pantry.scannerAccent, 6, 4),
+    },
+  });
+};

@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, Pressable, ScrollView } from 'react-native';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
+import { View, Text, StyleSheet, Pressable, RefreshControl, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
@@ -92,6 +92,51 @@ export default function PantryScreen({ navigation }: Props) {
   // Cooking a recommended meal deducts stock, so the pantry list reloads after it.
   const dailyMeals = useDailyMeals({ onStockChanged: refresh });
 
+  // Changing stock — not just adding or removing an item — invalidates the plan,
+  // so quantities are part of the signature the auto-refresh below dedupes on.
+  const inventorySignature = useMemo(
+    () => items.map((item) => `${item.id}:${item.quantity}`).join('|'),
+    [items],
+  );
+  const autoRefreshedSignature = useRef<string | null>(null);
+  const {
+    plan: mealPlan,
+    loading: mealsLoading,
+    refreshing: mealsRefreshing,
+    refreshPlan: refreshMealPlan,
+  } = dailyMeals;
+
+  // The meal plan is fetched once per mount, which can land before the pantry list
+  // has loaded or against stock that has since changed — leaving "Today's Meals"
+  // showing an empty-pantry or stale plan while ingredients are sitting right there.
+  // Once inventory items exist and the plan is out of date, refresh it instead of
+  // waiting for a tap. Recording the signature before the call keeps this to one
+  // attempt per stock change, so a plan the backend still reports stale can't loop.
+  useEffect(() => {
+    if (activeTab !== 'meals' || items.length === 0) {
+      return;
+    }
+    if (mealsLoading || mealsRefreshing) {
+      return;
+    }
+    if (!mealPlan || !(mealPlan.stale || mealPlan.pantryEmpty)) {
+      return;
+    }
+    if (autoRefreshedSignature.current === inventorySignature) {
+      return;
+    }
+    autoRefreshedSignature.current = inventorySignature;
+    refreshMealPlan();
+  }, [
+    activeTab,
+    items.length,
+    inventorySignature,
+    mealPlan,
+    mealsLoading,
+    mealsRefreshing,
+    refreshMealPlan,
+  ]);
+
   return (
     <View style={styles.root}>
       {/* Header Bar */}
@@ -107,9 +152,6 @@ export default function PantryScreen({ navigation }: Props) {
         <View style={styles.headerTitleBlock}>
           <Text style={styles.headerTitle} numberOfLines={1}>
             {t('smart_pantry.header_title')}
-          </Text>
-          <Text style={styles.headerSub} numberOfLines={1}>
-            {t('smart_pantry.header_sub')}
           </Text>
         </View>
         {noFamily ? (
@@ -204,8 +246,25 @@ export default function PantryScreen({ navigation }: Props) {
       {/* Main Screen Content */}
       <ScrollView
         style={styles.scrollArea}
-        contentContainerStyle={styles.contentContainer}
-        showsVerticalScrollIndicator={false}>
+        contentContainerStyle={[
+          styles.contentContainer,
+          // Lets the meals tab be pulled down even when its content is shorter
+          // than the viewport, which is what makes the gesture discoverable.
+          activeTab === 'meals' && styles.contentContainerFill,
+        ]}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          // Only the meals tab refetches on pull; the other tabs have their own
+          // refresh paths and no pull gesture today.
+          activeTab === 'meals' ? (
+            <RefreshControl
+              refreshing={mealsRefreshing}
+              onRefresh={refreshMealPlan}
+              tintColor={styles.backIcon.color}
+              colors={[styles.backIcon.color]}
+            />
+          ) : undefined
+        }>
         {loading ? (
           <View style={{ paddingTop: 8 }}>
             <SkeletonHeroCard />
@@ -340,8 +399,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     backIcon: { color: colors.textPrimary },
     // minWidth 0 lets the title block actually shrink instead of pushing the
-    // Add & Scan button off the row on long translations. justifyContent centers
-    // the two text lines as a block against the taller back button beside them.
+    // Add & Scan button off the row on long translations.
     headerTitleBlock: {
       flex: 1,
       minWidth: 0,
@@ -350,16 +408,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     headerTitle: {
       fontFamily: fonts.sansBold,
-      fontSize: 22,
-      lineHeight: 24,
+      fontSize: 16,
+      lineHeight: 20,
       color: colors.textPrimary,
-    },
-    headerSub: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 13,
-      lineHeight: 16,
-      color: colors.textMuted,
-      marginTop: 1,
     },
     headerAddBtn: {
       backgroundColor: colors.primary,
@@ -439,4 +490,5 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     tabChipText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary },
     tabChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     contentContainer: { paddingHorizontal: spacing.md, paddingBottom: spacing.xxl },
+    contentContainerFill: { flexGrow: 1 },
   });

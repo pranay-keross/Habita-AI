@@ -5,6 +5,7 @@ import { ALLERGEN_DEFINITIONS, MOCK_ZERO_WASTE_RECIPES } from '../data/mockPantr
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
+import { makePantryTokens } from '../constants/colors';
 import ChefHat from 'lucide-react-native/icons/chef-hat';
 import Timer from 'lucide-react-native/icons/timer';
 import X from 'lucide-react-native/icons/x';
@@ -208,7 +209,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     emptyContainer: { alignItems: 'center', paddingVertical: 32, backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border },
     emptyTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary, textAlign: 'center' },
     emptySub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted, marginTop: 4, textAlign: 'center', paddingHorizontal: 16 },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalOverlay: { flex: 1, backgroundColor: makePantryTokens(colors).scrim, justifyContent: 'flex-end' },
     modalSheet: { backgroundColor: colors.surface, borderTopLeftRadius: 24, borderTopRightRadius: 24, padding: spacing.lg },
     modalHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
     modalTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textPrimary },
