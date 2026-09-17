@@ -1097,7 +1097,10 @@
     "expires_in_days": "Vence en {{days}} día(s) · Cant.: {{qty}} {{unit}}",
     "expires_in_days_loc": "Vence en {{days}} días · {{location}}",
     "expires_on_date": "Vence el {{date}} ({{days}} días restantes)",
-    "storage_location_prefix": "Ubicación: {{location}}"
+    "storage_location_prefix": "Ubicación: {{location}}",
+    "no_family_title": "Únete a una familia primero",
+    "no_family_banner_message": "Crea o únete a una familia para añadir artículos de despensa, escanear compras y controlar caducidades.",
+    "go_to_family": "Ir a Familia"
   },
   "voice_assistant": {
     "header_title": "Asistente de Voz",

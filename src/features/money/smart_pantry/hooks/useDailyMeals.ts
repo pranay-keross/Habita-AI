@@ -32,67 +32,78 @@ export function useDailyMeals({ onStockChanged }: Options = {}) {
   // Guards against duplicate in-flight requests (double taps, re-renders).
   const inFlight = useRef(false);
 
-  const load = useCallback(
-    async (preference?: string) => {
+  /**
+   * Single fetch path for the plan, so the three entry points can't drift apart:
+   * - `initial` shows the full-screen loading state and clears the plan on failure.
+   * - `pull`    re-fetches the cached plan behind a refresh spinner, keeping the
+   *             meals already on screen if it fails. Costs no refresh quota.
+   * - `regenerate` asks the backend for a new plan, consuming one `refreshesLeft`.
+   */
+  const fetchPlan = useCallback(
+    async (preference: string | undefined, mode: 'initial' | 'pull' | 'regenerate') => {
       if (inFlight.current) {
         return;
       }
       inFlight.current = true;
-      setLoading(true);
+      if (mode === 'initial') {
+        setLoading(true);
+      } else {
+        setRefreshing(true);
+      }
       setError(null);
 
       try {
         const token = await getAccessToken();
         if (!token) {
           setError('Please sign in to see meal suggestions from your pantry.');
-          setPlan(null);
+          if (mode === 'initial') {
+            setPlan(null);
+          }
           return;
         }
-        const result = await getDailyMealsRemote(
-          token,
-          preference !== undefined ? preference : dietaryPreference,
-        );
+        const resolvedPreference = preference !== undefined ? preference : dietaryPreference;
+        const result =
+          mode === 'regenerate'
+            ? await refreshDailyMealsRemote(token, resolvedPreference)
+            : await getDailyMealsRemote(token, resolvedPreference);
         setPlan(result);
       } catch (err) {
         setError(pantryErrorMessage(err));
-        setPlan(null);
+        if (mode === 'initial') {
+          setPlan(null);
+        }
       } finally {
         inFlight.current = false;
-        setLoading(false);
+        if (mode === 'initial') {
+          setLoading(false);
+        } else {
+          setRefreshing(false);
+        }
       }
     },
     [getAccessToken, dietaryPreference],
+  );
+
+  const load = useCallback(
+    (preference?: string) => fetchPlan(preference, 'initial'),
+    [fetchPlan],
   );
 
   const refresh = useCallback(
-    async (preference?: string) => {
-      if (inFlight.current) {
-        return;
-      }
-      inFlight.current = true;
-      setRefreshing(true);
-      setError(null);
-
-      try {
-        const token = await getAccessToken();
-        if (!token) {
-          setError('Please sign in to see meal suggestions from your pantry.');
-          return;
-        }
-        const result = await refreshDailyMealsRemote(
-          token,
-          preference !== undefined ? preference : dietaryPreference,
-        );
-        setPlan(result);
-      } catch (err) {
-        setError(pantryErrorMessage(err));
-      } finally {
-        inFlight.current = false;
-        setRefreshing(false);
-      }
-    },
-    [getAccessToken, dietaryPreference],
+    (preference?: string) => fetchPlan(preference, 'regenerate'),
+    [fetchPlan],
   );
+
+  /**
+   * Pull-to-refresh / auto-refresh entry point. Regenerating burns one of the
+   * household's daily refreshes, so it is only worth it when the plan is actually
+   * out of date and quota remains; otherwise this re-reads the cached plan, which
+   * is free and still picks up a plan that was generated after the first fetch.
+   */
+  const refreshPlan = useCallback(async () => {
+    const outdated = !plan || plan.stale || plan.pantryEmpty;
+    await fetchPlan(undefined, outdated && (plan?.refreshesLeft ?? 0) > 0 ? 'regenerate' : 'pull');
+  }, [fetchPlan, plan]);
 
   const changeDietaryPreference = useCallback(
     async (preference: string) => {
@@ -184,6 +195,7 @@ export function useDailyMeals({ onStockChanged }: Options = {}) {
     setDietaryPreference: changeDietaryPreference,
     reload: load,
     refresh,
+    refreshPlan,
     loadMealDetail,
     markCooked,
   };

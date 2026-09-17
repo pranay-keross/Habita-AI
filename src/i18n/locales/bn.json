@@ -1097,7 +1097,10 @@
     "expires_in_days": "{{days}} দিনে মেয়াদ শেষ · পরিমাণ: {{qty}} {{unit}}",
     "expires_in_days_loc": "{{days}} দিনে মেয়াদ শেষ · {{location}}",
     "expires_on_date": "{{date}} তারিখে মেয়াদ শেষ ({{days}} দিন বাকি)",
-    "storage_location_prefix": "সংরক্ষণ: {{location}}"
+    "storage_location_prefix": "সংরক্ষণ: {{location}}",
+    "no_family_title": "প্রথমে একটি পরিবারে যোগ দিন",
+    "no_family_banner_message": "প্যান্ট্রি আইটেম যোগ করতে, মুদি স্ক্যান করতে এবং মেয়াদ ট্র্যাক করতে একটি পরিবার তৈরি করুন বা যোগ দিন।",
+    "go_to_family": "পরিবারে যান"
   },
   "voice_assistant": {
     "header_title": "ভয়েস অ্যাসিস্ট্যান্ট",

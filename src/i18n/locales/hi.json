@@ -1097,7 +1097,10 @@
     "expires_in_days": "{{days}} दिन(ों) में समाप्त · मात्रा: {{qty}} {{unit}}",
     "expires_in_days_loc": "{{days}} दिनों में समाप्त · {{location}}",
     "expires_on_date": "{{date}} को समाप्त ({{days}} दिन शेष)",
-    "storage_location_prefix": "भंडारण: {{location}}"
+    "storage_location_prefix": "भंडारण: {{location}}",
+    "no_family_title": "पहले एक परिवार से जुड़ें",
+    "no_family_banner_message": "पैंट्री आइटम जोड़ने, किराने का सामान स्कैन करने और समाप्ति ट्रैक करने के लिए परिवार बनाएं या जुड़ें।",
+    "go_to_family": "परिवार पर जाएं"
   },
   "voice_assistant": {
     "header_title": "वॉयस असिस्टेंट",

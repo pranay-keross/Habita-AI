@@ -902,7 +902,10 @@
     "expires_in_days": "{{days}} நாட்களில் காலாவதியாகும் · அளவு: {{qty}} {{unit}}",
     "expires_in_days_loc": "{{days}} நாட்களில் காலாவதியாகும் · {{location}}",
     "expires_on_date": "{{date}} அன்று காலாவதி ({{days}} நாட்கள் மீதம்)",
-    "storage_location_prefix": "சேமிப்பிடம்: {{location}}"
+    "storage_location_prefix": "சேமிப்பிடம்: {{location}}",
+    "no_family_title": "முதலில் ஒரு குடும்பத்தில் சேரவும்",
+    "no_family_banner_message": "பேண்ட்ரி பொருட்களைச் சேர்க்க, பொருட்களை ஸ்கேன் செய்ய, மற்றும் காலாவதியைக் கண்காணிக்க ஒரு குடும்பத்தை உருவாக்கவும் அல்லது சேரவும்.",
+    "go_to_family": "குடும்பத்திற்குச் செல்லவும்"
   },
   "voice_assistant": {
     "listening": "கேட�கிறத�...",

@@ -13,6 +13,7 @@ import { DailyMeal, MealIngredient } from '../types';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
+import { makePantryTokens } from '../constants/colors';
 import ChefHat from 'lucide-react-native/icons/chef-hat';
 import Timer from 'lucide-react-native/icons/timer';
 import Flame from 'lucide-react-native/icons/flame';
@@ -46,6 +47,14 @@ const MEAL_SECTIONS: { key: string; labelKey: string; label: string; icon: strin
   { key: 'dinner', labelKey: 'smart_pantry.meal_dinner', label: 'Dinner', icon: '🥣' },
   { key: 'snack', labelKey: 'smart_pantry.meal_snack', label: 'Snack', icon: '🍎' },
 ];
+
+const OTHER_SECTION = { key: 'other', labelKey: 'smart_pantry.meal_other', label: 'Other', icon: '🍽️' };
+
+/** Backend mealType strings are matched case/whitespace-insensitively so a casing
+ * difference (e.g. "Breakfast") never silently drops a meal from every section. */
+function normalizeMealType(mealType: string): string {
+  return (mealType || '').trim().toLowerCase();
+}
 
 function formatQuantity(value: number): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '';
@@ -247,9 +256,24 @@ export const DailyMealsView: React.FC<Props> = ({
         </View>
       )}
 
-      {/* Meal sections grouped by meal type */}
-      {MEAL_SECTIONS.map((section) => {
-        const sectionMeals = meals.filter((m) => m.mealType === section.key);
+      {/* Meal sections grouped by meal type; anything that doesn't match a known
+          type (unexpected casing, a backend synonym) falls into "Other" instead
+          of being silently dropped from every section. */}
+      {(() => {
+        const matchedIds = new Set<string>();
+        const knownSections = MEAL_SECTIONS.map((section) => {
+          const sectionMeals = meals.filter(
+            (m) => normalizeMealType(m.mealType) === section.key,
+          );
+          sectionMeals.forEach((m) => matchedIds.add(m.id));
+          return { section, sectionMeals };
+        });
+        const leftover = meals.filter((m) => !matchedIds.has(m.id));
+        const allSections = leftover.length > 0
+          ? [...knownSections, { section: OTHER_SECTION, sectionMeals: leftover }]
+          : knownSections;
+
+        return allSections.map(({ section, sectionMeals }) => {
         if (sectionMeals.length === 0) {
           return null;
         }
@@ -325,7 +349,8 @@ export const DailyMealsView: React.FC<Props> = ({
             ))}
           </View>
         );
-      })}
+        });
+      })()}
 
       {nutritionDisclaimer ? (
         <Text style={styles.disclaimer}>{nutritionDisclaimer}</Text>
@@ -631,7 +656,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginTop: 6,
     },
     stateBtnText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textOnPrimary },
-    modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.5)', justifyContent: 'flex-end' },
+    modalOverlay: { flex: 1, backgroundColor: makePantryTokens(colors).scrim, justifyContent: 'flex-end' },
     modalSheet: {
       maxHeight: '88%',
       backgroundColor: colors.surface,

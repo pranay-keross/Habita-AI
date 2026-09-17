@@ -1047,6 +1047,7 @@
     "meal_lunch": "Lunch",
     "meal_dinner": "Dinner",
     "meal_snack": "Snack",
+    "meal_other": "Other",
     "daily_meals_title": "Today's Healthy Meals",
     "daily_meals_sub": "Built from the ingredients already in your pantry.",
     "view_recipe": "View Recipe",
@@ -1226,7 +1227,10 @@
     "expires_in_days": "Expires in {{days}} day(s) · Qty: {{qty}} {{unit}}",
     "expires_in_days_loc": "Expires in {{days}} days · {{location}}",
     "expires_on_date": "Expires on {{date}} ({{days}} days remaining)",
-    "storage_location_prefix": "Storage: {{location}}"
+    "storage_location_prefix": "Storage: {{location}}",
+    "no_family_title": "Join a family first",
+    "no_family_banner_message": "Set up or join a family to add pantry items, scan groceries, and track expiry.",
+    "go_to_family": "Go to Family"
   },
   "voice_assistant": {
     "header_title": "Voice Assistant",

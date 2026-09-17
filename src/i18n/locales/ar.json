@@ -1097,7 +1097,10 @@
     "expires_in_days": "ينتهي خلال {{days}} يوم/أيام · الكمية: {{qty}} {{unit}}",
     "expires_in_days_loc": "ينتهي خلال {{days}} يوم/أيام · {{location}}",
     "expires_on_date": "ينتهي في {{date}} (متبقي {{days}} يوم/أيام)",
-    "storage_location_prefix": "التخزين: {{location}}"
+    "storage_location_prefix": "التخزين: {{location}}",
+    "no_family_title": "انضم إلى عائلة أولاً",
+    "no_family_banner_message": "أنشئ عائلة أو انضم إليها لإضافة عناصر المخزن ومسح المشتريات ومتابعة تواريخ الانتهاء.",
+    "go_to_family": "الذهاب إلى العائلة"
   },
   "voice_assistant": {
     "header_title": "المساعد الصوتي",
