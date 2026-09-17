@@ -19,6 +19,7 @@ import type {
   TripInput,
   TripOutfitEntry,
   TripOutfitInput,
+  TryOnResult,
   WardrobeCollection,
   WardrobeItemSuggestion,
   WardrobeTrip,
@@ -198,6 +199,11 @@ export function generateOutfitRecommendation(input: GenerateOutfitInput, token: 
 /** One conversational turn with the AI stylist (style topics only, server-enforced). */
 export function sendStyleMessage(input: StyleChatInput, token: Token): Promise<WriteResult<StyleChatReply>> {
   return write('sendStyleMessage', token, tk => api.styleChat(input, tk));
+}
+
+/** Never cached — a fresh, disposable result every time the user tries something on. */
+export function tryOnOutfit(photo: PickedFile, itemIds: string[], token: Token): Promise<WriteResult<TryOnResult>> {
+  return write('tryOnOutfit', token, tk => api.tryOnOutfit(photo, itemIds, tk));
 }
 
 interface TodayOutfitCache {

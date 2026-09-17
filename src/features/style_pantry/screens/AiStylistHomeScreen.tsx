@@ -28,6 +28,7 @@ import RefreshCw from 'lucide-react-native/icons/refresh-cw';
 import Shirt from 'lucide-react-native/icons/shirt';
 import BottomSheet from '../../../components/BottomSheet';
 import Button from '../../../components/Button';
+import TryOnSheet from '../components/TryOnSheet';
 import { SkeletonBox, SkeletonText } from '../../../components/Skeleton';
 import {
   loadClothingItems,
@@ -85,6 +86,7 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
     useState<OutfitRecommendation | null>(null);
   const [outfitError, setOutfitError] = useState<StoreError | null>(null);
   const [comingSoon, setComingSoon] = useState<string | null>(null);
+  const [tryOnTarget, setTryOnTarget] = useState<OutfitRecommendation | null>(null);
   const [regenerating, regenerate] = useBusy();
   const [wearing, wear] = useBusy();
 
@@ -315,6 +317,18 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
     { key: 'qa_try_on', Icon: Camera },
   ];
 
+  const handleLabPress = (key: string) => {
+    if (key !== 'qa_try_on') {
+      setComingSoon(t(`ai_stylist.${key}`));
+      return;
+    }
+    if (recommendation) {
+      setTryOnTarget(recommendation);
+      return;
+    }
+    Alert.alert(t('ai_stylist.qa_try_on'), t('style_pantry.try_on_needs_look'));
+  };
+
   return (
     <View style={styles.root}>
       <WardrobeHeader
@@ -488,7 +502,7 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
             <Pressable
               key={key}
               style={styles.labChip}
-              onPress={() => setComingSoon(t(`ai_stylist.${key}`))}
+              onPress={() => handleLabPress(key)}
               accessibilityRole="button"
               accessibilityLabel={t(`ai_stylist.${key}`)}
             >
@@ -511,6 +525,12 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
           style={styles.comingSoonBtn}
         />
       </BottomSheet>
+
+      <TryOnSheet
+        visible={!!tryOnTarget}
+        outfit={tryOnTarget}
+        onClose={() => setTryOnTarget(null)}
+      />
     </View>
   );
 }

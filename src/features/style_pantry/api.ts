@@ -19,6 +19,7 @@ import type {
   TripInput,
   TripOutfitEntry,
   TripOutfitInput,
+  TryOnResult,
   WardrobeCollection,
   WardrobeItemSuggestion,
   WardrobeTrip,
@@ -529,6 +530,30 @@ export async function updateTripChecklistItem(
 /** DELETE /api/style/trips/{tripId}/checklist/{itemId} */
 export async function deleteTripChecklistItem(tripId: string, itemId: string, token: string): Promise<void> {
   await apiFetch<void>(`/style/trips/${tripId}/checklist/${itemId}`, { method: 'DELETE', token });
+}
+
+// ---------------------------------------------------------------------------
+// Virtual try-on
+// ---------------------------------------------------------------------------
+
+/**
+ * POST /api/style/try-on (multipart: `photo` file + repeated `itemIds` fields) — the
+ * server edits the caller's photo to show them wearing the given closet items. Nothing
+ * is persisted; the returned image lives only in memory on the client.
+ */
+export async function tryOnOutfit(photo: PickedFile, itemIds: string[], token: string): Promise<TryOnResult> {
+  const form = new FormData();
+  form.append('photo', {
+    uri: photo.uri,
+    name: photo.name || 'photo.jpg',
+    type: photo.type || 'image/jpeg',
+  } as unknown as Blob);
+  for (const id of itemIds) {
+    form.append('itemIds', id);
+  }
+
+  const raw = await postMultipart<{ imageBase64: string; mimeType: string }>('/style/try-on', form, token, 'POST');
+  return { imageDataUri: `data:${raw.mimeType};base64,${raw.imageBase64}` };
 }
 
 export { ApiError } from '../auth/api';

@@ -66,6 +66,19 @@ export function guessIsLiquid(dosage: string): boolean {
   return LIQUID_DOSAGE_HINTS.some((hint) => lower.includes(hint));
 }
 
+// The backend's `doseQuantity` (e.g. `10` for "10ml", `2` for "2 tablets") is a required
+// numeric field with no dedicated input in this screen — derived from the leading number
+// in the free-text dosage string the user already types. Falls back to 1 (never 0/null,
+// which the backend rejects as `doseQuantity: must not be null`) when no number is found.
+export function parseDoseQuantity(dosage: string): number {
+  const match = dosage.match(/\d+(\.\d+)?/);
+  if (!match) {
+    return 1;
+  }
+  const parsed = parseFloat(match[0]);
+  return Number.isFinite(parsed) && parsed > 0 ? parsed : 1;
+}
+
 export function isTakenToday(
   log: IntakeLogEntry[],
   medicineId: string,

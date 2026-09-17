@@ -26,7 +26,7 @@ import {
   type MedicalDocument,
   type RemoteMedicine,
 } from './api';
-import { guessIsLiquid, loadLiquidFlags, saveLiquidFlags } from './medicineStore';
+import { guessIsLiquid, loadLiquidFlags, parseDoseQuantity, saveLiquidFlags } from './medicineStore';
 import MedicineQuantitySheet from './MedicineQuantitySheet';
 import { timeToSlot } from './types';
 
@@ -444,6 +444,8 @@ export default function PrescriptionsScreen({ navigation, route }: Props) {
           dosage: item.dosage,
           scheduleTimes: scheduleTimesMap,
           stockQuantity: qty,
+          medicineType: item.isLiquid ? 'LIQUID' : 'TABLET',
+          doseQuantity: parseDoseQuantity(item.dosage),
           lowStockThreshold: item.lowStockThreshold ?? 3,
         },
         token,

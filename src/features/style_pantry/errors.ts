@@ -42,6 +42,13 @@ const KNOWN_CODES = new Set([
   'VISION_UNAVAILABLE',
   'VISION_FAILED',
   'NO_IMAGE_PROVIDED',
+  'NO_PHOTO_PROVIDED',
+  'NO_ITEMS_PROVIDED',
+  'TOO_MANY_ITEMS',
+  'NO_ITEM_PHOTOS',
+  'TRY_ON_UNAVAILABLE',
+  'TRY_ON_FAILED',
+  'INVALID_PHOTO',
 ]);
 
 export function toStoreError(err: unknown): StoreError {

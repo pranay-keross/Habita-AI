@@ -32,15 +32,23 @@ export interface FamilyProfile {
   dateOfBirth: string; // "YYYY-MM-DD"
 }
 
+// TABLET/LIQUID only — confirmed against the backend's `MedicineType` enum
+// (`medchest/entity/MedicineType.java`).
+export type MedicineType = 'TABLET' | 'LIQUID';
+
 export interface RemoteMedicine {
   id: string;
   name: string;
-  dosage: string;
+  // Not part of the backend's response contract (`MedicineSummaryResponse` has no
+  // `dosage`/`medicineType` field) — present only for older/local-only data shapes.
+  dosage?: string;
   scheduleTimes: string[] | Record<string, string>; // "HH:MM", 24-hour array or slot-time map object
   // Nullable defensively — see `normalizeStockQuantity` below. A medicine just
   // auto-created from a parsed prescription may have no confirmed count yet.
   stockQuantity: number | null;
   lowStockThreshold: number | null;
+  // Echoes the request's `doseQuantity` (e.g. `10` for "10ml", `2` for "2 tablets").
+  dosageQuantity?: number | null;
   // `lowStock`/`adherenceRate` are computed server-side and returned on every
   // create/list/update response — unlike the local model's `calculateAdherence`, these
   // are not meant to be derived client-side once this is wired up for real.
@@ -84,9 +92,15 @@ export function parseAdherenceRate(raw: string | number | null | undefined): num
 
 export interface CreateOrUpdateMedicineInput {
   name: string;
+  // Not part of the backend's `MedicineRequest` contract — harmless extra field, kept
+  // only so callers can still round-trip local display text.
   dosage: string;
   scheduleTimes: Record<string, string>;
   stockQuantity: number;
+  // Both required by the backend (400 "medicineType: must not be null" /
+  // "doseQuantity: must not be null" otherwise) — see `medchest/dto/MedicineRequest.java`.
+  medicineType: MedicineType;
+  doseQuantity: number;
   lowStockThreshold: number;
 }
 

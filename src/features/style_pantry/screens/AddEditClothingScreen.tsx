@@ -14,7 +14,6 @@ import {
 } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { launchCamera, launchImageLibrary } from 'react-native-image-picker';
-import { keepLocalCopy } from '@react-native-documents/picker';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
@@ -41,6 +40,7 @@ import ItemThumb from '../components/ItemThumb';
 import OfflineBanner from '../components/OfflineBanner';
 import PhotoSuggestionSheet, { type SuggestionStatus } from '../components/PhotoSuggestionSheet';
 import { CATEGORY_ICON_KEYS, getClothingIconComponent } from '../clothingIcons';
+import { resolveLocalUri } from '../photo';
 import {
   CLOTHING_CATEGORIES,
   CLOTHING_SEASONS,
@@ -55,26 +55,6 @@ import {
 import { t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'AddEditClothing'>;
-
-// On iOS the picker can return asset-library URIs (ph://) that a later multipart
-// upload can't read from directly — copy a local cache copy first.
-async function resolveLocalUri(uri: string, fileName: string): Promise<string> {
-  if (!uri.startsWith('ph://') && !uri.startsWith('assets-library://')) {
-    return uri;
-  }
-  try {
-    const copies = await keepLocalCopy({
-      files: [{ uri, fileName }],
-      destination: 'cachesDirectory',
-    });
-    if (copies && copies[0] && copies[0].status === 'success') {
-      return copies[0].localUri;
-    }
-  } catch {
-    // fall back to the original uri and let the upload surface any error
-  }
-  return uri;
-}
 
 function parsePrice(value: string): { ok: true; price?: number } | { ok: false } {
   const trimmed = value.trim();

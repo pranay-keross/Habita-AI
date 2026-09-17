@@ -224,6 +224,16 @@ export interface WardrobeItemSuggestion {
   note?: string;
 }
 
+// ---------------------------------------------------------------------------
+// Virtual try-on (POST /api/style/try-on) — nothing is persisted server-side; the
+// generated image is returned inline and held only in memory on the client.
+// ---------------------------------------------------------------------------
+
+export interface TryOnResult {
+  /** A data URI (`data:image/png;base64,...`), renderable directly by `<Image>`. */
+  imageDataUri: string;
+}
+
 export interface WornOutfitEntry {
   id: string;
   date: string; // YYYY-MM-DD

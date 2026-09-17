@@ -2,6 +2,7 @@ import React from 'react';
 import { View, Text, Pressable, StyleSheet, useWindowDimensions } from 'react-native';
 import Bookmark from 'lucide-react-native/icons/bookmark';
 import BookmarkCheck from 'lucide-react-native/icons/bookmark-check';
+import Camera from 'lucide-react-native/icons/camera';
 import ChevronRight from 'lucide-react-native/icons/chevron-right';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
@@ -19,6 +20,7 @@ interface Props {
   onView?: () => void;
   onToggleSave?: () => void;
   onRegenerate?: () => void;
+  onTryOn?: () => void;
   onItemPress?: (item: ClothingItem) => void;
   busy?: boolean;
   /** Hide match rows, note and item rows (the detail screen renders those itself). */
@@ -174,6 +176,7 @@ export default function OutfitShowcase({
   onView,
   onToggleSave,
   onRegenerate,
+  onTryOn,
   onItemPress,
   busy,
   hideMeta,
@@ -272,10 +275,22 @@ export default function OutfitShowcase({
           </>
         ) : null}
 
-        {layout === 'chat' && (onView || onRegenerate) ? (
+        {layout === 'chat' && (onView || onRegenerate || onTryOn) ? (
           <View style={styles.actions}>
             {onView ? (
               <Button title={t('style_pantry.view_outfit_details')} onPress={onView} showArrow />
+            ) : null}
+            {onTryOn ? (
+              <Pressable
+                style={[styles.tryOnBtn, busy && styles.disabled]}
+                onPress={onTryOn}
+                disabled={busy}
+                accessibilityRole="button"
+                accessibilityLabel={t('style_pantry.try_on')}
+              >
+                <Camera size={15} color={styles.accent.color} />
+                <Text style={styles.tryOnBtnText}>{t('style_pantry.try_on')}</Text>
+              </Pressable>
             ) : null}
             {onRegenerate ? (
               <Button
@@ -379,6 +394,17 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
     },
     quoteBar: { width: 3, borderRadius: 2, backgroundColor: colors.primary, alignSelf: 'stretch' },
     quoteText: { flex: 1, fontFamily: fonts.sans, fontSize: 14, lineHeight: 21, color: colors.textPrimary },
+    tryOnBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 6,
+      paddingVertical: spacing.sm + 4,
+      borderRadius: radius.pill,
+      borderWidth: 1,
+      borderColor: colors.borderStrong,
+    },
+    tryOnBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.primary },
     itemList: { marginTop: spacing.md, gap: spacing.xs },
     itemRow: {
       flexDirection: 'row',

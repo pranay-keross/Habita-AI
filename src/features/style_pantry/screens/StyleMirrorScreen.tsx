@@ -40,6 +40,7 @@ import {
   unsaveOutfit,
 } from '../stylePantryStore';
 import OutfitShowcase from '../components/OutfitShowcase';
+import TryOnSheet from '../components/TryOnSheet';
 import ItemThumb from '../components/ItemThumb';
 import { describeStoreError, showStoreErrorAlert } from '../errors';
 import { useBusy, useFocusLoad, useKeyboardHeight, useLocaleRerender } from '../hooks';
@@ -111,6 +112,7 @@ export default function StyleMirrorScreen({ navigation }: Props) {
   const [refineText, setRefineText] = useState('');
   const [selectedMood, setSelectedMood] = useState<Mood>('confident');
   const [savingId, setSavingId] = useState<string | null>(null);
+  const [tryOnOutfitTarget, setTryOnOutfitTarget] = useState<OutfitRecommendation | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const bootstrapped = useRef(false);
 
@@ -443,6 +445,7 @@ export default function StyleMirrorScreen({ navigation }: Props) {
               onView={() => navigation.navigate('OutfitDetails', { outfit: entry.outfit })}
               onToggleSave={() => handleToggleSave(entry.id, entry.outfit)}
               onRegenerate={isLatest ? handleRegenerate : undefined}
+              onTryOn={() => setTryOnOutfitTarget(entry.outfit)}
               onItemPress={item => navigation.navigate('ClothingDetails', { itemId: item.id })}
             />
           </View>
@@ -657,6 +660,12 @@ export default function StyleMirrorScreen({ navigation }: Props) {
         <TextInput style={styles.textInput} value={newLocation} onChangeText={setNewLocation} placeholder={t('style_pantry.occasion_location_placeholder')} placeholderTextColor={styles.placeholder.color} />
         <Button title={t('style_pantry.save_occasion')} onPress={handleSaveOccasion} loading={savingOccasion} style={styles.emptyBtn} />
       </BottomSheet>
+
+      <TryOnSheet
+        visible={!!tryOnOutfitTarget}
+        outfit={tryOnOutfitTarget}
+        onClose={() => setTryOnOutfitTarget(null)}
+      />
     </Root>
   );
 }
