@@ -1762,6 +1762,7 @@
     "outfit_unsaved_msg": "Outfit removed from your saved looks.",
     "saved_outfits_title": "Saved outfits",
     "no_saved_outfits": "No saved outfits yet",
+    "saved_outfits_empty_sub": "Tap the bookmark on any outfit you like to keep it here for later.",
     "no_occasions_title": "No occasions yet",
     "no_occasions_sub": "Add an occasion to get a tailored outfit, or ask for today's look.",
     "generate_for_today": "Style me for today",

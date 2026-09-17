@@ -29,14 +29,15 @@ import { describeStoreError, showStoreErrorAlert } from '../errors';
 import { useBusy, useKeyboardHeight, useLocaleRerender } from '../hooks';
 import WardrobeHeader from '../components/WardrobeHeader';
 import OutfitShowcase from '../components/OutfitShowcase';
-import type { OutfitRecommendation, StyleChatTurn } from '../types';
+import ItemThumb from '../components/ItemThumb';
+import type { ClothingItem, OutfitRecommendation, StyleChatTurn } from '../types';
 import { t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'StyleChat'>;
 
 type ChatMessage =
   | { id: string; role: 'user'; text: string }
-  | { id: string; role: 'assistant'; text: string; outfit?: OutfitRecommendation }
+  | { id: string; role: 'assistant'; text: string; outfit?: OutfitRecommendation; items?: ClothingItem[] }
   | { id: string; role: 'error'; text: string };
 
 const PROMPT_KEYS = ['prompt_colours', 'prompt_loafers', 'prompt_pack', 'prompt_capsule'];
@@ -104,10 +105,10 @@ export default function StyleChatScreen({ navigation }: Props) {
             { id: nextId('e'), role: 'error', text: describeStoreError(result.error) },
           ];
         }
-        const { reply, outfit } = result.data;
+        const { reply, outfit, items } = result.data;
         return [
           ...prev,
-          { id: nextId('a'), role: 'assistant', text: reply, outfit: outfit ?? undefined },
+          { id: nextId('a'), role: 'assistant', text: reply, outfit: outfit ?? undefined, items: items ?? undefined },
         ];
       });
       scrollToEnd();
@@ -201,6 +202,24 @@ export default function StyleChatScreen({ navigation }: Props) {
                 navigation.navigate('ClothingDetails', { itemId: i.id })
               }
             />
+          </View>
+        ) : null}
+        {item.items && item.items.length > 0 ? (
+          <View style={styles.itemsGrid}>
+            {item.items.map(i => (
+              <Pressable
+                key={i.id}
+                style={styles.itemTile}
+                onPress={() => navigation.navigate('ClothingDetails', { itemId: i.id })}
+                accessibilityRole="button"
+                accessibilityLabel={i.name}
+              >
+                <ItemThumb item={i} size={68} radius={14} />
+                <Text style={styles.itemTileText} numberOfLines={1}>
+                  {i.name}
+                </Text>
+              </Pressable>
+            ))}
           </View>
         ) : null}
       </View>
@@ -337,6 +356,21 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
       color: colors.textPrimary,
     },
     outfitCard: { marginLeft: 36, marginTop: -spacing.xs },
+    itemsGrid: {
+      flexDirection: 'row',
+      flexWrap: 'wrap',
+      gap: spacing.sm,
+      marginLeft: 36,
+      marginTop: spacing.xs,
+    },
+    itemTile: { width: 72, alignItems: 'center' },
+    itemTileText: {
+      fontFamily: fonts.sansMedium,
+      fontSize: 11,
+      color: colors.textSecondary,
+      marginTop: 4,
+      textAlign: 'center',
+    },
     userRow: { alignItems: 'flex-end', marginBottom: spacing.md, paddingLeft: spacing.xl },
     userBubble: {
       backgroundColor: colors.primary,

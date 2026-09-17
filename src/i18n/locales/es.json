@@ -1630,6 +1630,7 @@
     "outfit_unsaved_msg": "Conjunto eliminado de tus looks guardados.",
     "saved_outfits_title": "Conjuntos guardados",
     "no_saved_outfits": "Aún no hay conjuntos guardados",
+    "saved_outfits_empty_sub": "Toca el marcador de cualquier conjunto que te guste para guardarlo aquí.",
     "no_occasions_title": "Aún no hay ocasiones",
     "no_occasions_sub": "Añade una ocasión para un conjunto a medida, o pide el look de hoy.",
     "generate_for_today": "Vísteme para hoy",

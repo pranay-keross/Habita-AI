@@ -40,6 +40,7 @@ import {
   unsaveOutfit,
 } from '../stylePantryStore';
 import OutfitShowcase from '../components/OutfitShowcase';
+import ItemThumb from '../components/ItemThumb';
 import { describeStoreError, showStoreErrorAlert } from '../errors';
 import { useBusy, useFocusLoad, useKeyboardHeight, useLocaleRerender } from '../hooks';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -68,6 +69,7 @@ type FeedEntry =
   | { id: string; kind: 'look'; outfit: OutfitRecommendation; note?: string }
   | { id: string; kind: 'request'; text: string }
   | { id: string; kind: 'note'; text: string }
+  | { id: string; kind: 'items'; text: string; items: ClothingItem[] }
   | { id: string; kind: 'error'; text: string };
 
 const REFINE_CHIPS: { key: string; labelKey: string }[] = [
@@ -82,7 +84,7 @@ function toHistory(feed: FeedEntry[]): StyleChatTurn[] {
   const turns: StyleChatTurn[] = [];
   for (const e of feed) {
     if (e.kind === 'request') turns.push({ role: 'user', text: e.text });
-    else if (e.kind === 'note') turns.push({ role: 'assistant', text: e.text });
+    else if (e.kind === 'note' || e.kind === 'items') turns.push({ role: 'assistant', text: e.text });
     else if (e.kind === 'look') turns.push({ role: 'assistant', text: e.note || e.outfit.title });
   }
   return turns;
@@ -230,8 +232,9 @@ export default function StyleMirrorScreen({ navigation }: Props) {
         if (!result.ok) {
           return [...prev, { id: nextId('err'), kind: 'error', text: describeStoreError(result.error) }];
         }
-        const { reply, outfit } = result.data;
+        const { reply, outfit, items } = result.data;
         if (outfit) return [...prev, { id: nextId('look'), kind: 'look', outfit, note: reply }];
+        if (items && items.length > 0) return [...prev, { id: nextId('items'), kind: 'items', text: reply, items }];
         if (reply) return [...prev, { id: nextId('note'), kind: 'note', text: reply }];
         return prev;
       });
@@ -396,6 +399,31 @@ export default function StyleMirrorScreen({ navigation }: Props) {
           <View key={entry.id} style={styles.noteBubble}>
             <Sparkles size={14} color={styles.iconTint.color} />
             <Text style={styles.noteText}>{entry.text}</Text>
+          </View>
+        );
+      case 'items':
+        return (
+          <View key={entry.id}>
+            <View style={styles.noteBubble}>
+              <Sparkles size={14} color={styles.iconTint.color} />
+              <Text style={styles.noteText}>{entry.text}</Text>
+            </View>
+            <View style={styles.itemsGrid}>
+              {entry.items.map(i => (
+                <Pressable
+                  key={i.id}
+                  style={styles.itemTile}
+                  onPress={() => navigation.navigate('ClothingDetails', { itemId: i.id })}
+                  accessibilityRole="button"
+                  accessibilityLabel={i.name}
+                >
+                  <ItemThumb item={i} size={68} radius={14} />
+                  <Text style={styles.itemTileText} numberOfLines={1}>
+                    {i.name}
+                  </Text>
+                </Pressable>
+              ))}
+            </View>
           </View>
         );
       case 'look': {
@@ -739,6 +767,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       marginBottom: spacing.sm,
     },
     noteText: { flex: 1, fontFamily: fonts.sans, fontSize: 13, color: colors.textPrimary, lineHeight: 19 },
+    itemsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.sm, marginBottom: spacing.sm },
+    itemTile: { width: 72, alignItems: 'center' },
+    itemTileText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary, marginTop: 4, textAlign: 'center' },
     errorBubble: {
       alignSelf: 'flex-start',
       maxWidth: '85%',

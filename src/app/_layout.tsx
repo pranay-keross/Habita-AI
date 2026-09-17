@@ -50,6 +50,7 @@ import {
   StyleChatScreen,
   OutfitDetailsScreen,
   StyleLogScreen,
+  SavedOutfitsScreen,
   StyleCalendarScreen,
   TripPlannerScreen,
   TripDetailsScreen,
@@ -129,6 +130,7 @@ export type RootStackParamList = {
   StyleChat: undefined;
   OutfitDetails: { outfit: OutfitRecommendation; readOnly?: boolean };
   StyleLog: undefined;
+  SavedOutfits: undefined;
   StyleCalendar: undefined;
   Trips: undefined;
   TripDetails: { tripId: string };
@@ -291,6 +293,7 @@ const AppLayout = () => {
           <Stack.Screen name="StyleChat" component={StyleChatScreen} />
           <Stack.Screen name="OutfitDetails" component={OutfitDetailsScreen} />
           <Stack.Screen name="StyleLog" component={StyleLogScreen} />
+          <Stack.Screen name="SavedOutfits" component={SavedOutfitsScreen} />
           <Stack.Screen name="StyleCalendar" component={StyleCalendarScreen} />
           <Stack.Screen name="Trips" component={TripPlannerScreen} />
           <Stack.Screen name="TripDetails" component={TripDetailsScreen} />

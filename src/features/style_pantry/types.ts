@@ -197,8 +197,10 @@ export interface StyleChatInput {
 
 export interface StyleChatReply {
   reply: string;
-  /** Present when the stylist proposed an outfit from the closet. */
+  /** Present when the stylist proposed a complete outfit from the closet. */
   outfit?: OutfitRecommendation;
+  /** Present when the stylist answered an inventory question (e.g. "show me my sneakers") — real owned items, not necessarily a full outfit. */
+  items?: ClothingItem[];
 }
 
 // ---------------------------------------------------------------------------

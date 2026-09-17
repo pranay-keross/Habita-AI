@@ -330,7 +330,11 @@ export async function generateOutfit(input: GenerateOutfitInput, token: string):
  * get a polite redirect; style questions may come back with an outfit from the closet.
  */
 export async function styleChat(input: StyleChatInput, token: string): Promise<StyleChatReply> {
-  const raw = await apiFetch<{ reply: string | null; outfit: Nullable<OutfitRecommendation> | null }>('/style/chat', {
+  const raw = await apiFetch<{
+    reply: string | null;
+    outfit: Nullable<OutfitRecommendation> | null;
+    items: Nullable<ClothingItem>[] | null;
+  }>('/style/chat', {
     method: 'POST',
     body: {
       message: input.message,
@@ -346,6 +350,7 @@ export async function styleChat(input: StyleChatInput, token: string): Promise<S
   return {
     reply: raw.reply ?? '',
     outfit: raw.outfit ? toOutfit(raw.outfit) : undefined,
+    items: raw.items && raw.items.length > 0 ? raw.items.map(toItem) : undefined,
   };
 }
 

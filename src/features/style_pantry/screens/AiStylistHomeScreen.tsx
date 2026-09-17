@@ -400,11 +400,17 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
 
         <View style={styles.statsRow}>
           {[
-            { key: 'stat_items', value: owned.length },
-            { key: 'stat_saved', value: savedCount },
-            { key: 'stat_worn_week', value: wornThisWeek },
+            { key: 'stat_items', value: owned.length, onPress: () => navigation.navigate('Wardrobe') },
+            { key: 'stat_saved', value: savedCount, onPress: () => navigation.navigate('SavedOutfits') },
+            { key: 'stat_worn_week', value: wornThisWeek, onPress: () => navigation.navigate('StyleLog') },
           ].map((s, i) => (
-            <View key={s.key} style={[styles.statTile, i > 0 && styles.statTileSpaced]}>
+            <Pressable
+              key={s.key}
+              style={[styles.statTile, i > 0 && styles.statTileSpaced]}
+              onPress={s.onPress}
+              accessibilityRole="button"
+              accessibilityLabel={t(`ai_stylist.${s.key}`)}
+            >
               {loading ? (
                 <SkeletonText width="40%" height={20} />
               ) : (
@@ -413,7 +419,7 @@ export default function AiStylistHomeScreen({ navigation }: Props) {
               <Text style={styles.statLabel} numberOfLines={2}>
                 {t(`ai_stylist.${s.key}`)}
               </Text>
-            </View>
+            </Pressable>
           ))}
         </View>
 
