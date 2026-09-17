@@ -1,635 +1,383 @@
 import { getItem, setItem } from '../../utils/storage';
-import { isNetworkError } from '../../utils/networkStatus';
-import {
-  createOccasion,
-  createWardrobeItem,
-  deleteOccasion,
-  deleteSavedOutfit,
-  deleteWardrobeItem,
-  generateOutfitRecommendationRemote,
-  getWeather,
-  listOccasions,
-  listSavedOutfits,
-  listStyleHistory,
-  listWardrobeItems,
-  recordStyleHistoryEntry,
-  recordWearEvent,
-  saveOutfitRemote,
-  updateWardrobeItem,
-} from './api';
+import { todayString } from '../../utils/date';
+import { t } from '../../i18n';
+import * as api from './api';
+import { NETWORK_ERROR, NO_SESSION_ERROR, toStoreError, type StoreError } from './errors';
 import type {
-  ClothingItem,
-  ClothingCategory,
-  ClothingItemInput,
   CalendarEvent,
-  CreateOccasionRequest,
-  Mood,
-  PickedFile,
-  WeatherContext,
+  ClothingItem,
+  ClothingItemInput,
+  CollectionInput,
+  GenerateOutfitInput,
+  OccasionInput,
   OutfitRecommendation,
+  PickedFile,
+  StyleChatInput,
+  StyleChatReply,
+  TripChecklistInput,
+  TripChecklistItem,
+  TripInput,
+  TripOutfitEntry,
+  TripOutfitInput,
+  WardrobeCollection,
+  WardrobeItemSuggestion,
+  WardrobeTrip,
+  WeatherContext,
   WornOutfitEntry,
 } from './types';
 
-const CLOSET_STORAGE_KEY = 'habita.style_pantry_items';
-const SAVED_OUTFITS_KEY = 'habita.style_pantry_saved_outfits';
-const OCCASIONS_STORAGE_KEY = 'habita.style_pantry_occasions';
-const STYLE_HISTORY_STORAGE_KEY = 'habita.style_pantry_history';
+/**
+ * Wardrobe sync layer. The server is authoritative:
+ *
+ * - Reads try the server, refresh the AsyncStorage cache, and return `{data, offline:false}`.
+ *   If the server is unreachable they return the last cached data with `offline: true`;
+ *   on a real HTTP error they return cached data plus `error`.
+ * - Writes require a session and a reachable server. On success the cache is updated
+ *   from the server response and `{ok:true, data}` is returned; on failure nothing is
+ *   written locally and `{ok:false, offline, error}` says why.
+ *
+ * No seed/mock data ever enters the cache — an empty closet is a valid state.
+ */
 
-// Local/offline fallback data — kept as the manual fallback per docs/BACKLOG.md M8-T4
-// ("each hook-point's manual/local fallback must keep working if the AI call fails"),
-// used whenever there's no token or the backend call fails.
-export const MOCK_WEATHER: WeatherContext = {
-  temperature: 28,
-  condition: 'sunny',
-  description: '28°C · Sunny & Pleasant',
-  icon: 'sun',
-};
-
-export const MOCK_EVENTS: CalendarEvent[] = [
-  {
-    id: 'evt_1',
-    title: 'Office Strategy Meeting',
-    date: new Date().toISOString().split('T')[0],
-    time: '10:00 AM',
-    eventType: 'office',
-    location: 'Conference Room A',
-  },
-  {
-    id: 'evt_2',
-    title: 'Client Lunch',
-    date: new Date().toISOString().split('T')[0],
-    time: '1:30 PM',
-    eventType: 'formal',
-    location: 'Taj Bengal Bistro',
-  },
-  {
-    id: 'evt_3',
-    title: 'Evening Celebration Party',
-    date: new Date().toISOString().split('T')[0],
-    time: '8:00 PM',
-    eventType: 'party',
-    location: 'Rooftop Lounge',
-  },
-  {
-    id: 'evt_4',
-    title: 'Weekend Casual Gathering',
-    date: new Date().toISOString().split('T')[0],
-    time: '5:00 PM',
-    eventType: 'casual',
-    location: 'Park Cafe',
-  },
-];
-
-export const INITIAL_CLOTHING: ClothingItem[] = [
-  {
-    id: 'c_1',
-    name: 'Oxford Cotton Shirt',
-    category: 'tops',
-    color: 'White',
-    brand: 'Brooks Brothers',
-    season: 'all-year',
-    material: '100% Premium Cotton',
-    tags: ['office', 'formal', 'meeting'],
-    emoji: 'shirt',
-    wearCount: 14,
-    lastWornDate: '2026-08-10',
-  },
-  {
-    id: 'c_2',
-    name: 'Tailored Slim Trousers',
-    category: 'bottoms',
-    color: 'Charcoal Black',
-    brand: 'Raymond',
-    season: 'all-year',
-    material: 'Wool Blend',
-    tags: ['office', 'formal', 'meeting', 'party'],
-    emoji: 'pants',
-    wearCount: 18,
-    lastWornDate: '2026-08-12',
-  },
-  {
-    id: 'c_3',
-    name: 'Italian Leather Loafers',
-    category: 'shoes',
-    color: 'Tan Brown',
-    brand: 'Clarks',
-    season: 'all-year',
-    material: 'Genuine Leather',
-    tags: ['office', 'formal', 'casual'],
-    emoji: 'shoes',
-    wearCount: 22,
-    lastWornDate: '2026-08-15',
-  },
-  {
-    id: 'c_4',
-    name: 'Single-Breasted Blazer',
-    category: 'jackets',
-    color: 'Navy Blue',
-    brand: 'Zara Man',
-    season: 'winter',
-    material: 'Blended Wool',
-    tags: ['office', 'formal', 'meeting'],
-    emoji: 'jacket',
-    wearCount: 8,
-    lastWornDate: '2026-08-01',
-  },
-  {
-    id: 'c_5',
-    name: 'Swiss Chronograph Watch',
-    category: 'accessories',
-    color: 'Silver & Blue',
-    brand: 'Tissot',
-    season: 'all-year',
-    material: 'Stainless Steel',
-    tags: ['office', 'formal', 'party', 'casual'],
-    emoji: 'watch',
-    wearCount: 35,
-    lastWornDate: '2026-08-17',
-  },
-  {
-    id: 'c_6',
-    name: 'Linen Graphic Polo',
-    category: 'tops',
-    color: 'Olive Green',
-    brand: 'Uniqlo',
-    season: 'summer',
-    material: 'Linen Cotton',
-    tags: ['casual', 'party', 'workout'],
-    emoji: 'shirt',
-    wearCount: 10,
-    lastWornDate: '2026-08-14',
-  },
-  {
-    id: 'c_7',
-    name: 'Slim Fit Denim Jeans',
-    category: 'bottoms',
-    color: 'Indigo Blue',
-    brand: "Levi's",
-    season: 'all-year',
-    material: 'Stretch Denim',
-    tags: ['casual', 'party'],
-    emoji: 'pants',
-    wearCount: 26,
-    lastWornDate: '2026-08-16',
-  },
-  {
-    id: 'c_8',
-    name: 'White Leather Sneakers',
-    category: 'shoes',
-    color: 'Pure White',
-    brand: 'Adidas Stan Smith',
-    season: 'all-year',
-    material: 'Leather & Rubber',
-    tags: ['casual', 'party', 'workout'],
-    emoji: 'shoes',
-    wearCount: 30,
-    lastWornDate: '2026-08-16',
-  },
-];
-
-export async function loadClothingItems(
-  token?: string | null,
-): Promise<ClothingItem[]> {
-  if (token) {
-    try {
-      const items = await listWardrobeItems(token);
-      await setItem(CLOSET_STORAGE_KEY, items);
-      return items;
-    } catch {
-      // Remote call failed, fallback to local storage
-    }
-  }
-  const data = await getItem<ClothingItem[]>(
-    CLOSET_STORAGE_KEY,
-    INITIAL_CLOTHING,
-  );
-  if (!data || data.length === 0) {
-    await setItem(CLOSET_STORAGE_KEY, INITIAL_CLOTHING);
-    return INITIAL_CLOTHING;
-  }
-  return data;
+export interface ReadResult<T> {
+  data: T;
+  /** True when `data` came from the local cache because the server was unreachable. */
+  offline: boolean;
+  /** Set when the server was reached but answered with an error. */
+  error?: StoreError;
 }
 
-export async function saveClothingItems(items: ClothingItem[]): Promise<void> {
-  await setItem(CLOSET_STORAGE_KEY, items);
+export type WriteResult<T> =
+  | { ok: true; data: T; offline: false; error?: undefined }
+  | { ok: false; data: null; offline: boolean; error: StoreError };
+
+type Token = string | null | undefined;
+
+// ---------------------------------------------------------------------------
+// Cache
+// ---------------------------------------------------------------------------
+
+const KEY = {
+  items: 'habita.style_pantry_items',
+  occasions: 'habita.style_pantry_occasions',
+  saved: 'habita.style_pantry_saved_outfits',
+  history: 'habita.style_pantry_history',
+  collections: 'habita.style_pantry_collections',
+  trips: 'habita.style_pantry_trips',
+  weather: 'habita.style_pantry_weather',
+  todayOutfit: 'habita.style_pantry_today_outfit',
+  tripOutfits: (tripId: string) => `habita.style_pantry_trip_outfits:${tripId}`,
+  tripChecklist: (tripId: string) => `habita.style_pantry_trip_checklist:${tripId}`,
+} as const;
+
+async function readCache<T>(key: string, fallback: T): Promise<T> {
+  return (await getItem<T>(key, fallback)) ?? fallback;
 }
 
-export async function addClothingItem(
-  input: ClothingItemInput,
-  photo: PickedFile | null,
-  token?: string | null,
-): Promise<{ item: ClothingItem; offline: boolean }> {
-  let offline = !token;
-  let created: ClothingItem = {
-    ...input,
-    id: `item_${Date.now()}`,
-    wearCount: 0,
-  };
-
-  if (token) {
-    try {
-      created = await createWardrobeItem(input, photo, token);
-      offline = false;
-    } catch {
-      offline = true;
-    }
+function warn(operation: string, error: StoreError): void {
+  if (__DEV__) {
+    console.warn(`[style_pantry] ${operation} failed (${error.code}${error.status ? ` HTTP ${error.status}` : ''})`, error.message ?? '');
   }
-
-  const current = await loadClothingItems();
-  await saveClothingItems([
-    created,
-    ...current.filter(i => i.id !== created.id),
-  ]);
-  return { item: created, offline };
 }
 
-export async function updateClothingItem(
-  updatedItem: ClothingItem,
-  photo: PickedFile | null,
-  token?: string | null,
-): Promise<{ item: ClothingItem; offline: boolean }> {
-  let offline = !token;
-  let result: ClothingItem = updatedItem;
-
-  if (token) {
-    try {
-      result = await updateWardrobeItem(
-        updatedItem.id,
-        updatedItem,
-        photo,
-        token,
-      );
-      offline = false;
-    } catch {
-      offline = true;
-    }
+async function readThrough<T>(operation: string, key: string, fallback: T, token: Token, fetcher: (token: string) => Promise<T>): Promise<ReadResult<T>> {
+  if (!token) {
+    return { data: await readCache(key, fallback), offline: true, error: NO_SESSION_ERROR };
   }
-
-  const current = await loadClothingItems();
-  await saveClothingItems(current.map(i => (i.id === result.id ? result : i)));
-  return { item: result, offline };
-}
-
-export async function deleteClothingItem(
-  id: string,
-  token?: string | null,
-): Promise<{ offline: boolean }> {
-  let offline = !token;
-  if (token) {
-    try {
-      await deleteWardrobeItem(id, token);
-      offline = false;
-    } catch (err) {
-      offline = isNetworkError(err);
-    }
+  try {
+    const data = await fetcher(token);
+    await setItem(key, data);
+    return { data, offline: false };
+  } catch (err) {
+    const error = toStoreError(err);
+    warn(operation, error);
+    return { data: await readCache(key, fallback), offline: error.code === 'NETWORK', error };
   }
-  const current = await loadClothingItems();
-  await saveClothingItems(current.filter(i => i.id !== id));
-  return { offline };
 }
 
-export async function recordWearOutfit(
-  itemIds: string[],
-  token?: string | null,
-): Promise<{ offline: boolean }> {
-  let offline = !token;
-  const todayStr = new Date().toISOString().split('T')[0];
-
-  if (token) {
-    try {
-      await recordWearEvent(itemIds, todayStr, token);
-      offline = false;
-    } catch (err) {
-      offline = isNetworkError(err);
-    }
+async function write<T>(operation: string, token: Token, action: (token: string) => Promise<T>, onSuccess?: (data: T) => Promise<void>): Promise<WriteResult<T>> {
+  if (!token) {
+    return { ok: false, data: null, offline: true, error: NO_SESSION_ERROR };
   }
-
-  const current = await loadClothingItems();
-  const updated = current.map(item => {
-    if (itemIds.includes(item.id)) {
-      return { ...item, wearCount: item.wearCount + 1, lastWornDate: todayStr };
-    }
-    return item;
-  });
-  await saveClothingItems(updated);
-  return { offline };
-}
-
-export async function loadSavedOutfits(
-  token?: string | null,
-): Promise<OutfitRecommendation[]> {
-  if (token) {
-    try {
-      const outfits = await listSavedOutfits(token);
-      await setItem(SAVED_OUTFITS_KEY, outfits);
-      return outfits;
-    } catch {
-      // fall through to local cache
-    }
+  try {
+    const data = await action(token);
+    if (onSuccess) await onSuccess(data);
+    return { ok: true, data, offline: false };
+  } catch (err) {
+    const error = toStoreError(err);
+    warn(operation, error);
+    return { ok: false, data: null, offline: error === NETWORK_ERROR, error };
   }
-  return (await getItem<OutfitRecommendation[]>(SAVED_OUTFITS_KEY, [])) || [];
 }
 
-export async function saveOutfit(
-  outfit: OutfitRecommendation,
-  token?: string | null,
-): Promise<{ offline: boolean }> {
-  let offline = !token;
-  if (token) {
-    try {
-      await saveOutfitRemote(outfit, token);
-      offline = false;
-    } catch (err) {
-      offline = isNetworkError(err);
-    }
-  }
-
-  const current = await loadSavedOutfits();
-  const exists = current.find(o => o.id === outfit.id);
-  const updated = exists
-    ? current.map(o => (o.id === outfit.id ? { ...o, isSaved: true } : o))
-    : [{ ...outfit, isSaved: true }, ...current];
-  await setItem(SAVED_OUTFITS_KEY, updated);
-  return { offline };
+async function upsertCached<T extends { id: string }>(key: string, entity: T, prepend = true): Promise<void> {
+  const current = await readCache<T[]>(key, []);
+  const rest = current.filter(e => e.id !== entity.id);
+  await setItem(key, prepend && !current.some(e => e.id === entity.id) ? [entity, ...rest] : current.map(e => (e.id === entity.id ? entity : e)));
 }
 
-export async function unsaveOutfit(
-  outfitId: string,
-  token?: string | null,
-): Promise<{ offline: boolean }> {
-  let offline = !token;
-  if (token) {
-    try {
-      await deleteSavedOutfit(outfitId, token);
-      offline = false;
-    } catch (err) {
-      offline = isNetworkError(err);
-    }
-  }
-  const current = await loadSavedOutfits();
-  await setItem(
-    SAVED_OUTFITS_KEY,
-    current.filter(o => o.id !== outfitId),
-  );
-  return { offline };
+async function removeCached<T extends { id: string }>(key: string, id: string): Promise<void> {
+  const current = await readCache<T[]>(key, []);
+  await setItem(key, current.filter(e => e.id !== id));
 }
 
-export async function loadWeather(
-  token?: string | null,
-): Promise<WeatherContext> {
-  if (token) {
-    try {
-      return await getWeather(token);
-    } catch {
-      // fall through to the local fallback
-    }
-  }
-  return MOCK_WEATHER;
+// ---------------------------------------------------------------------------
+// Items
+// ---------------------------------------------------------------------------
+
+export function loadClothingItems(token: Token): Promise<ReadResult<ClothingItem[]>> {
+  return readThrough('loadClothingItems', KEY.items, [], token, api.listWardrobeItems);
 }
 
-export async function loadOccasions(
-  token?: string | null,
-): Promise<CalendarEvent[]> {
-  if (token) {
-    try {
-      const occasions = await listOccasions(token);
-      await setItem(OCCASIONS_STORAGE_KEY, occasions);
-      return occasions;
-    } catch {
-      // fall through to local cache/mock
-    }
-  }
-  const cached = await getItem<CalendarEvent[] | null>(
-    OCCASIONS_STORAGE_KEY,
-    null,
-  );
-  return cached && cached.length > 0 ? cached : MOCK_EVENTS;
+export async function getClothingItem(id: string, token: Token): Promise<ReadResult<ClothingItem | undefined>> {
+  const r = await loadClothingItems(token);
+  return { ...r, data: r.data.find(i => i.id === id) };
 }
 
-export async function createOccasionEntry(
-  data: CreateOccasionRequest,
-  token?: string | null,
-): Promise<{ occasion: CalendarEvent; offline: boolean }> {
-  let offline = !token;
-  let created: CalendarEvent = { ...data, id: `evt_${Date.now()}` };
-
-  if (token) {
-    try {
-      created = await createOccasion(data, token);
-      offline = false;
-    } catch {
-      offline = true;
-    }
-  }
-
-  const current = await loadOccasions();
-  await setItem(OCCASIONS_STORAGE_KEY, [created, ...current]);
-  return { occasion: created, offline };
+/** Vision auto-fill suggestion for a just-picked photo — reviewed by the user, never cached. */
+export function analyzeItemPhoto(photo: PickedFile, token: Token): Promise<WriteResult<WardrobeItemSuggestion>> {
+  return write('analyzeItemPhoto', token, tk => api.analyzeWardrobeItemPhoto(photo, tk));
 }
 
-export async function deleteOccasionEntry(
-  occasionId: string,
-  token?: string | null,
-): Promise<{ offline: boolean }> {
-  let offline = !token;
-  if (token) {
-    try {
-      await deleteOccasion(occasionId, token);
-      offline = false;
-    } catch (err) {
-      offline = isNetworkError(err);
-    }
-  }
-  const current = await loadOccasions();
-  await setItem(
-    OCCASIONS_STORAGE_KEY,
-    current.filter(o => o.id !== occasionId),
-  );
-  return { offline };
+export function addClothingItem(input: ClothingItemInput, photo: PickedFile | null, token: Token): Promise<WriteResult<ClothingItem>> {
+  return write('addClothingItem', token, tk => api.createWardrobeItem(input, photo, tk), item => upsertCached(KEY.items, item));
 }
 
-// Which style tags a mood leans toward, layered on top of the occasion's own EventType
-// tag match — e.g. a 'bold' mood on an 'office' occasion still prefers an item tagged
-// both 'office' and 'party' over one tagged 'office' alone. Independent of EventType
-// (docs/WARDROBE_API_SPEC.md §3.7), so an item never needs a mood-specific tag of its
-// own — it's just a second pass over the same free-form `tags` the item already has.
-const MOOD_TAG_HINTS: Record<Mood, string[]> = {
-  confident: ['formal', 'office'],
-  relaxed: ['casual'],
-  bold: ['party'],
-  cozy: ['casual', 'workout'],
-  playful: ['party', 'casual'],
-};
+export function updateClothingItem(id: string, input: ClothingItemInput, photo: PickedFile | null, token: Token): Promise<WriteResult<ClothingItem>> {
+  return write('updateClothingItem', token, tk => api.updateWardrobeItem(id, input, photo, tk), item => upsertCached(KEY.items, item, false));
+}
 
-const MOOD_NOTE_PHRASE: Record<Mood, string> = {
-  confident: ' with a confident, put-together edge',
-  relaxed: ' with an easy, relaxed feel',
-  bold: ' with a bold, stand-out energy',
-  cozy: ' with a cozy, comfortable feel',
-  playful: ' with a playful, fun touch',
-};
+export function deleteClothingItem(id: string, token: Token): Promise<WriteResult<void>> {
+  return write('deleteClothingItem', token, tk => api.deleteWardrobeItem(id, tk), () => removeCached<ClothingItem>(KEY.items, id));
+}
 
-// Pure, testable rule-based outfit matcher — kept as the manual/local fallback per
-// docs/BACKLOG.md M7-T4/M8-T4, used whenever there's no token or the backend
-// recommendation call fails. Never renamed/changed shape so it keeps working standalone;
-// `mood` was added additively (optional, defaults to no preference) so existing callers
-// keep compiling untouched.
-export function generateAIOutfit(
-  weather: WeatherContext,
-  event: CalendarEvent,
-  items: ClothingItem[],
-  mood?: Mood,
-): OutfitRecommendation {
-  const targetTag = event.eventType;
-  const moodTags = mood ? MOOD_TAG_HINTS[mood] : [];
-  const findItem = (category: ClothingCategory): ClothingItem | undefined => {
-    const matchingCat = items.filter(i => i.category === category);
-    if (matchingCat.length === 0) return undefined;
-    const moodAndOccasionMatch = matchingCat.find(
-      i =>
-        i.tags.includes(targetTag) &&
-        moodTags.some(hint => i.tags.includes(hint)),
-    );
-    const tagMatch =
-      moodAndOccasionMatch || matchingCat.find(i => i.tags.includes(targetTag));
-    return (
-      tagMatch || matchingCat[Math.floor(Math.random() * matchingCat.length)]
-    );
-  };
+/** Items the wearer actually owns — wishlist entries are never outfit candidates. */
+export function ownedItems(items: ClothingItem[]): ClothingItem[] {
+  return items.filter(i => !i.isWishlist);
+}
 
-  const top = findItem('tops') || items[0];
-  const bottom = findItem('bottoms') || items.find(i => i !== top);
-  const shoes = findItem('shoes') || items.find(i => i !== top && i !== bottom);
-  const jacket =
-    weather.temperature < 22 || targetTag === 'office'
-      ? findItem('jackets')
-      : undefined;
-  const accessory = findItem('accessories');
+// ---------------------------------------------------------------------------
+// Weather & occasions
+// ---------------------------------------------------------------------------
 
-  const selectedItems: ClothingItem[] = [
-    top,
-    bottom,
-    shoes,
-    jacket,
-    accessory,
-  ].filter((i): i is ClothingItem => Boolean(i));
+export function loadWeather(token: Token): Promise<ReadResult<WeatherContext | null>> {
+  return readThrough('loadWeather', KEY.weather, null, token, api.getWeather);
+}
 
-  const occasionSuitability =
-    targetTag === 'office' || targetTag === 'formal'
-      ? '98% Professional & Meeting Compliant'
-      : targetTag === 'party'
-      ? '95% Vibrant Party Aesthetic'
-      : '96% Comfortable Casual Vibe';
+export function loadOccasions(token: Token): Promise<ReadResult<CalendarEvent[]>> {
+  return readThrough('loadOccasions', KEY.occasions, [], token, api.listOccasions);
+}
 
-  const weatherSuitability =
-    weather.temperature > 26
-      ? `100% Breathable for Hot Weather (${weather.temperature}°C)`
-      : '95% Layered Comfort for Cool Weather';
+export function createOccasionEntry(input: OccasionInput, token: Token): Promise<WriteResult<CalendarEvent>> {
+  return write('createOccasionEntry', token, tk => api.createOccasion(input, tk), o => upsertCached(KEY.occasions, o));
+}
 
-  const title =
-    top && bottom
-      ? `${top.color} ${top.name} + ${bottom.color} ${bottom.name}`
-      : top
-      ? `${top.color} ${top.name}`
-      : 'Outfit Suggestion';
-  const stylistNote =
-    top && bottom
-      ? `Perfect pairing for ${event.title} at ${event.time}. ${
-          top.name
-        } combined with ${bottom.name} ensures a crisp silhouette${
-          mood ? MOOD_NOTE_PHRASE[mood] : ''
-        } appropriate for ${event.eventType}.`
-      : `Add more items to your wardrobe for a complete outfit suggestion for ${event.title}.`;
+export function deleteOccasionEntry(occasionId: string, token: Token): Promise<WriteResult<void>> {
+  return write('deleteOccasionEntry', token, tk => api.deleteOccasion(occasionId, tk), () => removeCached<CalendarEvent>(KEY.occasions, occasionId));
+}
 
+// ---------------------------------------------------------------------------
+// Recommendation
+// ---------------------------------------------------------------------------
+
+/** The AI Stylist home's ad-hoc "what should I wear today" occasion. */
+export function todaysEvent(): CalendarEvent {
   return {
-    id: `outfit_${Date.now()}_${Math.floor(Math.random() * 1000)}`,
-    title,
-    occasion: event.eventType.toUpperCase(),
-    eventTitle: event.title,
-    weatherSuitability,
-    occasionSuitability,
-    items: selectedItems,
-    stylistNote,
-    mood,
+    id: 'today',
+    title: t('ai_stylist.today_outfit_event_title'),
+    date: todayString(),
+    time: '',
+    eventType: 'casual',
   };
 }
 
-/**
- * Online-first outfit recommendation: tries the backend's AI/rule-based endpoint
- * (docs/WARDROBE_API_SPEC.md §"Outfit Recommendation") and falls back to the local
- * `generateAIOutfit` rule-based matcher on any failure — same manual-fallback shape
- * every other AI hook-point in this app uses (docs/BACKLOG.md M8-T4).
- */
-export async function generateOutfitRecommendation(
-  weather: WeatherContext,
-  event: CalendarEvent,
-  items: ClothingItem[],
-  token?: string | null,
-  mood?: Mood,
-): Promise<OutfitRecommendation> {
-  if (token) {
-    try {
-      return await generateOutfitRecommendationRemote(event.id, token, mood);
-    } catch {
-      // fall through to the local rule-based matcher
-    }
-  }
-  return generateAIOutfit(weather, event, items, mood);
+export function generateOutfitRecommendation(input: GenerateOutfitInput, token: Token): Promise<WriteResult<OutfitRecommendation>> {
+  return write('generateOutfitRecommendation', token, tk => api.generateOutfit(input, tk));
+}
+
+/** One conversational turn with the AI stylist (style topics only, server-enforced). */
+export function sendStyleMessage(input: StyleChatInput, token: Token): Promise<WriteResult<StyleChatReply>> {
+  return write('sendStyleMessage', token, tk => api.styleChat(input, tk));
+}
+
+interface TodayOutfitCache {
+  date: string;
+  outfit: OutfitRecommendation;
 }
 
 /**
- * Lists the caller's style log (aCloset-style "what did I actually wear" history),
- * most recently worn first. Online-first with an AsyncStorage fallback — same
- * shape as every other read in this store.
+ * Today's outfit for the AI Stylist home, generated once per calendar day and cached so
+ * the card doesn't change every time the screen is focused. `regenerate` forces a new one.
  */
-export async function loadStyleHistory(
-  token?: string | null,
-): Promise<WornOutfitEntry[]> {
-  if (token) {
-    try {
-      const history = await listStyleHistory(token);
-      await setItem(STYLE_HISTORY_STORAGE_KEY, history);
-      return history;
-    } catch {
-      // fall through to local cache
+export async function loadTodaysOutfit(token: Token, opts: { regenerate?: boolean } = {}): Promise<WriteResult<OutfitRecommendation>> {
+  const today = todayString();
+  if (!opts.regenerate) {
+    const cached = await readCache<TodayOutfitCache | null>(KEY.todayOutfit, null);
+    if (cached && cached.date === today) {
+      return { ok: true, data: cached.outfit, offline: false };
     }
   }
-  return (
-    (await getItem<WornOutfitEntry[]>(STYLE_HISTORY_STORAGE_KEY, [])) || []
+  const result = await generateOutfitRecommendation({ event: todaysEvent() }, token);
+  if (result.ok) {
+    await setItem(KEY.todayOutfit, { date: today, outfit: result.data } satisfies TodayOutfitCache);
+  }
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Saved outfits
+// ---------------------------------------------------------------------------
+
+export function loadSavedOutfits(token: Token): Promise<ReadResult<OutfitRecommendation[]>> {
+  return readThrough('loadSavedOutfits', KEY.saved, [], token, api.listSavedOutfits);
+}
+
+/** Bookmarks an outfit. The returned outfit carries the server id — use it, not the input's. */
+export function saveOutfit(outfit: OutfitRecommendation, token: Token): Promise<WriteResult<OutfitRecommendation>> {
+  return write('saveOutfit', token, tk => api.saveOutfit(outfit, tk), saved => upsertCached(KEY.saved, saved));
+}
+
+export function unsaveOutfit(outfitId: string, token: Token): Promise<WriteResult<void>> {
+  return write('unsaveOutfit', token, tk => api.deleteSavedOutfit(outfitId, tk), () => removeCached<OutfitRecommendation>(KEY.saved, outfitId));
+}
+
+// ---------------------------------------------------------------------------
+// Wear today & style log
+// ---------------------------------------------------------------------------
+
+export function loadStyleHistory(token: Token): Promise<ReadResult<WornOutfitEntry[]>> {
+  return readThrough('loadStyleHistory', KEY.history, [], token, api.listStyleHistory);
+}
+
+/**
+ * "Wear Today": bumps each item's wearCount/lastWornDate AND appends a style-log row —
+ * two independent endpoints by design (docs/WARDROBE_API_SPEC.md §4.6).
+ */
+export function wearOutfit(outfit: OutfitRecommendation, token: Token): Promise<WriteResult<WornOutfitEntry>> {
+  const date = todayString();
+  const itemIds = outfit.items.map(i => i.id);
+  return write(
+    'wearOutfit',
+    token,
+    async tk => {
+      await api.recordWearEvent(itemIds, date, tk);
+      return api.recordStyleHistoryEntry(
+        { date, outfitTitle: outfit.title, occasion: outfit.occasion, eventTitle: outfit.eventTitle, itemIds, mood: outfit.mood },
+        tk,
+      );
+    },
+    async entry => {
+      await upsertCached(KEY.history, entry);
+      const items = await readCache<ClothingItem[]>(KEY.items, []);
+      await setItem(
+        KEY.items,
+        items.map(i => (itemIds.includes(i.id) ? { ...i, wearCount: i.wearCount + 1, lastWornDate: date } : i)),
+      );
+    },
   );
 }
 
-/**
- * Appends a style-log entry for an outfit just worn. Called alongside
- * `recordWearOutfit` (which only bumps each item's wearCount/lastWornDate) from
- * `OutfitDetailsScreen`'s "Wear Today" action — kept as a separate function so that
- * existing call sites of `recordWearOutfit` are untouched.
- */
-export async function logStyleHistoryEntry(
-  outfit: OutfitRecommendation,
-  token?: string | null,
-): Promise<{ offline: boolean }> {
-  let offline = !token;
-  const draft: Omit<WornOutfitEntry, 'id'> = {
-    date: new Date().toISOString().split('T')[0],
-    outfitTitle: outfit.title,
-    occasion: outfit.occasion,
-    eventTitle: outfit.eventTitle,
-    itemIds: outfit.items.map(i => i.id),
-    mood: outfit.mood,
-  };
-  let entry: WornOutfitEntry = { ...draft, id: `history_${Date.now()}` };
+// ---------------------------------------------------------------------------
+// Collections
+// ---------------------------------------------------------------------------
 
-  if (token) {
-    try {
-      entry = await recordStyleHistoryEntry(draft, token);
-      offline = false;
-    } catch (err) {
-      offline = isNetworkError(err);
-    }
+export function loadCollections(token: Token): Promise<ReadResult<WardrobeCollection[]>> {
+  return readThrough('loadCollections', KEY.collections, [], token, api.listCollections);
+}
+
+export function addCollection(input: CollectionInput, token: Token): Promise<WriteResult<WardrobeCollection>> {
+  return write('addCollection', token, tk => api.createCollection(input, tk), c => upsertCached(KEY.collections, c));
+}
+
+export function editCollection(collectionId: string, input: CollectionInput, token: Token): Promise<WriteResult<WardrobeCollection>> {
+  return write('editCollection', token, tk => api.updateCollection(collectionId, input, tk), c => upsertCached(KEY.collections, c, false));
+}
+
+/** Appends an item to a closet folder (used right after creating an item from inside that folder). */
+export async function addItemToCollection(collectionId: string, itemId: string, token: Token): Promise<WriteResult<WardrobeCollection>> {
+  const current = await loadCollections(token);
+  const collection = current.data.find(c => c.id === collectionId);
+  if (!collection) {
+    return { ok: false, data: null, offline: current.offline, error: { status: 404, code: 'COLLECTION_NOT_FOUND' } };
   }
+  if (collection.itemIds.includes(itemId)) {
+    return { ok: true, data: collection, offline: false };
+  }
+  return editCollection(
+    collectionId,
+    { name: collection.name, iconKey: collection.iconKey, itemIds: [...collection.itemIds, itemId] },
+    token,
+  );
+}
 
-  const current = await loadStyleHistory();
-  await setItem(STYLE_HISTORY_STORAGE_KEY, [entry, ...current]);
-  return { offline };
+export function removeCollection(collectionId: string, token: Token): Promise<WriteResult<void>> {
+  return write('removeCollection', token, tk => api.deleteCollection(collectionId, tk), () => removeCached<WardrobeCollection>(KEY.collections, collectionId));
+}
+
+// ---------------------------------------------------------------------------
+// Trips
+// ---------------------------------------------------------------------------
+
+export function loadTrips(token: Token): Promise<ReadResult<WardrobeTrip[]>> {
+  return readThrough('loadTrips', KEY.trips, [], token, api.listTrips);
+}
+
+export async function getTrip(tripId: string, token: Token): Promise<ReadResult<WardrobeTrip | undefined>> {
+  const r = await loadTrips(token);
+  return { ...r, data: r.data.find(tr => tr.id === tripId) };
+}
+
+export function addTrip(input: TripInput, token: Token): Promise<WriteResult<WardrobeTrip>> {
+  return write('addTrip', token, tk => api.createTrip(input, tk), tr => upsertCached(KEY.trips, tr));
+}
+
+export function editTrip(tripId: string, input: TripInput, token: Token): Promise<WriteResult<WardrobeTrip>> {
+  return write('editTrip', token, tk => api.updateTrip(tripId, input, tk), tr => upsertCached(KEY.trips, tr, false));
+}
+
+export function removeTrip(tripId: string, token: Token): Promise<WriteResult<void>> {
+  return write('removeTrip', token, tk => api.deleteTrip(tripId, tk), async () => {
+    await removeCached<WardrobeTrip>(KEY.trips, tripId);
+    await setItem(KEY.tripOutfits(tripId), []);
+    await setItem(KEY.tripChecklist(tripId), []);
+  });
+}
+
+export function loadTripOutfits(tripId: string, token: Token): Promise<ReadResult<TripOutfitEntry[]>> {
+  return readThrough('loadTripOutfits', KEY.tripOutfits(tripId), [], token, tk => api.listTripOutfits(tripId, tk));
+}
+
+/** Creates or replaces the entry for `input.date` (server upserts on trip + date). */
+export function saveTripOutfit(tripId: string, input: TripOutfitInput, token: Token): Promise<WriteResult<TripOutfitEntry>> {
+  return write('saveTripOutfit', token, tk => api.upsertTripOutfit(tripId, input, tk), async entry => {
+    const key = KEY.tripOutfits(tripId);
+    const current = await readCache<TripOutfitEntry[]>(key, []);
+    const next = [...current.filter(e => e.id !== entry.id && e.date !== entry.date), entry].sort((a, b) => a.date.localeCompare(b.date));
+    await setItem(key, next);
+  });
+}
+
+export function removeTripOutfit(tripId: string, outfitEntryId: string, token: Token): Promise<WriteResult<void>> {
+  return write('removeTripOutfit', token, tk => api.deleteTripOutfit(tripId, outfitEntryId, tk), () => removeCached<TripOutfitEntry>(KEY.tripOutfits(tripId), outfitEntryId));
+}
+
+export function loadTripChecklist(tripId: string, token: Token): Promise<ReadResult<TripChecklistItem[]>> {
+  return readThrough('loadTripChecklist', KEY.tripChecklist(tripId), [], token, tk => api.listTripChecklist(tripId, tk));
+}
+
+export function addTripChecklistItem(tripId: string, label: string, token: Token): Promise<WriteResult<TripChecklistItem>> {
+  return write('addTripChecklistItem', token, tk => api.createTripChecklistItem(tripId, { label }, tk), item => upsertCached(KEY.tripChecklist(tripId), item, false).then(async () => {
+    // keep insertion order (oldest first) to match the server listing
+    const key = KEY.tripChecklist(tripId);
+    const current = await readCache<TripChecklistItem[]>(key, []);
+    if (!current.some(i => i.id === item.id)) await setItem(key, [...current, item]);
+  }));
+}
+
+export function updateTripChecklistItem(tripId: string, itemId: string, input: TripChecklistInput, token: Token): Promise<WriteResult<TripChecklistItem>> {
+  return write('updateTripChecklistItem', token, tk => api.updateTripChecklistItem(tripId, itemId, input, tk), item => upsertCached(KEY.tripChecklist(tripId), item, false));
+}
+
+export function removeTripChecklistItem(tripId: string, itemId: string, token: Token): Promise<WriteResult<void>> {
+  return write('removeTripChecklistItem', token, tk => api.deleteTripChecklistItem(tripId, itemId, tk), () => removeCached<TripChecklistItem>(KEY.tripChecklist(tripId), itemId));
 }

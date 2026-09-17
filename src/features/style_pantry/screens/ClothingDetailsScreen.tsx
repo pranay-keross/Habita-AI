@@ -1,60 +1,51 @@
-import React, { useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  Alert,
-  Image,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useCallback, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, Pressable, Alert, RefreshControl, useWindowDimensions } from 'react-native';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import useAuth from '../../../hooks/useAuth';
-import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import Pencil from 'lucide-react-native/icons/pencil';
-import Trash2 from 'lucide-react-native/icons/trash-2';
+import Trash2 from 'lucide-react-native/icons/trash';
 import Tag from 'lucide-react-native/icons/tag';
 import Clock from 'lucide-react-native/icons/clock';
+import Bookmark from 'lucide-react-native/icons/bookmark';
 import Button from '../../../components/Button';
 import GlassCard from '../../../components/GlassCard';
-import { SkeletonBox, SkeletonText } from '../../../components/Skeleton';
-import { loadClothingItems, deleteClothingItem } from '../stylePantryStore';
-import { getClothingIconComponent } from '../clothingIcons';
+import { SkeletonBox } from '../../../components/Skeleton';
+import { getClothingItem, deleteClothingItem } from '../stylePantryStore';
+import { showStoreErrorAlert } from '../errors';
+import { useBusy, useFocusLoad, useLocaleRerender } from '../hooks';
+import { dateLabel, itemCategoryLabel, priceLabel, seasonLabel } from '../format';
+import WardrobeHeader from '../components/WardrobeHeader';
+import PhotoCard from '../components/PhotoCard';
+import OfflineBanner from '../components/OfflineBanner';
 import type { ClothingItem } from '../types';
-import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'ClothingDetails'>;
 
+// Matches this screen's `content` horizontal padding (spacing.lg).
+const HERO_HORIZONTAL_INSET = 24;
+
 export default function ClothingDetailsScreen({ navigation, route }: Props) {
   const styles = useThemedStyles(makeStyles);
-  const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
   const { itemId } = route.params;
-  const [, setLocaleVersion] = useState(0);
+  const { width: screenWidth } = useWindowDimensions();
+  useLocaleRerender();
 
-  const [loading, setLoading] = useState(true);
   const [item, setItem] = useState<ClothingItem | undefined>();
+  const [busy, run] = useBusy();
 
-  const fetchDetail = async () => {
-    setLoading(true);
-    const token = await getAccessToken();
-    const list = await loadClothingItems(token);
-    const found = list.find((i) => i.id === itemId);
-    setItem(found);
-    setLoading(false);
-  };
-
-  useEffect(() => {
-    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
-    fetchDetail();
-    return () => {
-      unsubLang();
-    };
-  }, [itemId]);
+  const { loading, refreshing, offline, refresh } = useFocusLoad(
+    useCallback(async () => {
+      const token = await getAccessToken();
+      const r = await getClothingItem(itemId, token);
+      setItem(r.data);
+      return { offline: r.offline };
+    }, [getAccessToken, itemId]),
+  );
 
   const handleDelete = () => {
     if (!item) return;
@@ -66,12 +57,16 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
         {
           text: t('style_pantry.delete'),
           style: 'destructive',
-          onPress: async () => {
-            const token = await getAccessToken();
-            await deleteClothingItem(item.id, token);
-            Alert.alert(t('style_pantry.dash_title'), t('style_pantry.deleted_msg'));
-            navigation.goBack();
-          },
+          onPress: () =>
+            run(async () => {
+              const token = await getAccessToken();
+              const result = await deleteClothingItem(item.id, token);
+              if (!result.ok) {
+                showStoreErrorAlert(result.error);
+                return;
+              }
+              navigation.goBack();
+            }),
         },
       ],
     );
@@ -80,13 +75,9 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
   if (loading) {
     return (
       <View style={styles.root}>
-        <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-          <View style={styles.headerBtn} />
-          <SkeletonText width={140} height={18} />
-          <View style={styles.headerBtn} />
-        </View>
+        <WardrobeHeader title={t('style_pantry.item_details_title')} onBack={() => navigation.goBack()} />
         <View style={styles.content}>
-          <SkeletonBox width="100%" height={180} borderRadius={16} style={{ marginBottom: 16 }} />
+          <SkeletonBox width="100%" height={180} borderRadius={16} style={styles.skeletonGap} />
           <SkeletonBox width="100%" height={100} borderRadius={16} />
         </View>
       </View>
@@ -95,56 +86,81 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
 
   if (!item) {
     return (
-      <View style={[styles.root, styles.center]}>
-        <Text style={styles.errorText}>{t('style_pantry.item_not_found')}</Text>
-        <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Text style={styles.backBtnText}>{t('style_pantry.go_back')}</Text>
-        </Pressable>
+      <View style={styles.root}>
+        <WardrobeHeader title={t('style_pantry.item_details_title')} onBack={() => navigation.goBack()} />
+        <View style={styles.center}>
+          <Text style={styles.errorText}>{t('style_pantry.item_not_found')}</Text>
+          <Pressable style={styles.backBtn} onPress={() => navigation.goBack()}>
+            <Text style={styles.backBtnText}>{t('style_pantry.go_back')}</Text>
+          </Pressable>
+        </View>
       </View>
     );
   }
 
-  const ItemIcon = getClothingIconComponent(item.emoji);
-
   return (
     <View style={styles.root}>
-      {/* Header Bar */}
-      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <ArrowLeft size={20} color={styles.headerIcon.color} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('style_pantry.item_details_title')}</Text>
-        <View style={{ flexDirection: 'row', gap: 8 }}>
-          <Pressable
-            onPress={() => navigation.navigate('AddEditClothing', { itemId: item.id })}
-            style={styles.headerActionBtn}>
-            <Pencil size={18} color={styles.iconTint.color} />
-          </Pressable>
-          <Pressable onPress={handleDelete} style={styles.headerActionBtn}>
-            <Trash2 size={18} color={styles.dangerColor.color} />
-          </Pressable>
-        </View>
-      </View>
+      <WardrobeHeader
+        title={t('style_pantry.item_details_title')}
+        onBack={() => navigation.goBack()}
+        right={[
+          {
+            icon: Pencil,
+            accessibilityLabel: t('style_pantry.edit_item'),
+            onPress: () => navigation.navigate('AddEditClothing', { itemId: item.id }),
+          },
+          {
+            icon: Trash2,
+            accessibilityLabel: t('style_pantry.delete_item'),
+            onPress: handleDelete,
+            disabled: busy,
+          },
+        ]}
+      />
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Large Clothing Hero Card */}
-        <GlassCard variant="elevated" style={styles.heroCard}>
-          {item.imageUri ? (
-            <Image source={{ uri: item.imageUri }} style={styles.heroImage} resizeMode="cover" />
-          ) : (
-            <View style={styles.heroEmojiBadge}>
-              <ItemIcon size={42} color={styles.iconTint.color} />
+      <ScrollView
+        contentContainerStyle={styles.content}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={styles.iconTint.color} colors={[styles.iconTint.color]} />
+        }
+      >
+        <OfflineBanner visible={offline} />
+
+        {(() => {
+          const heroWidth = screenWidth - HERO_HORIZONTAL_INSET * 2;
+          const heroHeight = Math.round(heroWidth * 0.92);
+          return (
+            <View style={[styles.heroWrap, { width: heroWidth, height: heroHeight }]}>
+              <PhotoCard
+                item={item}
+                width={heroWidth}
+                height={heroHeight}
+                radius={28}
+                stripHeight={Math.round(heroHeight * 0.3)}
+                overlay={
+                  item.isWishlist ? (
+                    <View style={styles.wishlistBadge}>
+                      <Bookmark size={12} color={styles.onPrimary.color} />
+                      <Text style={styles.wishlistBadgeText}>{t('style_pantry.wishlist_badge')}</Text>
+                    </View>
+                  ) : undefined
+                }
+              >
+                <View>
+                  <Text style={styles.heroKicker}>{itemCategoryLabel(item)}</Text>
+                  <Text style={styles.heroTitle} numberOfLines={2}>
+                    {item.name}
+                  </Text>
+                  <Text style={styles.heroSub}>{item.color}</Text>
+                </View>
+              </PhotoCard>
             </View>
-          )}
-          <Text style={styles.heroTitle}>{item.name}</Text>
-          <Text style={styles.heroSub}>
-            {item.category.toUpperCase()} · {item.color}
-          </Text>
-        </GlassCard>
+          );
+        })()}
 
-        {/* Info Metadata Card */}
         <Text style={styles.sectionTitle}>{t('style_pantry.clothing_info')}</Text>
-        <GlassCard variant="default" style={styles.card}>
+        <GlassCard variant="elevated" style={styles.card}>
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('style_pantry.brand_label')}</Text>
             <Text style={styles.metaVal}>{item.brand || t('style_pantry.not_specified')}</Text>
@@ -152,24 +168,32 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
           <View style={styles.divider} />
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('style_pantry.season_label')}</Text>
-            <Text style={styles.metaVal}>{item.season.toUpperCase()}</Text>
+            <Text style={styles.metaVal}>{seasonLabel(item.season)}</Text>
           </View>
           <View style={styles.divider} />
           <View style={styles.metaRow}>
             <Text style={styles.metaLabel}>{t('style_pantry.material_label')}</Text>
             <Text style={styles.metaVal}>{item.material || t('style_pantry.standard_fabric')}</Text>
           </View>
+          {item.purchasePrice != null ? (
+            <>
+              <View style={styles.divider} />
+              <View style={styles.metaRow}>
+                <Text style={styles.metaLabel}>{t('style_pantry.purchase_price_label')}</Text>
+                <Text style={styles.metaVal}>{priceLabel(item.purchasePrice)}</Text>
+              </View>
+            </>
+          ) : null}
         </GlassCard>
 
-        {/* Style Tags Card */}
         {item.tags.length > 0 && (
           <>
             <Text style={styles.sectionTitle}>{t('style_pantry.tags_label')}</Text>
             <GlassCard variant="default" style={styles.card}>
               <View style={styles.tagsWrap}>
-                {item.tags.map((tag) => (
+                {item.tags.map(tag => (
                   <View key={tag} style={styles.tagBadge}>
-                    <Tag size={12} color={styles.iconTint.color} style={{ marginRight: 4 }} />
+                    <Tag size={12} color={styles.iconTint.color} style={styles.tagIcon} />
                     <Text style={styles.tagBadgeText}>#{tag}</Text>
                   </View>
                 ))}
@@ -178,162 +202,74 @@ export default function ClothingDetailsScreen({ navigation, route }: Props) {
           </>
         )}
 
-        {/* Usage & Wear History Card */}
-        <Text style={styles.sectionTitle}>{t('style_pantry.usage_history')}</Text>
-        <GlassCard variant="default" style={styles.card}>
-          <View style={styles.statsRow}>
-            <View style={styles.statBox}>
-              <Text style={styles.statNumber}>{item.wearCount}</Text>
-              <Text style={styles.statLabel}>{t('style_pantry.times_worn')}</Text>
-            </View>
-            <View style={styles.vDivider} />
-            <View style={styles.statBox}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
-                <Clock size={16} color={styles.iconTint.color} />
-                <Text style={styles.statDateVal}>
-                  {item.lastWornDate || t('style_pantry.not_worn_yet')}
-                </Text>
+        {!item.isWishlist ? (
+          <>
+            <Text style={styles.sectionTitle}>{t('style_pantry.usage_history')}</Text>
+            <GlassCard variant="default" style={styles.card}>
+              <View style={styles.statsRow}>
+                <View style={styles.statBox}>
+                  <Text style={styles.statNumber}>{item.wearCount}</Text>
+                  <Text style={styles.statLabel}>{t('style_pantry.times_worn')}</Text>
+                </View>
+                <View style={styles.vDivider} />
+                <View style={styles.statBox}>
+                  <View style={styles.statDateRow}>
+                    <Clock size={16} color={styles.iconTint.color} />
+                    <Text style={styles.statDateVal}>
+                      {item.lastWornDate ? dateLabel(item.lastWornDate) : t('style_pantry.not_worn_yet')}
+                    </Text>
+                  </View>
+                  <Text style={styles.statLabel}>{t('style_pantry.last_worn_date')}</Text>
+                </View>
               </View>
-              <Text style={styles.statLabel}>{t('style_pantry.last_worn_date')}</Text>
-            </View>
-          </View>
-        </GlassCard>
+            </GlassCard>
+          </>
+        ) : null}
 
-        {/* Style with AI Button */}
-        <Button
-          title={t('style_pantry.try_style_mirror')}
-          onPress={() => navigation.navigate('StyleMirror')}
-        />
+        <Button title={t('style_pantry.add_to_outfit')} onPress={() => navigation.navigate('StyleMirror')} />
       </ScrollView>
     </View>
   );
 }
 
-const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
+const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
   StyleSheet.create({
-    root: {
-      flex: 1,
-      backgroundColor: colors.background,
+    root: { flex: 1, backgroundColor: colors.background },
+    center: { flex: 1, alignItems: 'center', justifyContent: 'center', padding: spacing.xl },
+    iconTint: { color: colors.primary },
+    content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+    skeletonGap: { marginBottom: spacing.md },
+    onPrimary: { color: colors.textOnPrimary },
+    heroWrap: { alignSelf: 'center', marginBottom: spacing.md },
+    heroKicker: {
+      fontFamily: fonts.sansBold,
+      fontSize: 10,
+      letterSpacing: 1.2,
+      textTransform: 'uppercase',
+      color: colors.textOnPrimaryMuted,
     },
-    center: {
-      alignItems: 'center',
-      justifyContent: 'center',
-      padding: spacing.xl,
-    },
-    headerBar: {
+    heroTitle: { fontFamily: fonts.serif, fontSize: 22, lineHeight: 27, color: colors.textOnPrimary, marginTop: 2 },
+    heroSub: { fontFamily: fonts.sans, fontSize: 13, color: colors.textOnPrimaryMuted, marginTop: 3 },
+    wishlistBadge: {
+      position: 'absolute',
+      top: spacing.sm + 4,
+      right: spacing.sm + 4,
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.sm,
-      backgroundColor: colors.background,
+      gap: 5,
+      backgroundColor: colors.primary,
+      borderRadius: radius.full,
+      paddingHorizontal: spacing.sm + 2,
+      paddingVertical: 5,
     },
-    headerBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...shadow.soft,
-    },
-    headerActionBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...shadow.soft,
-    },
-    headerIcon: {
-      color: colors.textPrimary,
-    },
-    iconTint: {
-      color: colors.primary,
-    },
-    dangerColor: {
-      color: colors.danger,
-    },
-    headerTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 18,
-      color: colors.textPrimary,
-    },
-    content: {
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xxl,
-    },
-    heroCard: {
-      alignItems: 'center',
-      marginBottom: spacing.md,
-    },
-    heroImage: {
-      width: 96,
-      height: 96,
-      borderRadius: radius.md,
-      marginBottom: spacing.md,
-    },
-    heroEmojiBadge: {
-      width: 80,
-      height: 80,
-      borderRadius: 40,
-      backgroundColor: colors.surfaceElevated,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: spacing.md,
-    },
-    heroTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 18,
-      color: colors.textPrimary,
-      textAlign: 'center',
-    },
-    heroSub: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 13,
-      color: colors.primary,
-      marginTop: 4,
-    },
-    sectionTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 15,
-      color: colors.textPrimary,
-      marginBottom: spacing.xs,
-    },
-    card: {
-      marginBottom: spacing.md,
-    },
-    metaRow: {
-      flexDirection: 'row',
-      justifyContent: 'space-between',
-      alignItems: 'center',
-      paddingVertical: spacing.xs,
-    },
-    metaLabel: {
-      fontFamily: fonts.sans,
-      fontSize: 13,
-      color: colors.textSecondary,
-    },
-    metaVal: {
-      fontFamily: fonts.sansBold,
-      fontSize: 13,
-      color: colors.textPrimary,
-    },
-    divider: {
-      height: 1,
-      backgroundColor: colors.border,
-      marginVertical: spacing.xs,
-    },
-    tagsWrap: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      gap: spacing.xs,
-    },
+    wishlistBadgeText: { fontFamily: fonts.sansBold, fontSize: 11, color: colors.textOnPrimary },
+    sectionTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.textPrimary, marginBottom: spacing.xs },
+    card: { marginBottom: spacing.md },
+    metaRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: spacing.xs },
+    metaLabel: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary },
+    metaVal: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.textPrimary },
+    divider: { height: 1, backgroundColor: colors.border, marginVertical: spacing.xs },
+    tagsWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
     tagBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -342,48 +278,16 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingVertical: 4,
       borderRadius: radius.md,
     },
-    tagBadgeText: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 12,
-      color: colors.primary,
-    },
-    statsRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-around',
-      paddingVertical: spacing.xs,
-    },
-    statBox: {
-      alignItems: 'center',
-      flex: 1,
-    },
-    vDivider: {
-      width: 1,
-      height: 40,
-      backgroundColor: colors.border,
-    },
-    statNumber: {
-      fontFamily: fonts.sansBold,
-      fontSize: 22,
-      color: colors.primary,
-    },
-    statDateVal: {
-      fontFamily: fonts.sansBold,
-      fontSize: 14,
-      color: colors.textPrimary,
-    },
-    statLabel: {
-      fontFamily: fonts.sans,
-      fontSize: 12,
-      color: colors.textSecondary,
-      marginTop: 2,
-    },
-    errorText: {
-      fontFamily: fonts.sansBold,
-      fontSize: 16,
-      color: colors.textPrimary,
-      marginBottom: spacing.md,
-    },
+    tagIcon: { marginRight: 4 },
+    tagBadgeText: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.primary },
+    statsRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-around', paddingVertical: spacing.xs },
+    statBox: { alignItems: 'center', flex: 1 },
+    vDivider: { width: 1, height: 40, backgroundColor: colors.border },
+    statNumber: { fontFamily: fonts.sansBold, fontSize: 22, color: colors.primary },
+    statDateRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
+    statDateVal: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary },
+    statLabel: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    errorText: { fontFamily: fonts.sansBold, fontSize: 16, color: colors.textPrimary, marginBottom: spacing.md },
     backBtn: {
       paddingHorizontal: spacing.lg,
       paddingVertical: spacing.sm,
@@ -392,9 +296,5 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    backBtnText: {
-      fontFamily: fonts.sansBold,
-      fontSize: 14,
-      color: colors.textPrimary,
-    },
+    backBtnText: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary },
   });

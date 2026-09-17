@@ -515,3 +515,23 @@ Added in **D-050 / D-052** (2026-08-27) matching Module 11 of the SRS and the up
    - Three split algorithms: `EQUAL`, `PERCENTAGE` (must sum to 100%), and `SHARES`.
    - Greedy debt minimization matches creditors with debtors in $O(N \log N)$ to minimize total transaction count.
    - Complete technical specification and PostgreSQL DDL live in `docs/EXPENSES_API_SPEC.md`.
+
+## 14. Wardrobe & Weather-Adaptive Style Mirror (D-063)
+
+`src/features/style_pantry/` is the first module built **server-authoritative** against a live backend (`docs/WARDROBE_API_SPEC.md`, base path `/api/style`, no family scoping). Layout:
+
+| File | Role |
+| --- | --- |
+| `types.ts` | Client shapes. `*Input` types are exactly what may be sent; response types are post-normalisation (nulls → `undefined`, upper-cased enums → the lower-case unions, `isWishlist`/`isSaved` always booleans). |
+| `api.ts` | One thin, typed function per endpoint (30 routes). Builds the exact request shape (multipart `metadata` JSON part + optional `file` for items) and maps every response through `toItem`/`toOutfit`/… so screens never see raw server JSON. |
+| `errors.ts` | `StoreError {status, code, message}` from the backend's `{code, message}` envelope; `describeStoreError` maps known codes to `style_pantry.err_*` strings; `showStoreErrorAlert`. |
+| `stylePantryStore.ts` | Sync layer. Reads return `ReadResult<T> = {data, offline, error?}` — server first, AsyncStorage cache only when the server is unreachable. Writes return `WriteResult<T>` (`{ok:true, data}` / `{ok:false, offline, error}`), require a session and a reachable server, and update the cache only from the server response. No seed/mock data exists any more. Trip outfits/checklists are cached per trip id. `loadTodaysOutfit` caches the AI Stylist home's outfit per calendar day. |
+| `hooks.ts` | `useFocusLoad` (refetch on every focus + pull-to-refresh, exposes `offline`), `useBusy`, `useLocaleRerender`. |
+| `format.ts` | Localized labels for every enum (`eventTypeLabel`, `categoryLabel`, `seasonLabel`, `moodLabel`), `dateLabel`/`dateRangeLabel`, `priceLabel` (INR). |
+| `components/` | `WardrobeHeader`, `ItemThumb` (photo with icon fallback; keeps the last loaded URL per S3 object path for 8 min so re-signed URLs don't re-flicker), `OfflineBanner`, `ItemPickerSheet` (scrollable multi-select), `TripFormSheet`, `OutfitShowcase` (large hero image + big item tiles used by the Style Mirror chat and Outfit Details). |
+| AI stylist | `sendStyleMessage` → `POST /api/style/chat` (style-only conversation, may return an outfit); `generateOutfitRecommendation` → `POST /recommendations/generate` (OpenAI stylist first, rule-based fallback on the server). Both need the backend's `OPEN_AI_KEY`; without it chat is `422 STYLIST_UNAVAILABLE` and generation silently uses the fallback. |
+| `screens/` | Twelve screens: AI Stylist home (editorial: dark "today's look" hero, purpose cards, stats, photo carousel), closet dashboard, folder items, add/edit item, item details, **Style Mirror** (= outfit suggestion: weather/mood/occasion controls, a feed of magazine-style looks, a wardrobe-aware "refine this look" composer), **Style Chat** (= a pure conversation with the stylist about style, no occasion/mood controls; outfit cards appear only when the stylist proposes one), outfit details (full-bleed mosaic hero + sheet-style panel + sticky Wear/Save bar), style log, style calendar, trip planner, trip details. Routes: `AiStylistHome`, `Wardrobe`, `ClosetItems`, `AddEditClothing`, `ClothingDetails`, `StyleMirror`, `StyleChat`, `OutfitDetails`, `StyleLog`, `StyleCalendar`, `Trips`, `TripDetails` (the old `StylePantryDashboard` alias was removed; `StyleChat` is now its own screen, not an alias of `StyleMirror`). |
+
+Calendar dates always go through `src/utils/date.ts` (`todayString`, `parseDateString`, `dateRange`) — `Date#toISOString()` is UTC and shifts "today" for part of every evening in IST. `apiFetch` now aborts after 15 s (uploads 60 s) and reports the timeout as a network error.
+
+Storage keys: `habita.style_pantry_{items,occasions,saved_outfits,history,collections,trips,weather,today_outfit}` and `habita.style_pantry_trip_{outfits,checklist}:<tripId>` — all caches of server data, safe to clear.

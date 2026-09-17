@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   View,
   Text,
@@ -6,455 +6,556 @@ import {
   StyleSheet,
   Pressable,
   TextInput,
+  Alert,
+  Share,
   RefreshControl,
+  useWindowDimensions,
 } from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import useAuth from '../../../hooks/useAuth';
-import ArrowLeft from 'lucide-react-native/icons/arrow-left';
-import Search from 'lucide-react-native/icons/search';
 import Plus from 'lucide-react-native/icons/plus';
-import Sparkles from 'lucide-react-native/icons/sparkles';
-import ChevronRight from 'lucide-react-native/icons/chevron-right';
-import Shirt from 'lucide-react-native/icons/shirt';
-import GlassCard from '../../../components/GlassCard';
-import { SkeletonBox, SkeletonCircle, SkeletonText } from '../../../components/Skeleton';
-import { loadClothingItems } from '../stylePantryStore';
-import { CATEGORY_ICON_KEYS, getClothingIconComponent } from '../clothingIcons';
-import type { ClothingCategory, ClothingItem } from '../types';
-import { subscribeToLanguageChanges, t } from '../../../i18n';
+import BarChart3 from 'lucide-react-native/icons/chart-column';
+import Heart from 'lucide-react-native/icons/heart';
+import WandSparkles from 'lucide-react-native/icons/wand-sparkles';
+import Share2 from 'lucide-react-native/icons/share-2';
+import FolderOpen from 'lucide-react-native/icons/folder-open';
+import Pencil from 'lucide-react-native/icons/pencil';
+import Trash2 from 'lucide-react-native/icons/trash';
+import BottomSheet from '../../../components/BottomSheet';
+import Button from '../../../components/Button';
+import { SkeletonBox } from '../../../components/Skeleton';
+import {
+  loadClothingItems,
+  loadCollections,
+  addCollection,
+  editCollection,
+  removeCollection,
+  ownedItems as pickOwned,
+} from '../stylePantryStore';
+import { showStoreErrorAlert } from '../errors';
+import { useBusy, useFocusLoad, useLocaleRerender } from '../hooks';
+import WardrobeHeader from '../components/WardrobeHeader';
+import ItemThumb from '../components/ItemThumb';
+import PhotoCard from '../components/PhotoCard';
+import OfflineBanner from '../components/OfflineBanner';
+import ItemPickerSheet from '../components/ItemPickerSheet';
+import {
+  COLLECTION_ICON_KEYS,
+  getCollectionIconComponent,
+} from '../collectionIcons';
+import type { ClothingItem, WardrobeCollection } from '../types';
+import { t } from '../../../i18n';
 
-type Props = StackScreenProps<RootStackParamList, 'StylePantryDashboard' | 'Wardrobe'>;
+type Props = StackScreenProps<RootStackParamList, 'Wardrobe'>;
 
-const CATEGORIES: { key: ClothingCategory | 'all'; labelKey: string; iconKey: string }[] = [
-  { key: 'all', labelKey: 'style_pantry.cat_all', iconKey: 'shirt' },
-  { key: 'tops', labelKey: 'style_pantry.cat_tops', iconKey: CATEGORY_ICON_KEYS.tops },
-  { key: 'bottoms', labelKey: 'style_pantry.cat_bottoms', iconKey: CATEGORY_ICON_KEYS.bottoms },
-  { key: 'shoes', labelKey: 'style_pantry.cat_shoes', iconKey: CATEGORY_ICON_KEYS.shoes },
-  { key: 'jackets', labelKey: 'style_pantry.cat_jackets', iconKey: CATEGORY_ICON_KEYS.jackets },
-  { key: 'accessories', labelKey: 'style_pantry.cat_accessories', iconKey: CATEGORY_ICON_KEYS.accessories },
-];
+interface FolderCard {
+  key: string;
+  title: string;
+  count: number;
+  coverItems: ClothingItem[];
+  iconKey: string;
+  onPress: () => void;
+  collection?: WardrobeCollection;
+}
 
 export default function WardrobeDashboardScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
-  const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
-  const [, setLocaleVersion] = useState(0);
+  const { width } = useWindowDimensions();
+  useLocaleRerender();
+  const folderWidth = Math.floor((width - 2 * 24 - 12) / 2);
+  const folderHeight = Math.round(folderWidth * 1.1);
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [items, setItems] = useState<ClothingItem[]>([]);
-  const [selectedCat, setSelectedCat] = useState<ClothingCategory | 'all'>('all');
-  const [searchQuery, setSearchQuery] = useState('');
+  const [collections, setCollections] = useState<WardrobeCollection[]>([]);
 
-  const fetchItems = useCallback(async () => {
-    const token = await getAccessToken();
-    const list = await loadClothingItems(token);
-    setItems(list);
-  }, [getAccessToken]);
+  // Create / edit closet sheet
+  const [sheetOpen, setSheetOpen] = useState(false);
+  const [editing, setEditing] = useState<WardrobeCollection | null>(null);
+  const [name, setName] = useState('');
+  const [iconKey, setIconKey] = useState<string>(COLLECTION_ICON_KEYS[0]);
+  const [selectedIds, setSelectedIds] = useState<string[]>([]);
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [optionsFor, setOptionsFor] = useState<WardrobeCollection | null>(null);
+  const [showComingSoon, setShowComingSoon] = useState<string | null>(null);
+  const [busy, run] = useBusy();
 
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchItems();
-    setRefreshing(false);
-  }, [fetchItems]);
+  const { loading, refreshing, offline, refresh, reload } = useFocusLoad(
+    useCallback(async () => {
+      const token = await getAccessToken();
+      const [list, cols] = await Promise.all([
+        loadClothingItems(token),
+        loadCollections(token),
+      ]);
+      setItems(list.data);
+      setCollections(cols.data);
+      return { offline: list.offline || cols.offline };
+    }, [getAccessToken]),
+  );
 
-  useEffect(() => {
-    const unsubLang = subscribeToLanguageChanges(() => setLocaleVersion((v) => v + 1));
-    const unsubFocus = navigation.addListener('focus', () => {
-      setLoading(true);
-      fetchItems().finally(() => setLoading(false));
+  const owned = useMemo(() => pickOwned(items), [items]);
+  const wishlistCount = items.length - owned.length;
+  const winterItems = useMemo(() => owned.filter(i => i.season === 'winter'), [owned]);
+
+  const openCreate = () => {
+    setEditing(null);
+    setName('');
+    setIconKey(COLLECTION_ICON_KEYS[0]);
+    setSelectedIds([]);
+    setSheetOpen(true);
+  };
+
+  const openEdit = (col: WardrobeCollection) => {
+    setOptionsFor(null);
+    setEditing(col);
+    setName(col.name);
+    setIconKey(col.iconKey);
+    setSelectedIds(col.itemIds.filter(id => owned.some(i => i.id === id)));
+    setSheetOpen(true);
+  };
+
+  const closeSheet = () => {
+    setSheetOpen(false);
+    setEditing(null);
+  };
+
+  const handleSaveCollection = () =>
+    run(async () => {
+      const trimmed = name.trim();
+      if (!trimmed) {
+        Alert.alert(t('closet.missing_name_title'), t('closet.missing_name_msg'));
+        return;
+      }
+      const token = await getAccessToken();
+      const input = { name: trimmed, iconKey, itemIds: selectedIds };
+      const result = editing
+        ? await editCollection(editing.id, input, token)
+        : await addCollection(input, token);
+      if (!result.ok) {
+        showStoreErrorAlert(result.error);
+        return;
+      }
+      closeSheet();
+      await reload();
     });
-    return () => {
-      unsubLang();
-      unsubFocus();
-    };
-  }, [navigation, fetchItems]);
 
-  const filteredItems = items.filter((item) => {
-    const matchesCat = selectedCat === 'all' || item.category === selectedCat;
-    const matchesSearch =
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      (item.brand && item.brand.toLowerCase().includes(searchQuery.toLowerCase())) ||
-      (item.color && item.color.toLowerCase().includes(searchQuery.toLowerCase()));
-    return matchesCat && matchesSearch;
-  });
+  const confirmDelete = (col: WardrobeCollection) => {
+    setOptionsFor(null);
+    Alert.alert(
+      t('closet.delete_closet_confirm_title'),
+      t('closet.delete_closet_confirm_msg'),
+      [
+        { text: t('style_pantry.cancel'), style: 'cancel' },
+        {
+          text: t('style_pantry.delete'),
+          style: 'destructive',
+          onPress: () =>
+            run(async () => {
+              const token = await getAccessToken();
+              const result = await removeCollection(col.id, token);
+              if (!result.ok) {
+                showStoreErrorAlert(result.error);
+                return;
+              }
+              await reload();
+            }),
+        },
+      ],
+    );
+  };
+
+  const handleShareCloset = async () => {
+    try {
+      await Share.share({
+        message: t('closet.share_message', { count: owned.length }),
+      });
+    } catch {
+      // user cancelled the native share sheet
+    }
+  };
+
+  const folders: FolderCard[] = [
+    {
+      key: 'all',
+      title: t('closet.folder_all_clothes'),
+      count: owned.length,
+      coverItems: owned.slice(0, 4),
+      iconKey: 'closet',
+      onPress: () =>
+        navigation.navigate('ClosetItems', { title: t('closet.folder_all_clothes') }),
+    },
+    {
+      key: 'winter',
+      title: t('closet.folder_winter_items'),
+      count: winterItems.length,
+      coverItems: winterItems.slice(0, 4),
+      iconKey: 'winter',
+      onPress: () =>
+        navigation.navigate('ClosetItems', {
+          title: t('closet.folder_winter_items'),
+          seasonFilter: 'winter',
+        }),
+    },
+    ...collections.map(col => {
+      const members = owned.filter(i => col.itemIds.includes(i.id));
+      return {
+        key: col.id,
+        title: col.name,
+        count: members.length,
+        coverItems: members.slice(0, 4),
+        iconKey: col.iconKey,
+        collection: col,
+        onPress: () =>
+          navigation.navigate('ClosetItems', { title: col.name, collectionId: col.id }),
+      };
+    }),
+  ];
 
   return (
     <View style={styles.root}>
-      {/* Header Bar */}
-      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <ArrowLeft size={20} color={styles.headerIcon.color} />
-        </Pressable>
-        <Text style={styles.headerTitle}>{t('style_pantry.dash_title')}</Text>
-        <Pressable
-          onPress={() => navigation.navigate('AddEditClothing', {})}
-          style={styles.addNavBtn}>
-          <Plus size={20} color={styles.headerIconOnPrimary.color} />
-        </Pressable>
-      </View>
+      <WardrobeHeader
+        title={t('closet.title')}
+        onBack={() => navigation.goBack()}
+        right={{
+          icon: Plus,
+          primary: true,
+          accessibilityLabel: t('style_pantry.add_item_btn'),
+          onPress: () => navigation.navigate('AddEditClothing', {}),
+        }}
+      />
 
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={styles.headerIcon.color} colors={[styles.headerIcon.color]} />
-        }>
-        {/* Search Bar */}
-        <View style={styles.searchBarRow}>
-          <Search size={18} color={styles.placeholder.color} style={{ marginRight: 8 }} />
-          <TextInput
-            style={styles.searchInput}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholder={t('style_pantry.search_placeholder')}
-            placeholderTextColor={styles.placeholder.color}
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={refresh}
+            tintColor={styles.iconTint.color}
+            colors={[styles.iconTint.color]}
           />
-        </View>
+        }
+      >
+        <OfflineBanner visible={offline} />
 
-        {/* AI Style Mirror Banner */}
-        <GlassCard
-          variant="default"
-          style={styles.aiBannerCard}
-          onPress={() => navigation.navigate('StyleMirror')}>
-          <View style={styles.aiBannerRow}>
-            <View style={styles.aiBannerLeft}>
-              <View style={styles.sparkleCircle}>
-                <Sparkles size={22} color={styles.aiAccent.color} />
-              </View>
-              <View style={{ flex: 1 }}>
-                <Text style={styles.aiBannerTitle}>{t('style_pantry.ai_banner_title')}</Text>
-                <Text style={styles.aiBannerSub}>{t('style_pantry.ai_banner_sub')}</Text>
-              </View>
+        <View style={styles.actionRow}>
+          <Pressable style={styles.actionItem} onPress={() => navigation.navigate('StyleCalendar')}>
+            <View style={styles.actionIconCircle}>
+              <BarChart3 size={18} color={styles.iconTint.color} />
             </View>
-            <ChevronRight size={20} color={styles.aiAccent.color} />
-          </View>
-        </GlassCard>
-
-        {/* Category Horizontal Filter Chips */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesContainer}>
-          {CATEGORIES.map((cat) => {
-            const CatIcon = getClothingIconComponent(cat.iconKey);
-            return (
-            <Pressable
-              key={cat.key}
-              style={[
-                styles.categoryChip,
-                selectedCat === cat.key && styles.categoryChipActive,
-              ]}
-              onPress={() => setSelectedCat(cat.key)}>
-              <CatIcon
-                size={14}
-                color={selectedCat === cat.key ? styles.headerIconOnPrimary.color : styles.chipText.color}
-                style={styles.chipIcon}
-              />
-              <Text
-                style={[
-                  styles.chipText,
-                  selectedCat === cat.key && styles.chipTextActive,
-                ]}>
-                {t(cat.labelKey)}
-              </Text>
-            </Pressable>
-            );
-          })}
-        </ScrollView>
-
-        {/* Items List Header */}
-        <View style={styles.listHeaderRow}>
-          <Text style={styles.sectionTitle}>
-            {t('style_pantry.all_items', { count: filteredItems.length })}
-          </Text>
+            <Text style={styles.actionLabel}>{t('closet.action_stats')}</Text>
+          </Pressable>
           <Pressable
-            onPress={() => navigation.navigate('AddEditClothing', {})}
-            style={styles.inlineAddBtn}>
-            <Text style={styles.inlineAddBtnText}>{t('style_pantry.add_item_btn')}</Text>
+            style={styles.actionItem}
+            onPress={() =>
+              navigation.navigate('ClosetItems', {
+                title: t('closet.folder_wishlist'),
+                wishlistOnly: true,
+              })
+            }
+          >
+            <View style={styles.actionIconCircle}>
+              <Heart size={18} color={styles.iconTint.color} />
+            </View>
+            <Text style={styles.actionLabel}>
+              {t('closet.action_wishlist')}
+              {wishlistCount > 0 ? ` (${wishlistCount})` : ''}
+            </Text>
+          </Pressable>
+          <Pressable style={styles.actionItem} onPress={() => setShowComingSoon(t('closet.action_beautify'))}>
+            <View style={styles.actionIconCircle}>
+              <WandSparkles size={18} color={styles.iconTint.color} />
+            </View>
+            <Text style={styles.actionLabel}>{t('closet.action_beautify')}</Text>
+          </Pressable>
+          <Pressable style={styles.actionItem} onPress={handleShareCloset}>
+            <View style={styles.actionIconCircle}>
+              <Share2 size={18} color={styles.iconTint.color} />
+            </View>
+            <Text style={styles.actionLabel}>{t('closet.action_share')}</Text>
           </Pressable>
         </View>
 
         {loading ? (
           <View style={styles.gridWrap}>
-            {[0, 1, 2, 3].map((i) => (
-              <View key={i} style={styles.clothingCard}>
-                <SkeletonCircle size={56} style={{ alignSelf: 'center', marginBottom: 12 }} />
-                <SkeletonText width="70%" style={{ alignSelf: 'center', marginBottom: 6 }} />
-                <SkeletonText width="50%" height={11} style={{ alignSelf: 'center' }} />
-              </View>
+            {[0, 1].map(i => (
+              <SkeletonBox key={i} width={folderWidth} height={folderHeight} borderRadius={20} style={styles.folderCardWrap} />
             ))}
-          </View>
-        ) : filteredItems.length === 0 ? (
-          <View style={styles.emptyCard}>
-            <Shirt size={36} color={styles.placeholder.color} />
-            <Text style={styles.emptyTitle}>{t('style_pantry.no_items_found')}</Text>
-            <Text style={styles.emptySub}>
-              {searchQuery ? t('style_pantry.try_search_again') : t('style_pantry.add_first_item')}
-            </Text>
           </View>
         ) : (
           <View style={styles.gridWrap}>
-            {filteredItems.map((item) => {
-              const ItemIcon = getClothingIconComponent(item.emoji);
+            {folders.map(folder => {
+              const FolderIcon = getCollectionIconComponent(folder.iconKey);
+              const cover = folder.coverItems[0];
+              const onLongPress = folder.collection ? () => setOptionsFor(folder.collection ?? null) : undefined;
+              if (cover) {
+                return (
+                  <PhotoCard
+                    key={folder.key}
+                    item={cover}
+                    width={folderWidth}
+                    height={folderHeight}
+                    radius={20}
+                    stripHeight={66}
+                    style={styles.folderCardWrap}
+                    onPress={folder.onPress}
+                    onLongPress={onLongPress}
+                    accessibilityLabel={folder.title}
+                    overlay={
+                      <View style={styles.folderIconChip} pointerEvents="none">
+                        <FolderIcon size={14} color={styles.iconTint.color} />
+                      </View>
+                    }
+                  >
+                    <Text style={styles.folderTitle} numberOfLines={1}>
+                      {folder.title}
+                    </Text>
+                    <Text style={styles.folderCount}>
+                      {t('closet.folder_item_count', { count: folder.count })}
+                    </Text>
+                  </PhotoCard>
+                );
+              }
               return (
-              <GlassCard
-                key={item.id}
-                variant="default"
-                style={styles.clothingCard}
-                onPress={() => navigation.navigate('ClothingDetails', { itemId: item.id })}>
-                <View style={styles.cardEmojiBadge}>
-                  <ItemIcon size={28} color={styles.iconTint.color} />
-                </View>
-                <Text style={styles.cardItemName} numberOfLines={1}>
-                  {item.name}
-                </Text>
-                <Text style={styles.cardSubText}>
-                  {item.color} {item.brand ? `· ${item.brand}` : ''}
-                </Text>
-                <View style={styles.cardFooter}>
-                  <Text style={styles.wearCountText}>
-                    {t('style_pantry.item_worn_times', { count: item.wearCount })}
+                <Pressable
+                  key={folder.key}
+                  style={[styles.folderCardWrap, styles.folderEmptyCard, { width: folderWidth, height: folderHeight }]}
+                  onPress={folder.onPress}
+                  onLongPress={onLongPress}
+                  delayLongPress={350}
+                  accessibilityRole="button"
+                  accessibilityLabel={folder.title}
+                >
+                  <View style={styles.folderCoverEmpty}>
+                    <FolderIcon size={26} color={styles.iconTint.color} />
+                  </View>
+                  <Text style={styles.folderEmptyTitle} numberOfLines={1}>
+                    {folder.title}
                   </Text>
-                </View>
-              </GlassCard>
+                  <Text style={styles.folderEmptyCount}>
+                    {t('closet.folder_item_count', { count: folder.count })}
+                  </Text>
+                </Pressable>
               );
             })}
+            <Pressable style={[styles.createFolderCard, { width: folderWidth, height: folderHeight }]} onPress={openCreate}>
+              <FolderOpen size={26} color={styles.iconTint.color} />
+              <Text style={styles.createFolderText}>{t('closet.create_closet')}</Text>
+            </Pressable>
           </View>
         )}
       </ScrollView>
+
+      {/* Create / edit closet */}
+      <BottomSheet
+        visible={sheetOpen}
+        onClose={closeSheet}
+        title={editing ? t('closet.edit_closet') : t('closet.create_closet')}
+      >
+        <Text style={styles.inputLabel}>{t('closet.closet_name_label')}</Text>
+        <TextInput
+          style={styles.textInput}
+          value={name}
+          onChangeText={setName}
+          placeholder={t('closet.closet_name_placeholder')}
+          placeholderTextColor={styles.placeholder.color}
+        />
+        <Text style={styles.inputLabel}>{t('closet.closet_icon_label')}</Text>
+        <View style={styles.iconPickerWrap}>
+          {COLLECTION_ICON_KEYS.map(key => {
+            const IconComp = getCollectionIconComponent(key);
+            const active = iconKey === key;
+            return (
+              <Pressable
+                key={key}
+                style={[styles.iconChoice, active && styles.iconChoiceActive]}
+                onPress={() => setIconKey(key)}
+                accessibilityRole="radio"
+                accessibilityState={{ selected: active }}
+              >
+                <IconComp size={18} color={active ? styles.iconOnPrimary.color : styles.iconTint.color} />
+              </Pressable>
+            );
+          })}
+        </View>
+        <Text style={styles.inputLabel}>{t('closet.closet_items_label')}</Text>
+        <Pressable style={styles.pickItemsBtn} onPress={() => setPickerOpen(true)}>
+          <View style={styles.pickPreview}>
+            {owned
+              .filter(i => selectedIds.includes(i.id))
+              .slice(0, 5)
+              .map(i => (
+                <ItemThumb key={i.id} item={i} size={32} radius={6} style={styles.pickPreviewThumb} />
+              ))}
+          </View>
+          <Text style={styles.pickItemsText}>
+            {t('closet.items_selected', { count: selectedIds.length })}
+          </Text>
+        </Pressable>
+        <Button
+          title={t('closet.save_closet')}
+          onPress={handleSaveCollection}
+          loading={busy}
+          style={styles.sheetBtn}
+        />
+      </BottomSheet>
+
+      <ItemPickerSheet
+        visible={pickerOpen}
+        title={t('closet.closet_items_label')}
+        items={owned}
+        selectedIds={selectedIds}
+        onClose={() => setPickerOpen(false)}
+        onConfirm={ids => {
+          setSelectedIds(ids);
+          setPickerOpen(false);
+        }}
+        confirmLabel={t('closet.closet_items_label')}
+      />
+
+      {/* Long-press options for a custom closet */}
+      <BottomSheet
+        visible={!!optionsFor}
+        onClose={() => setOptionsFor(null)}
+        title={optionsFor?.name ?? t('closet.closet_options')}
+      >
+        <Pressable style={styles.optionRow} onPress={() => optionsFor && openEdit(optionsFor)}>
+          <Pencil size={18} color={styles.iconTint.color} />
+          <Text style={styles.optionText}>{t('closet.edit_closet')}</Text>
+        </Pressable>
+        <Pressable style={styles.optionRow} onPress={() => optionsFor && confirmDelete(optionsFor)}>
+          <Trash2 size={18} color={styles.danger.color} />
+          <Text style={[styles.optionText, styles.danger]}>{t('closet.delete_closet')}</Text>
+        </Pressable>
+      </BottomSheet>
+
+      <BottomSheet
+        visible={!!showComingSoon}
+        onClose={() => setShowComingSoon(null)}
+        title={showComingSoon || ''}
+      >
+        <Text style={styles.comingSoonText}>{t('ai_stylist.coming_soon')}</Text>
+        <Button title={t('ai_stylist.coming_soon_ok')} onPress={() => setShowComingSoon(null)} style={styles.sheetBtn} />
+      </BottomSheet>
     </View>
   );
 }
 
-const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
+const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
   StyleSheet.create({
-    root: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    headerBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.sm,
-      backgroundColor: colors.background,
-    },
-    headerBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...shadow.soft,
-    },
-    headerIcon: {
-      color: colors.textPrimary,
-    },
-    headerIconOnPrimary: {
-      color: colors.textOnPrimary,
-    },
-    iconTint: {
-      color: colors.primary,
-    },
-    aiAccent: {
-      color: colors.primary,
-    },
-    headerTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 18,
-      color: colors.textPrimary,
-    },
-    addNavBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-      ...shadow.soft,
-    },
-    content: {
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xxl,
-    },
-    searchBarRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: radius.md,
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.sm,
-      borderWidth: 1,
-      borderColor: colors.border,
-      marginBottom: spacing.md,
-    },
-    searchInput: {
-      flex: 1,
-      fontFamily: fonts.sans,
-      fontSize: 14,
-      color: colors.textPrimary,
-      padding: 0,
-    },
-    placeholder: {
-      color: colors.textSecondary,
-    },
-    aiBannerCard: {
-      marginBottom: spacing.md,
-    },
-    aiBannerRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-    },
-    aiBannerLeft: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      flex: 1,
-      marginRight: spacing.sm,
-    },
-    sparkleCircle: {
+    root: { flex: 1, backgroundColor: colors.background },
+    iconTint: { color: colors.primary },
+    iconOnPrimary: { color: colors.textOnPrimary },
+    danger: { color: colors.danger },
+    content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+    actionRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: spacing.lg },
+    actionItem: { alignItems: 'center', flex: 1 },
+    actionIconCircle: {
       width: 44,
       height: 44,
       borderRadius: 22,
-      backgroundColor: colors.blush,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: spacing.sm,
-    },
-    aiBannerTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 15,
-      color: colors.textPrimary,
-    },
-    aiBannerSub: {
-      fontFamily: fonts.sans,
-      fontSize: 12,
-      color: colors.textSecondary,
-      marginTop: 2,
-    },
-    categoriesContainer: {
-      paddingVertical: spacing.xs,
-      gap: spacing.xs,
-      marginBottom: spacing.md,
-    },
-    categoryChip: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: spacing.md,
-      paddingVertical: spacing.xs + 2,
-      borderRadius: radius.pill,
-      backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      marginRight: 6,
-    },
-    categoryChipActive: {
-      backgroundColor: colors.primary,
-      borderColor: colors.primary,
-    },
-    chipIcon: {
-      marginRight: 6,
-    },
-    chipText: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 13,
-      color: colors.textSecondary,
-    },
-    chipTextActive: {
-      color: colors.textOnPrimary,
-    },
-    listHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.md,
-    },
-    sectionTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 16,
-      color: colors.textPrimary,
-    },
-    inlineAddBtn: {
-      paddingHorizontal: spacing.sm,
-      paddingVertical: 4,
-    },
-    inlineAddBtnText: {
-      fontFamily: fonts.sansBold,
-      fontSize: 13,
-      color: colors.primary,
-    },
-    emptyCard: {
-      backgroundColor: colors.surface,
-      borderRadius: radius.lg,
-      padding: spacing.xl,
+      backgroundColor: colors.surfaceElevated,
       alignItems: 'center',
       justifyContent: 'center',
       borderWidth: 1,
       borderColor: colors.border,
-      marginTop: spacing.md,
+      marginBottom: 6,
     },
-    emptyTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 15,
-      color: colors.textPrimary,
-      marginTop: spacing.md,
+    actionLabel: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary, textAlign: 'center' },
+    gridWrap: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'space-between' },
+    folderCardWrap: { marginBottom: spacing.sm + 4 },
+    folderIconChip: {
+      position: 'absolute',
+      top: spacing.sm + 2,
+      left: spacing.sm + 2,
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
-    emptySub: {
-      fontFamily: fonts.sans,
-      fontSize: 13,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginTop: spacing.xs,
-    },
-    gridWrap: {
-      flexDirection: 'row',
-      flexWrap: 'wrap',
-      justifyContent: 'space-between',
-    },
-    clothingCard: {
-      width: '48%',
-      marginBottom: spacing.md,
+    folderTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textOnPrimary },
+    folderCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.textOnPrimaryMuted, marginTop: 2 },
+    folderEmptyCard: {
+      borderRadius: 20,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
       padding: spacing.md,
+      justifyContent: 'flex-end',
     },
-    cardEmojiBadge: {
-      width: 56,
-      height: 56,
+    folderCoverEmpty: {
+      flex: 1,
       borderRadius: radius.md,
       backgroundColor: colors.surfaceElevated,
       alignItems: 'center',
       justifyContent: 'center',
       marginBottom: spacing.sm,
-      alignSelf: 'center',
     },
-    cardItemName: {
-      fontFamily: fonts.sansBold,
+    folderEmptyTitle: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary },
+    folderEmptyCount: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    createFolderCard: {
+      marginBottom: spacing.sm + 4,
+      padding: spacing.md,
+      borderRadius: 20,
+      borderWidth: 1,
+      borderStyle: 'dashed',
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    createFolderText: { fontFamily: fonts.sansBold, fontSize: 13, color: colors.primary, marginTop: spacing.sm, textAlign: 'center' },
+    inputLabel: { fontFamily: fonts.sansMedium, fontSize: 13, color: colors.textSecondary, marginBottom: spacing.xs, marginTop: spacing.sm },
+    textInput: {
+      fontFamily: fonts.sans,
       fontSize: 14,
       color: colors.textPrimary,
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: radius.md,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
     },
-    cardSubText: {
-      fontFamily: fonts.sans,
-      fontSize: 12,
-      color: colors.textSecondary,
-      marginTop: 2,
+    placeholder: { color: colors.textSecondary },
+    iconPickerWrap: { flexDirection: 'row', flexWrap: 'wrap', gap: spacing.xs },
+    iconChoice: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.surfaceElevated,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 1,
+      borderColor: colors.border,
     },
-    cardFooter: {
-      marginTop: spacing.sm,
-      paddingTop: spacing.xs,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
+    iconChoiceActive: { backgroundColor: colors.primary, borderColor: colors.primary },
+    pickItemsBtn: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.sm,
+      backgroundColor: colors.surfaceElevated,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: colors.border,
+      padding: spacing.sm,
     },
-    wearCountText: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 11,
-      color: colors.primary,
+    pickPreview: { flexDirection: 'row', gap: 4 },
+    pickPreviewThumb: { marginRight: 0 },
+    pickItemsText: { flex: 1, fontFamily: fonts.sansMedium, fontSize: 13, color: colors.primary },
+    sheetBtn: { marginTop: spacing.md },
+    optionRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: spacing.md,
+      paddingVertical: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
     },
+    optionText: { fontFamily: fonts.sansMedium, fontSize: 14, color: colors.textPrimary },
+    comingSoonText: { fontFamily: fonts.sans, fontSize: 14, color: colors.textSecondary, lineHeight: 20, marginBottom: spacing.sm },
   });

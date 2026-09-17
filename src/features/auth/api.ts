@@ -23,6 +23,25 @@ interface ApiFetchOptions {
   method: 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
   body?: unknown;
   token?: string | null;
+  timeoutMs?: number;
+}
+
+// A hung server must not spin every screen forever; treat a timeout like "unreachable".
+export const DEFAULT_TIMEOUT_MS = 15_000;
+const UPLOAD_TIMEOUT_MS = 60_000;
+
+async function fetchWithTimeout(input: string, init: RequestInit, timeoutMs: number): Promise<Response> {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  try {
+    return await fetch(input, { ...init, signal: controller.signal });
+  } catch {
+    // No HTTP response at all — offline, DNS failure, server unreachable, or timeout.
+    // Status 0 distinguishes this from a real HTTP error status for parseAuthError below.
+    throw new ApiError(0, null);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 
 export async function apiFetch<T>(path: string, options: ApiFetchOptions): Promise<T> {
@@ -31,18 +50,15 @@ export async function apiFetch<T>(path: string, options: ApiFetchOptions): Promi
     headers.Authorization = `Bearer ${options.token}`;
   }
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE_URL}${path}`, {
+  const res = await fetchWithTimeout(
+    `${API_BASE_URL}${path}`,
+    {
       method: options.method,
       headers,
       body: options.body !== undefined ? JSON.stringify(options.body) : undefined,
-    });
-  } catch {
-    // No HTTP response at all — offline, DNS failure, server unreachable. Status 0
-    // distinguishes this from a real HTTP error status for parseAuthError below.
-    throw new ApiError(0, null);
-  }
+    },
+    options.timeoutMs ?? DEFAULT_TIMEOUT_MS,
+  );
 
   const text = await res.text();
   const parsed = text ? safeJsonParse(text) : null;
@@ -66,13 +82,11 @@ export async function postMultipart<T>(
     headers.Authorization = `Bearer ${token}`;
   }
 
-  let res: Response;
-  try {
-    res = await fetch(`${API_BASE_URL}${path}`, { method, headers, body: form });
-  } catch (err) {
-    console.warn(`[postMultipart] ${method} ${API_BASE_URL}${path} failed before a response:`, err);
-    throw new ApiError(0, null);
-  }
+  const res = await fetchWithTimeout(
+    `${API_BASE_URL}${path}`,
+    { method, headers, body: form },
+    UPLOAD_TIMEOUT_MS,
+  );
 
   const text = await res.text();
   const parsed = text ? safeJsonParse(text) : null;

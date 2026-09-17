@@ -21,7 +21,7 @@ import CheckCircle2 from 'lucide-react-native/icons/circle-check';
 import HandCoins from 'lucide-react-native/icons/hand-coins';
 import Calendar from 'lucide-react-native/icons/calendar';
 import User from 'lucide-react-native/icons/user';
-import Trash2 from 'lucide-react-native/icons/trash-2';
+import Trash2 from 'lucide-react-native/icons/trash';
 import CreditCard from 'lucide-react-native/icons/credit-card';
 import Banknote from 'lucide-react-native/icons/banknote';
 import Landmark from 'lucide-react-native/icons/landmark';

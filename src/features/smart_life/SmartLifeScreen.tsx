@@ -80,7 +80,7 @@ export default function SmartLifeScreen({ navigation }: Props) {
               <Pressable
                 key={mod.id}
                 style={({ pressed }) => [styles.moduleBox, pressed && styles.moduleBoxPressed]}
-                onPress={() => navigation.navigate(mod.id === 'pantry' ? 'Pantry' : 'Wardrobe')}>
+                onPress={() => navigation.navigate(mod.id === 'pantry' ? 'Pantry' : 'AiStylistHome')}>
                 <View style={styles.moduleBoxHeader}>
                   <View style={styles.moduleBoxBadge}>
                     <mod.Icon size={18} color="#000000" strokeWidth={1.5} />
@@ -150,7 +150,7 @@ export default function SmartLifeScreen({ navigation }: Props) {
               onPress={() => {
                 const mod = infoModule;
                 setInfoModule(null);
-                navigation.navigate(mod.id === 'pantry' ? 'Pantry' : 'Wardrobe');
+                navigation.navigate(mod.id === 'pantry' ? 'Pantry' : 'AiStylistHome');
               }}
               style={styles.infoSheetCta}
             />

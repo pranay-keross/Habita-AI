@@ -26,7 +26,7 @@ import Package from 'lucide-react-native/icons/package';
 import Pencil from 'lucide-react-native/icons/pencil';
 import Plus from 'lucide-react-native/icons/plus';
 import ScanLine from 'lucide-react-native/icons/scan-line';
-import Trash2 from 'lucide-react-native/icons/trash-2';
+import Trash2 from 'lucide-react-native/icons/trash';
 import Wifi from 'lucide-react-native/icons/wifi';
 import type { RootStackParamList } from '../../app/_layout';
 import BottomSheet from '../../components/BottomSheet';

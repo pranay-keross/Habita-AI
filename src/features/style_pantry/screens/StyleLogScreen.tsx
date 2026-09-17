@@ -1,183 +1,122 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import {
-  View,
-  Text,
-  ScrollView,
-  StyleSheet,
-  Pressable,
-  RefreshControl,
-} from 'react-native';
-import { useSafeAreaInsets } from 'react-native-safe-area-context';
+import React, { useCallback, useState } from 'react';
+import { View, Text, ScrollView, StyleSheet, RefreshControl } from 'react-native';
 import type { StackScreenProps } from '@react-navigation/stack';
 import type { RootStackParamList } from '../../../app/_layout';
 import type { ThemeTokens } from '../../../theme';
 import useThemedStyles from '../../../hooks/useThemedStyles';
 import useAuth from '../../../hooks/useAuth';
-import ArrowLeft from 'lucide-react-native/icons/arrow-left';
 import ClockArrowLeft from 'lucide-react-native/icons/clock-arrow-left';
 import GlassCard from '../../../components/GlassCard';
-import {
-  SkeletonBox,
-  SkeletonCircle,
-  SkeletonText,
-} from '../../../components/Skeleton';
+import { SkeletonBox, SkeletonCircle, SkeletonText } from '../../../components/Skeleton';
 import { loadClothingItems, loadStyleHistory } from '../stylePantryStore';
-import { getClothingIconComponent } from '../clothingIcons';
 import { getMoodIconComponent } from '../moods';
-import type { ClothingItem, WornOutfitEntry } from '../types';
-import { subscribeToLanguageChanges, t } from '../../../i18n';
+import { useFocusLoad, useLocaleRerender } from '../hooks';
+import { dateLabel, eventTypeLabel, moodLabel } from '../format';
+import WardrobeHeader from '../components/WardrobeHeader';
+import ItemThumb from '../components/ItemThumb';
+import OfflineBanner from '../components/OfflineBanner';
+import type { ClothingItem, OutfitRecommendation, WornOutfitEntry } from '../types';
+import { t } from '../../../i18n';
 
 type Props = StackScreenProps<RootStackParamList, 'StyleLog'>;
 
-function displayDate(value: string): string {
-  const date = new Date(`${value}T00:00:00`);
-  return Number.isNaN(date.getTime())
-    ? value
-    : date.toLocaleDateString(undefined, {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-      });
+export function entryToOutfit(entry: WornOutfitEntry, itemsById: Map<string, ClothingItem>): OutfitRecommendation {
+  return {
+    id: entry.id,
+    title: entry.outfitTitle,
+    occasion: entry.occasion,
+    eventTitle: entry.eventTitle,
+    weatherSuitability: '',
+    occasionSuitability: '',
+    items: entry.itemIds.map(id => itemsById.get(id)).filter((i): i is ClothingItem => Boolean(i)),
+    stylistNote: t('style_calendar.worn_on', { date: dateLabel(entry.date) }),
+    mood: entry.mood,
+    isSaved: false,
+  };
 }
 
 export default function StyleLogScreen({ navigation }: Props) {
   const styles = useThemedStyles(makeStyles);
-  const insets = useSafeAreaInsets();
   const { getAccessToken } = useAuth();
-  const [, setLocaleVersion] = useState(0);
+  useLocaleRerender();
 
-  const [loading, setLoading] = useState(true);
-  const [refreshing, setRefreshing] = useState(false);
   const [history, setHistory] = useState<WornOutfitEntry[]>([]);
   const [items, setItems] = useState<ClothingItem[]>([]);
 
-  const fetchData = useCallback(async () => {
-    const token = await getAccessToken();
-    const [loadedHistory, loadedItems] = await Promise.all([
-      loadStyleHistory(token),
-      loadClothingItems(token),
-    ]);
-    setHistory(loadedHistory);
-    setItems(loadedItems);
-  }, [getAccessToken]);
-
-  const onRefresh = useCallback(async () => {
-    setRefreshing(true);
-    await fetchData();
-    setRefreshing(false);
-  }, [fetchData]);
-
-  useEffect(() => {
-    const unsubLang = subscribeToLanguageChanges(() =>
-      setLocaleVersion(v => v + 1),
-    );
-    setLoading(true);
-    fetchData().finally(() => setLoading(false));
-    return () => {
-      unsubLang();
-    };
-  }, [fetchData]);
+  const { loading, refreshing, offline, refresh } = useFocusLoad(
+    useCallback(async () => {
+      const token = await getAccessToken();
+      const [h, i] = await Promise.all([loadStyleHistory(token), loadClothingItems(token)]);
+      setHistory(h.data);
+      setItems(i.data);
+      return { offline: h.offline || i.offline };
+    }, [getAccessToken]),
+  );
 
   const itemsById = new Map(items.map(item => [item.id, item]));
 
   return (
     <View style={styles.root}>
-      {/* Header Bar */}
-      <View style={[styles.headerBar, { paddingTop: insets.top + 8 }]}>
-        <Pressable onPress={() => navigation.goBack()} style={styles.headerBtn}>
-          <ArrowLeft size={20} color={styles.headerIcon.color} />
-        </Pressable>
-        <Text style={styles.headerTitle}>
-          {t('style_pantry.style_log_title')}
-        </Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <WardrobeHeader title={t('style_pantry.style_log_title')} onBack={() => navigation.goBack()} />
 
       <ScrollView
         contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={
-          <RefreshControl
-            refreshing={refreshing}
-            onRefresh={onRefresh}
-            tintColor={styles.headerIcon.color}
-            colors={[styles.headerIcon.color]}
-          />
-        }
-      >
+          <RefreshControl refreshing={refreshing} onRefresh={refresh} tintColor={styles.tint.color} colors={[styles.tint.color]} />
+        }>
+        <OfflineBanner visible={offline} />
         {loading ? (
           <View>
             {[0, 1, 2].map(i => (
               <View key={i} style={styles.logCard}>
                 <View style={styles.logHeaderRow}>
-                  <SkeletonCircle size={36} style={{ marginRight: 12 }} />
-                  <View style={{ flex: 1 }}>
-                    <SkeletonText width="40%" style={{ marginBottom: 6 }} />
+                  <SkeletonCircle size={36} style={styles.skelGap} />
+                  <View style={styles.flex}>
+                    <SkeletonText width="40%" style={styles.skelLine} />
                     <SkeletonText width="60%" height={11} />
                   </View>
                 </View>
-                <SkeletonBox
-                  width="100%"
-                  height={44}
-                  borderRadius={12}
-                  style={{ marginTop: 12 }}
-                />
+                <SkeletonBox width="100%" height={44} borderRadius={12} style={styles.skelBox} />
               </View>
             ))}
           </View>
         ) : history.length === 0 ? (
           <View style={styles.emptyCard}>
             <ClockArrowLeft size={36} color={styles.placeholder.color} />
-            <Text style={styles.emptyTitle}>
-              {t('style_pantry.style_log_empty_title')}
-            </Text>
-            <Text style={styles.emptySub}>
-              {t('style_pantry.style_log_empty_sub')}
-            </Text>
+            <Text style={styles.emptyTitle}>{t('style_pantry.style_log_empty_title')}</Text>
+            <Text style={styles.emptySub}>{t('style_pantry.style_log_empty_sub')}</Text>
           </View>
         ) : (
           history.map(entry => {
             const MoodIcon = getMoodIconComponent(entry.mood);
-            const entryItems = entry.itemIds
-              .map(id => itemsById.get(id))
-              .filter((item): item is ClothingItem => Boolean(item));
+            const entryItems = entry.itemIds.map(id => itemsById.get(id)).filter((i): i is ClothingItem => Boolean(i));
+            const missing = entry.itemIds.length - entryItems.length;
             return (
               <GlassCard
                 key={entry.id}
                 variant="default"
                 style={styles.logCard}
-              >
+                onPress={() => navigation.navigate('OutfitDetails', { outfit: entryToOutfit(entry, itemsById), readOnly: true })}>
                 <View style={styles.logHeaderRow}>
-                  <Text style={styles.logDate}>{displayDate(entry.date)}</Text>
+                  <Text style={styles.logDate}>{dateLabel(entry.date)}</Text>
                   {entry.mood ? (
                     <View style={styles.moodBadge}>
-                      {MoodIcon ? (
-                        <MoodIcon
-                          size={12}
-                          color={styles.aiAccent.color}
-                          style={{ marginRight: 4 }}
-                        />
-                      ) : null}
-                      <Text style={styles.moodBadgeText}>
-                        {t(`style_pantry.mood_${entry.mood}`)}
-                      </Text>
+                      {MoodIcon ? <MoodIcon size={12} color={styles.tint.color} style={styles.moodIcon} /> : null}
+                      <Text style={styles.moodBadgeText}>{moodLabel(entry.mood)}</Text>
                     </View>
                   ) : null}
                 </View>
                 <Text style={styles.logTitle}>{entry.outfitTitle}</Text>
                 <Text style={styles.logSub}>
-                  {entry.occasion} · {entry.eventTitle}
+                  {eventTypeLabel(entry.occasion)} · {entry.eventTitle}
                 </Text>
-                {entryItems.length > 0 ? (
+                {entryItems.length > 0 || missing > 0 ? (
                   <View style={styles.itemsRow}>
-                    {entryItems.map(item => {
-                      const ItemIcon = getClothingIconComponent(item.emoji);
-                      return (
-                        <View key={item.id} style={styles.itemBadge}>
-                          <ItemIcon size={16} color={styles.iconTint.color} />
-                        </View>
-                      );
-                    })}
+                    {entryItems.map(item => (
+                      <ItemThumb key={item.id} item={item} size={36} />
+                    ))}
+                    {missing > 0 ? <Text style={styles.missingText}>{t('style_pantry.removed_items_count', { count: missing })}</Text> : null}
                   </View>
                 ) : null}
               </GlassCard>
@@ -189,52 +128,16 @@ export default function StyleLogScreen({ navigation }: Props) {
   );
 }
 
-const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
+const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
   StyleSheet.create({
-    root: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    headerBar: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.sm,
-      backgroundColor: colors.background,
-    },
-    headerBtn: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.surface,
-      alignItems: 'center',
-      justifyContent: 'center',
-      borderWidth: 1,
-      borderColor: colors.border,
-      ...shadow.soft,
-    },
-    headerIcon: {
-      color: colors.textPrimary,
-    },
-    iconTint: {
-      color: colors.primary,
-    },
-    aiAccent: {
-      color: colors.primary,
-    },
-    placeholder: {
-      color: colors.textSecondary,
-    },
-    headerTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 18,
-      color: colors.textPrimary,
-    },
-    content: {
-      paddingHorizontal: spacing.lg,
-      paddingBottom: spacing.xxl,
-    },
+    root: { flex: 1, backgroundColor: colors.background },
+    flex: { flex: 1 },
+    tint: { color: colors.primary },
+    placeholder: { color: colors.textSecondary },
+    content: { paddingHorizontal: spacing.lg, paddingBottom: spacing.xxl },
+    skelGap: { marginRight: 12 },
+    skelLine: { marginBottom: 6 },
+    skelBox: { marginTop: 12 },
     emptyCard: {
       backgroundColor: colors.surface,
       borderRadius: radius.lg,
@@ -245,35 +148,11 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderColor: colors.border,
       marginTop: spacing.md,
     },
-    emptyTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 15,
-      color: colors.textPrimary,
-      marginTop: spacing.md,
-    },
-    emptySub: {
-      fontFamily: fonts.sans,
-      fontSize: 13,
-      color: colors.textSecondary,
-      textAlign: 'center',
-      marginTop: spacing.xs,
-    },
-    logCard: {
-      marginBottom: spacing.md,
-    },
-    logHeaderRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      marginBottom: spacing.xs,
-    },
-    logDate: {
-      fontFamily: fonts.sansBold,
-      fontSize: 12,
-      color: colors.textSecondary,
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-    },
+    emptyTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.textPrimary, marginTop: spacing.md },
+    emptySub: { fontFamily: fonts.sans, fontSize: 13, color: colors.textSecondary, textAlign: 'center', marginTop: spacing.xs },
+    logCard: { marginBottom: spacing.md },
+    logHeaderRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginBottom: spacing.xs },
+    logDate: { fontFamily: fonts.sansBold, fontSize: 12, color: colors.textSecondary, textTransform: 'uppercase', letterSpacing: 0.5 },
     moodBadge: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -282,33 +161,10 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       paddingVertical: 3,
       borderRadius: radius.pill,
     },
-    moodBadgeText: {
-      fontFamily: fonts.sansMedium,
-      fontSize: 11,
-      color: colors.primary,
-    },
-    logTitle: {
-      fontFamily: fonts.sansBold,
-      fontSize: 15,
-      color: colors.textPrimary,
-    },
-    logSub: {
-      fontFamily: fonts.sans,
-      fontSize: 12,
-      color: colors.textSecondary,
-      marginTop: 2,
-    },
-    itemsRow: {
-      flexDirection: 'row',
-      gap: spacing.xs,
-      marginTop: spacing.sm,
-    },
-    itemBadge: {
-      width: 32,
-      height: 32,
-      borderRadius: radius.md,
-      backgroundColor: colors.surfaceElevated,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
+    moodIcon: { marginRight: 4 },
+    moodBadgeText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.primary },
+    logTitle: { fontFamily: fonts.sansBold, fontSize: 15, color: colors.textPrimary },
+    logSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textSecondary, marginTop: 2 },
+    itemsRow: { flexDirection: 'row', flexWrap: 'wrap', alignItems: 'center', gap: spacing.xs, marginTop: spacing.sm },
+    missingText: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted, marginLeft: spacing.xs },
   });

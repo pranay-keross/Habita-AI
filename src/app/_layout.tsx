@@ -42,11 +42,18 @@ import {
 import PantryScreen from '../features/money/smart_pantry/PantryScreen';
 import {
   WardrobeDashboardScreen,
+  ClosetItemsScreen,
   AddEditClothingScreen,
   ClothingDetailsScreen,
+  AiStylistHomeScreen,
   StyleMirrorScreen,
+  StyleChatScreen,
   OutfitDetailsScreen,
   StyleLogScreen,
+  StyleCalendarScreen,
+  TripPlannerScreen,
+  TripDetailsScreen,
+  type ClothingSeason,
   type OutfitRecommendation,
 } from '../features/style_pantry';
 import VoiceScreen from '../features/money/voice_assistant/VoiceScreen';
@@ -97,13 +104,34 @@ export type RootStackParamList = {
   ExpirationAlerts: undefined;
   DocViewer: { url: string; fileName?: string; kind: 'pdf' | 'image' };
   Pantry: undefined;
+  AiStylistHome: undefined;
   Wardrobe: undefined;
-  StylePantryDashboard: undefined;
-  AddEditClothing: { itemId?: string } | undefined;
+  ClosetItems:
+    | {
+        title?: string;
+        collectionId?: string;
+        seasonFilter?: ClothingSeason;
+        wishlistOnly?: boolean;
+      }
+    | undefined;
+  AddEditClothing:
+    | {
+        itemId?: string;
+        /** Closet folder to add a newly created item to. */
+        collectionId?: string;
+        collectionName?: string;
+        /** Pre-select the wishlist toggle (opened from the Wishlist folder). */
+        wishlist?: boolean;
+      }
+    | undefined;
   ClothingDetails: { itemId: string };
   StyleMirror: undefined;
-  OutfitDetails: { outfit: OutfitRecommendation };
+  StyleChat: undefined;
+  OutfitDetails: { outfit: OutfitRecommendation; readOnly?: boolean };
   StyleLog: undefined;
+  StyleCalendar: undefined;
+  Trips: undefined;
+  TripDetails: { tripId: string };
   Voice: undefined;
   VoiceSettings: undefined;
   SmartLife: undefined;
@@ -248,11 +276,9 @@ const AppLayout = () => {
             options={{ animation: 'fade', presentation: 'fullScreenModal' }}
           />
           <Stack.Screen name="Pantry" component={PantryScreen} />
+          <Stack.Screen name="AiStylistHome" component={AiStylistHomeScreen} />
           <Stack.Screen name="Wardrobe" component={WardrobeDashboardScreen} />
-          <Stack.Screen
-            name="StylePantryDashboard"
-            component={WardrobeDashboardScreen}
-          />
+          <Stack.Screen name="ClosetItems" component={ClosetItemsScreen} />
           <Stack.Screen
             name="AddEditClothing"
             component={AddEditClothingScreen}
@@ -262,8 +288,12 @@ const AppLayout = () => {
             component={ClothingDetailsScreen}
           />
           <Stack.Screen name="StyleMirror" component={StyleMirrorScreen} />
+          <Stack.Screen name="StyleChat" component={StyleChatScreen} />
           <Stack.Screen name="OutfitDetails" component={OutfitDetailsScreen} />
           <Stack.Screen name="StyleLog" component={StyleLogScreen} />
+          <Stack.Screen name="StyleCalendar" component={StyleCalendarScreen} />
+          <Stack.Screen name="Trips" component={TripPlannerScreen} />
+          <Stack.Screen name="TripDetails" component={TripDetailsScreen} />
           <Stack.Screen
             name="Voice"
             component={VoiceScreen}
