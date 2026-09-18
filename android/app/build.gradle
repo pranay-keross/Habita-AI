@@ -75,6 +75,39 @@ def enableProguardInReleaseBuilds = false
  */
 def jscFlavor = 'io.github.react-native-community:jsc-android:2026004.+'
 
+/**
+ * Release signing, loaded from outside version control so no secret ever lives
+ * in a committed file:
+ *   1. Environment variables (RELEASE_STORE_FILE/RELEASE_STORE_PASSWORD/
+ *      RELEASE_KEY_ALIAS/RELEASE_KEY_PASSWORD) — for CI, where secrets are
+ *      injected at build time rather than checked out.
+ *   2. android/keystore.properties (gitignored; copy keystore.properties.example
+ *      and fill in your real values) — for a local release build.
+ * If neither is fully set up, release builds fall back to the debug keystore
+ * (with a loud warning below) so `assembleRelease` still succeeds out of the
+ * box for local testing — it just must never be the thing you actually ship.
+ */
+def keystorePropertiesFile = rootProject.file("keystore.properties")
+def keystoreProperties = new Properties()
+if (keystorePropertiesFile.exists()) {
+    keystorePropertiesFile.withInputStream { keystoreProperties.load(it) }
+}
+
+def releaseStoreFile = System.getenv("RELEASE_STORE_FILE") ?: keystoreProperties["RELEASE_STORE_FILE"]
+def releaseStorePassword = System.getenv("RELEASE_STORE_PASSWORD") ?: keystoreProperties["RELEASE_STORE_PASSWORD"]
+def releaseKeyAlias = System.getenv("RELEASE_KEY_ALIAS") ?: keystoreProperties["RELEASE_KEY_ALIAS"]
+def releaseKeyPassword = System.getenv("RELEASE_KEY_PASSWORD") ?: keystoreProperties["RELEASE_KEY_PASSWORD"]
+
+def hasReleaseSigning = releaseStoreFile && releaseStorePassword && releaseKeyAlias && releaseKeyPassword &&
+    file(releaseStoreFile).exists()
+
+if (!hasReleaseSigning) {
+    logger.warn("\n" +
+        "⚠️  No release keystore configured for :app — release builds will be signed\n" +
+        "   with the DEBUG keystore. Fine for local testing; never ship this build.\n" +
+        "   See android/keystore.properties.example to set up real release signing.\n")
+}
+
 android {
     ndkVersion rootProject.ext.ndkVersion
     buildToolsVersion rootProject.ext.buildToolsVersion
@@ -95,6 +128,14 @@ android {
             keyAlias 'androiddebugkey'
             keyPassword 'android'
         }
+        if (hasReleaseSigning) {
+            release {
+                storeFile file(releaseStoreFile)
+                storePassword releaseStorePassword
+                keyAlias releaseKeyAlias
+                keyPassword releaseKeyPassword
+            }
+        }
     }
     buildTypes {
         debug {
@@ -102,9 +143,9 @@ android {
             manifestPlaceholders = [usesCleartextTraffic: "true"]
         }
         release {
-            // Caution! In production, you need to generate your own keystore file.
-            // see https://reactnative.dev/docs/signed-apk-android.
-            signingConfig signingConfigs.debug
+            // See the hasReleaseSigning block above: this is the debug keystore
+            // only when no real release keystore has been configured yet.
+            signingConfig hasReleaseSigning ? signingConfigs.release : signingConfigs.debug
             minifyEnabled enableProguardInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro"
             manifestPlaceholders = [usesCleartextTraffic: "false"]
@@ -113,7 +154,13 @@ android {
 
     externalNativeBuild {
         cmake {
-            buildStagingDirectory file("C:/tmp/cxx")
+            // Windows only: CMake/NDK intermediate paths nested under node_modules
+            // (react-native-reanimated, react-native-worklets, etc.) can exceed
+            // Windows' 260-char MAX_PATH. Redirect to a short path outside the repo.
+            // A no-op on macOS/Linux CI, where this isn't a problem.
+            if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+                buildStagingDirectory file("C:/tmp/cxx")
+            }
         }
     }
 }

@@ -24,4 +24,113 @@ buildscript {
 
 apply plugin: "com.facebook.react.rootproject"
 
+/**
+ * `./gradlew clean` recurringly fails inside one CMake-based native module or
+ * another with errors like:
+ *   "ninja: error: rebuilding 'build.ninja': subcommand failed"
+ *   "ninja: error: manifest 'build.ninja' still dirty after 100 tries"
+ *   "Cannot specify link libraries for target ... which is not built by this project"
+ * — seen so far from react-native-reanimated (importing the
+ * react-native-worklets::worklets prefab target) and react-native-datetimepicker
+ * (referencing another module's codegen target). Different modules, same root
+ * cause, so fixing them one at a time is whack-a-mole: it will keep recurring
+ * as new native modules are added or updated.
+ *
+ * Root cause: AGP's externalNativeBuildClean task reconfigures CMake (runs
+ * `ninja -t clean` against a freshly-generated build.ninja) before it can
+ * compute what to delete. When a CMakeLists.txt references a target generated
+ * by ANOTHER module (a prefab package, a Codegen target), that reconfigure
+ * depends on that other module's build output still being on disk. But Gradle
+ * gives independent modules' `clean` tasks no defined ordering — so if that
+ * other module's own `clean` already deleted its build output, the reconfigure
+ * dangling-references it and fails. This is a task-ordering gap in how AGP's
+ * generated clean tasks compose across autolinked modules, not something
+ * fixable by changing versions, and it reproduces on a plain `gradlew clean`
+ * from a clean checkout.
+ *
+ * The fix, applied to every subproject with a CMake external native build:
+ * skip CMake's own (fragile) clean-and-reconfigure and just delete that
+ * module's native build output directly. A full recursive delete is a
+ * superset of what externalNativeBuildClean would have removed, and a later
+ * `assemble*` regenerates everything from scratch via CMake *configure* (not
+ * clean), which has no such ordering requirement — confirmed: a fresh
+ * assembleRelease succeeds correctly against a fully-wiped .cxx/build even
+ * before its native-module dependencies have been rebuilt in that same run.
+ */
+gradle.projectsEvaluated {
+    rootProject.subprojects.each { subproject ->
+        def cmakeCleanTasks = subproject.tasks.matching { it.name.startsWith('externalNativeBuildClean') }
+        if (!cmakeCleanTasks.isEmpty()) {
+            cmakeCleanTasks.configureEach { it.enabled = false }
+            def plainCxxClean = subproject.tasks.register('cleanNativeOutputsDirectly', Delete) {
+                delete subproject.file('.cxx')
+                delete subproject.file('build')
+            }
+            subproject.tasks.named('clean').configure { it.dependsOn(plainCxxClean) }
+        }
+    }
+}
+
+/**
+ * `ninja: error: manifest 'build.ninja' still dirty after 100 tries` during an
+ * actual (non-clean) native compile of react-native-reanimated — not caused by
+ * the -flto=thin flag (verified: this still reproduces with LTO fully removed
+ * from the build), not caused by Gradle's `--parallel` workers racing (still
+ * reproduces with --no-parallel), not caused by antivirus scan timing (fully
+ * deterministic across repeated identical runs, not intermittent).
+ *
+ * What IS different about this target: its native build output lives under
+ *   node_modules/react-native-reanimated/android/.cxx/RelWithDebInfo/<hash>/<abi>/
+ *     CMakeFiles/reanimated.dir/<32-char-hash>/interpolation/groups/
+ *       ArrayPropertiesInterpolator.cpp.o
+ * — 250 characters before even reaching the object filename, and reanimated
+ * has files with longer relative paths than that one. Windows' default
+ * MAX_PATH is 260 characters; once ninja's own generated paths cross that
+ * line, its file reads/writes/stats become unreliable, which is exactly what
+ * "manifest still dirty after N tries" looks like (ninja can't get a stable
+ * read on its own dependency files). android/app/build.gradle already works
+ * around this exact problem for the :app module itself, by redirecting its
+ * CMake staging directory to a short path outside the repo
+ * (externalNativeBuild.cmake.buildStagingDirectory = "C:/tmp/cxx") — but that
+ * setting is local to :app's own build.gradle. Every autolinked native module
+ * (reanimated included) still builds at its default location, deep inside
+ * node_modules, with none of that protection. This block gives every
+ * CMake-based subproject the same short staging path, keyed by module name so
+ * they don't collide with each other or with :app's own C:/tmp/cxx.
+ *
+ * `plugins.withId(...)` fires as soon as a subproject applies the Android
+ * library plugin — early in that subproject's own build.gradle, before AGP
+ * has read externalNativeBuild to wire up its CMake tasks — so this reaches
+ * AGP in time to actually change where those tasks read/write, unlike
+ * `gradle.projectsEvaluated` above (fine for reassigning already-created
+ * `clean` tasks, but too late to influence how CMake tasks get created).
+ * Windows only: this isn't a problem on macOS/Linux, where paths under
+ * node_modules are already well short of any OS path limit.
+ *
+ * Scoped to react-native-reanimated specifically (the module where this was
+ * actually observed) rather than every `com.android.library` subproject:
+ * setting `externalNativeBuild.cmake.buildStagingDirectory` on a module that
+ * never declared a `cmake` block in the first place makes AGP think it now
+ * has a native build to validate, which would break every native-module-free
+ * autolinked package (most of them). `plugins.withId` fires before that
+ * subproject's own build.gradle has run, so "does this module already
+ * configure cmake" can't be checked at that point — safer to name the one
+ * module actually confirmed to need it than to guess broadly. If another
+ * autolinked module hits this same "still dirty" signature, add it here by
+ * name rather than widening the match blindly.
+ */
+if (System.getProperty("os.name").toLowerCase().contains("windows")) {
+    subprojects { subproject ->
+        if (subproject.name == 'react-native-reanimated') {
+            subproject.plugins.withId('com.android.library') {
+                subproject.android.externalNativeBuild {
+                    cmake {
+                        buildStagingDirectory = new File("C:/tmp/cxx-modules/${subproject.name}")
+                    }
+                }
+            }
+        }
+    }
+}
+
 

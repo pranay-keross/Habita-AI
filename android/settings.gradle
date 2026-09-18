@@ -1,5 +1,12 @@
 pluginManagement { includeBuild("../node_modules/@react-native/gradle-plugin") }
-plugins { id("com.facebook.react.settings") }
+plugins {
+    id("com.facebook.react.settings")
+    // Lets Gradle auto-download a matching JDK (per gradle/gradle-daemon-jvm.properties)
+    // when the machine doesn't already have one installed, instead of every
+    // developer/CI runner needing a pre-installed JDK at a known path. See
+    // docs/ANDROID_BUILD_TROUBLESHOOTING.md.
+    id("org.gradle.toolchains.foojay-resolver-convention") version "1.0.0"
+}
 extensions.configure(com.facebook.react.ReactSettingsExtension){ ex -> ex.autolinkLibrariesFromCommand() }
 rootProject.name = 'SaheliCLI'
 include ':app'
