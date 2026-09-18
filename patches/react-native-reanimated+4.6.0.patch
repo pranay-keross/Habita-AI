@@ -1,0 +1,23 @@
+diff --git a/node_modules/react-native-reanimated/android/CMakeLists.txt b/node_modules/react-native-reanimated/android/CMakeLists.txt
+index 6300ffb..71510ef 100644
+--- a/node_modules/react-native-reanimated/android/CMakeLists.txt
++++ b/node_modules/react-native-reanimated/android/CMakeLists.txt
+@@ -27,7 +27,17 @@ endif()
+ 
+ if(NOT ${CMAKE_BUILD_TYPE} MATCHES "Debug")
+   string(APPEND CMAKE_CXX_FLAGS " -DNDEBUG")
+-  string(APPEND CMAKE_CXX_FLAGS " -flto=thin")
++  # -flto=thin makes ninja's own dependency check on the generated build.ninja
++  # never converge on Windows hosts ("manifest 'build.ninja' still dirty after
++  # 100 tries"), reproducing on every release/RelWithDebInfo build regardless
++  # of Gradle parallelism, antivirus exclusions, or a clean checkout — this is
++  # a Windows NDK/clang/lld thin-LTO toolchain issue, not a project misconfig.
++  # See docs/ANDROID_BUILD_TROUBLESHOOTING.md. Applied via patch-package
++  # (patches/react-native-reanimated+*.patch) since this file lives in
++  # node_modules and is overwritten on every install.
++  if(NOT CMAKE_HOST_SYSTEM_NAME MATCHES "Windows")
++    string(APPEND CMAKE_CXX_FLAGS " -flto=thin")
++  endif()
+ endif()
+ 
+ set(BUILD_DIR "${CMAKE_SOURCE_DIR}/build")

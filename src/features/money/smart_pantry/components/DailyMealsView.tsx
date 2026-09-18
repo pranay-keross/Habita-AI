@@ -14,6 +14,7 @@ import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
 import useThemedStyles from '../../../../hooks/useThemedStyles';
 import { makePantryTokens } from '../constants/colors';
+import { getProductEmoji } from '../constants/productEmoji';
 import ChefHat from 'lucide-react-native/icons/chef-hat';
 import Timer from 'lucide-react-native/icons/timer';
 import Flame from 'lucide-react-native/icons/flame';
@@ -22,6 +23,7 @@ import TriangleAlert from 'lucide-react-native/icons/triangle-alert';
 import Check from 'lucide-react-native/icons/check';
 import X from 'lucide-react-native/icons/x';
 import Salad from 'lucide-react-native/icons/salad';
+import Sparkles from 'lucide-react-native/icons/sparkles';
 
 interface Props {
   meals: DailyMeal[];
@@ -59,6 +61,29 @@ function normalizeMealType(mealType: string): string {
 function formatQuantity(value: number): string {
   if (value === null || value === undefined || Number.isNaN(value)) return '';
   return Number.isInteger(value) ? String(value) : String(Number(value.toFixed(2)));
+}
+
+/**
+ * No AI image-generation service exists for meals yet (unlike, say, a photo a
+ * barcode scan could carry — see docs/SMART_PANTRY_API_SPEC.md, which has no
+ * image field or endpoint for daily meals at all), and a real one would need a
+ * server-side call so an API key never ships inside the app. Until that
+ * exists, this builds an illustrative hero visual straight from the meal's
+ * own ingredients — the same per-product emoji resolver the pantry inventory
+ * uses (constants/productEmoji.ts) — so every meal gets something distinct
+ * derived from what's actually in it, with zero network dependency.
+ */
+function getMealHeroEmojis(meal: DailyMeal): string[] {
+  const seen = new Set<string>();
+  for (const ingredient of meal.ingredients) {
+    const emoji = getProductEmoji(ingredient.name);
+    if (!seen.has(emoji)) {
+      seen.add(emoji);
+      if (seen.size >= 4) break;
+    }
+  }
+  if (seen.size === 0) seen.add('🍽️');
+  return Array.from(seen);
 }
 
 export const DailyMealsView: React.FC<Props> = ({
@@ -366,133 +391,156 @@ export const DailyMealsView: React.FC<Props> = ({
           <View style={styles.modalSheet}>
             {selectedMeal && (
               <>
-                <View style={styles.modalHeaderRow}>
-                  <ChefHat
-                    size={26}
-                    color={styles.modalTitle.color}
-                    strokeWidth={1.8}
-                    style={{ marginRight: 8 }}
-                  />
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles.modalTitle}>{selectedMeal.name}</Text>
-                    <Text style={styles.modalSub}>
-                      {selectedMeal.mealType} · {selectedMeal.estimatedTime} min ·{' '}
-                      {selectedMeal.difficulty} · {selectedMeal.pantryMatchPercentage}
-                      {t('smart_pantry.pantry_match_short', { defaultValue: '% pantry' })}
+                {/* Hero visual — see getMealHeroEmojis() for why this is an
+                    illustration built from the meal's own ingredients rather
+                    than a real photo: there's no AI image-generation backend
+                    for meals to call yet, and one would need a server-side
+                    call so no API key ships inside the app. */}
+                <View style={styles.mealHeroBanner}>
+                  <View style={styles.mealHeroBadge}>
+                    <Sparkles size={10} color={styles.mealHeroBadgeText.color} strokeWidth={2.4} />
+                    <Text style={styles.mealHeroBadgeText}>
+                      {t('smart_pantry.ai_visual_badge', { defaultValue: 'AI VISUAL' })}
                     </Text>
                   </View>
-                  <Pressable style={styles.modalCloseBtn} onPress={() => setSelectedMeal(null)}>
-                    <X size={20} color={styles.modalSub.color} strokeWidth={2} />
-                  </Pressable>
+                  <View style={styles.mealHeroEmojiRow}>
+                    {getMealHeroEmojis(selectedMeal).map((emoji, idx) => (
+                      <Text key={idx} style={styles.mealHeroEmoji}>
+                        {emoji}
+                      </Text>
+                    ))}
+                  </View>
                 </View>
 
-                <ScrollView
-                  style={styles.modalScroll}
-                  contentContainerStyle={{ paddingBottom: 16 }}
-                  showsVerticalScrollIndicator={false}>
-                  {selectedMeal.description ? (
-                    <Text style={styles.modalBody}>{selectedMeal.description}</Text>
-                  ) : null}
-
-                  {selectedMeal.recommendationReason ? (
-                    <View style={styles.reasonBox}>
-                      <Text style={styles.reasonLabel}>
-                        {t('smart_pantry.why_recommended', {
-                          defaultValue: 'Why this meal is recommended',
-                        })}
+                <View style={styles.modalContent}>
+                  <View style={styles.modalHeaderRow}>
+                    <ChefHat
+                      size={26}
+                      color={styles.modalTitle.color}
+                      strokeWidth={1.8}
+                      style={{ marginRight: 8 }}
+                    />
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles.modalTitle}>{selectedMeal.name}</Text>
+                      <Text style={styles.modalSub}>
+                        {selectedMeal.mealType} · {selectedMeal.estimatedTime} min ·{' '}
+                        {selectedMeal.difficulty} · {selectedMeal.pantryMatchPercentage}
+                        {t('smart_pantry.pantry_match_short', { defaultValue: '% pantry' })}
                       </Text>
-                      <Text style={styles.reasonText}>{selectedMeal.recommendationReason}</Text>
                     </View>
-                  ) : null}
-
-                  <Text style={styles.modalSectionLabel}>
-                    {t('smart_pantry.ingredients_req', { defaultValue: 'Ingredients' })}
-                  </Text>
-                  {selectedMeal.ingredients.map(renderIngredientRow)}
-
-                  {selectedMeal.missingIngredients.length > 0 && (
-                    <Text style={styles.missingNote}>
-                      {t('smart_pantry.missing_note', {
-                        count: selectedMeal.missingIngredients.length,
-                        defaultValue: `${selectedMeal.missingIngredients.length} ingredient(s) are not in your pantry yet.`,
-                      })}
-                    </Text>
-                  )}
-
-                  <Text style={[styles.modalSectionLabel, { marginTop: 14 }]}>
-                    {t('smart_pantry.instructions', { defaultValue: 'Cooking Instructions' })}
-                  </Text>
-                  {selectedMeal.instructions.map((step, idx) => (
-                    <Text key={idx} style={styles.instructionStep}>
-                      {idx + 1}. {step}
-                    </Text>
-                  ))}
-
-                  <Text style={[styles.modalSectionLabel, { marginTop: 14 }]}>
-                    {t('smart_pantry.nutrition', { defaultValue: 'Nutrition (estimated)' })}
-                  </Text>
-                  <View style={styles.nutritionGrid}>
-                    {[
-                      { label: 'Calories', value: selectedMeal.nutrition?.calories, unit: 'kcal' },
-                      { label: 'Protein', value: selectedMeal.nutrition?.protein, unit: 'g' },
-                      { label: 'Carbs', value: selectedMeal.nutrition?.carbohydrates, unit: 'g' },
-                      { label: 'Fat', value: selectedMeal.nutrition?.fat, unit: 'g' },
-                      { label: 'Fibre', value: selectedMeal.nutrition?.fiber, unit: 'g' },
-                    ]
-                      .filter((n) => n.value != null)
-                      .map((n) => (
-                        <View key={n.label} style={styles.nutritionCell}>
-                          <Text style={styles.nutritionValue}>
-                            {n.value}
-                            {n.unit}
-                          </Text>
-                          <Text style={styles.nutritionLabel}>{n.label}</Text>
-                        </View>
-                      ))}
+                    <Pressable style={styles.modalCloseBtn} onPress={() => setSelectedMeal(null)}>
+                      <X size={20} color={styles.modalSub.color} strokeWidth={2} />
+                    </Pressable>
                   </View>
 
-                  {selectedMeal.healthBenefits.length > 0 && (
-                    <>
-                      <Text style={[styles.modalSectionLabel, { marginTop: 14 }]}>
-                        {t('smart_pantry.health_benefits', { defaultValue: 'Health Benefits' })}
-                      </Text>
-                      {selectedMeal.healthBenefits.map((benefit, idx) => (
-                        <Text key={idx} style={styles.instructionStep}>
-                          • {benefit}
+                  <ScrollView
+                    style={styles.modalScroll}
+                    contentContainerStyle={{ paddingBottom: 16 }}
+                    showsVerticalScrollIndicator={false}>
+                    {selectedMeal.description ? (
+                      <Text style={styles.modalBody}>{selectedMeal.description}</Text>
+                    ) : null}
+
+                    {selectedMeal.recommendationReason ? (
+                      <View style={styles.reasonBox}>
+                        <Text style={styles.reasonLabel}>
+                          {t('smart_pantry.why_recommended', {
+                            defaultValue: 'Why this meal is recommended',
+                          })}
                         </Text>
-                      ))}
-                    </>
-                  )}
+                        <Text style={styles.reasonText}>{selectedMeal.recommendationReason}</Text>
+                      </View>
+                    ) : null}
 
-                  <Text style={styles.modalPrepRow}>
-                    {t('smart_pantry.prep_time', { defaultValue: 'Prep' })}: {selectedMeal.prepTime}{' '}
-                    min · {t('smart_pantry.cook_time', { defaultValue: 'Cook' })}:{' '}
-                    {selectedMeal.cookTime} min · {selectedMeal.difficulty}
-                  </Text>
-
-                  {nutritionDisclaimer ? (
-                    <Text style={styles.disclaimer}>{nutritionDisclaimer}</Text>
-                  ) : null}
-                </ScrollView>
-
-                <Pressable
-                  style={[
-                    styles.cookBtn,
-                    (selectedMeal.cooked || cookingMealId === selectedMeal.id) &&
-                      styles.cookBtnDisabled,
-                  ]}
-                  onPress={() => handleCook(selectedMeal)}
-                  disabled={selectedMeal.cooked || cookingMealId === selectedMeal.id}>
-                  {cookingMealId === selectedMeal.id ? (
-                    <ActivityIndicator color={styles.cookBtnText.color} />
-                  ) : (
-                    <Text style={styles.cookBtnText}>
-                      {selectedMeal.cooked
-                        ? t('smart_pantry.already_cooked', { defaultValue: 'Already Cooked' })
-                        : t('smart_pantry.mark_as_cooked', { defaultValue: 'Mark as Cooked' })}
+                    <Text style={styles.modalSectionLabel}>
+                      {t('smart_pantry.ingredients_req', { defaultValue: 'Ingredients' })}
                     </Text>
-                  )}
-                </Pressable>
+                    {selectedMeal.ingredients.map(renderIngredientRow)}
+
+                    {selectedMeal.missingIngredients.length > 0 && (
+                      <Text style={styles.missingNote}>
+                        {t('smart_pantry.missing_note', {
+                          count: selectedMeal.missingIngredients.length,
+                          defaultValue: `${selectedMeal.missingIngredients.length} ingredient(s) are not in your pantry yet.`,
+                        })}
+                      </Text>
+                    )}
+
+                    <Text style={[styles.modalSectionLabel, { marginTop: 14 }]}>
+                      {t('smart_pantry.instructions', { defaultValue: 'Cooking Instructions' })}
+                    </Text>
+                    {selectedMeal.instructions.map((step, idx) => (
+                      <Text key={idx} style={styles.instructionStep}>
+                        {idx + 1}. {step}
+                      </Text>
+                    ))}
+
+                    <Text style={[styles.modalSectionLabel, { marginTop: 14 }]}>
+                      {t('smart_pantry.nutrition', { defaultValue: 'Nutrition (estimated)' })}
+                    </Text>
+                    <View style={styles.nutritionGrid}>
+                      {[
+                        { label: 'Calories', value: selectedMeal.nutrition?.calories, unit: 'kcal' },
+                        { label: 'Protein', value: selectedMeal.nutrition?.protein, unit: 'g' },
+                        { label: 'Carbs', value: selectedMeal.nutrition?.carbohydrates, unit: 'g' },
+                        { label: 'Fat', value: selectedMeal.nutrition?.fat, unit: 'g' },
+                        { label: 'Fibre', value: selectedMeal.nutrition?.fiber, unit: 'g' },
+                      ]
+                        .filter((n) => n.value != null)
+                        .map((n) => (
+                          <View key={n.label} style={styles.nutritionCell}>
+                            <Text style={styles.nutritionValue}>
+                              {n.value}
+                              {n.unit}
+                            </Text>
+                            <Text style={styles.nutritionLabel}>{n.label}</Text>
+                          </View>
+                        ))}
+                    </View>
+
+                    {selectedMeal.healthBenefits.length > 0 && (
+                      <>
+                        <Text style={[styles.modalSectionLabel, { marginTop: 14 }]}>
+                          {t('smart_pantry.health_benefits', { defaultValue: 'Health Benefits' })}
+                        </Text>
+                        {selectedMeal.healthBenefits.map((benefit, idx) => (
+                          <Text key={idx} style={styles.instructionStep}>
+                            • {benefit}
+                          </Text>
+                        ))}
+                      </>
+                    )}
+
+                    <Text style={styles.modalPrepRow}>
+                      {t('smart_pantry.prep_time', { defaultValue: 'Prep' })}: {selectedMeal.prepTime}{' '}
+                      min · {t('smart_pantry.cook_time', { defaultValue: 'Cook' })}:{' '}
+                      {selectedMeal.cookTime} min · {selectedMeal.difficulty}
+                    </Text>
+
+                    {nutritionDisclaimer ? (
+                      <Text style={styles.disclaimer}>{nutritionDisclaimer}</Text>
+                    ) : null}
+                  </ScrollView>
+
+                  <Pressable
+                    style={[
+                      styles.cookBtn,
+                      (selectedMeal.cooked || cookingMealId === selectedMeal.id) &&
+                        styles.cookBtnDisabled,
+                    ]}
+                    onPress={() => handleCook(selectedMeal)}
+                    disabled={selectedMeal.cooked || cookingMealId === selectedMeal.id}>
+                    {cookingMealId === selectedMeal.id ? (
+                      <ActivityIndicator color={styles.cookBtnText.color} />
+                    ) : (
+                      <Text style={styles.cookBtnText}>
+                        {selectedMeal.cooked
+                          ? t('smart_pantry.already_cooked', { defaultValue: 'Already Cooked' })
+                          : t('smart_pantry.mark_as_cooked', { defaultValue: 'Mark as Cooked' })}
+                      </Text>
+                    )}
+                  </Pressable>
+                </View>
               </>
             )}
           </View>
@@ -662,7 +710,41 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       backgroundColor: colors.surface,
       borderTopLeftRadius: 24,
       borderTopRightRadius: 24,
-      padding: spacing.lg,
+      // Clips the hero banner below to the sheet's own rounded top corners —
+      // the banner is a plain rectangle, drawn full-bleed before the padded
+      // content starts, so it needs the parent to do the corner-rounding.
+      overflow: 'hidden',
+    },
+    // Padding used to live on modalSheet itself; moved here so the hero
+    // banner above it can run edge-to-edge instead of inheriting an inset.
+    modalContent: { padding: spacing.lg },
+    mealHeroBanner: {
+      height: 130,
+      backgroundColor: colors.blush,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: 10,
+    },
+    mealHeroEmojiRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    mealHeroEmoji: { fontSize: 40 },
+    mealHeroBadge: {
+      position: 'absolute',
+      top: 12,
+      left: 14,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+      backgroundColor: 'rgba(0, 0, 0, 0.45)',
+      paddingHorizontal: 8,
+      paddingVertical: 3,
+      borderRadius: radius.pill,
+    },
+    mealHeroBadgeText: {
+      fontFamily: fonts.sansBold,
+      fontSize: 9,
+      color: '#FFFFFF',
+      letterSpacing: 0.6,
     },
     modalScroll: { marginTop: spacing.sm },
     modalHeaderRow: { flexDirection: 'row', alignItems: 'center' },
