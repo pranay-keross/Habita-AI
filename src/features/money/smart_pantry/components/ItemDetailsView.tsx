@@ -1,7 +1,8 @@
 import React from 'react';
 import { View, Text, StyleSheet, Pressable, ScrollView, Alert } from 'react-native';
 import { PantryItem, StorageLocation } from '../types';
-import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../data/mockPantryData';
+import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS } from '../data/mockPantryData';
+import { getProductEmoji } from '../constants/productEmoji';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
@@ -59,14 +60,14 @@ export const ItemDetailsView: React.FC<Props> = ({
       <Text style={styles.formLabel}>{t('smart_pantry.inspect_label')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 6, marginBottom: 16 }}>
         {items.map((item) => {
-          const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+          const productEmoji = getProductEmoji(item.name, item.category);
           const active = selectedItem?.id === item.id;
           return (
             <Pressable
               key={item.id}
               style={[styles.catChip, styles.catChipRow, active && styles.catChipActive]}
               onPress={() => onSelectItem(item)}>
-              <CategoryIcon size={14} color={active ? styles.catChipTextActive.color : styles.catChipText.color} strokeWidth={2} style={{ marginRight: 4 }} />
+              <Text style={styles.catChipEmoji}>{productEmoji}</Text>
               <Text style={[styles.catChipText, active && styles.catChipTextActive]}>
                 {item.name}
               </Text>
@@ -79,10 +80,9 @@ export const ItemDetailsView: React.FC<Props> = ({
         <View style={styles.itemDetailsCard}>
           <View style={styles.detailsHeaderRow}>
             <View style={styles.detailsEmojiCircle}>
-              {(() => {
-                const CategoryIcon = PANTRY_CATEGORY_ICONS[selectedItem.category] || DEFAULT_CATEGORY_ICON;
-                return <CategoryIcon size={32} color={styles.detailsTitle.color} strokeWidth={1.5} />;
-              })()}
+              <Text style={styles.detailsEmoji}>
+                {getProductEmoji(selectedItem.name, selectedItem.category)}
+              </Text>
             </View>
             <View style={{ flex: 1 }}>
               <Text style={styles.detailsTitle}>{selectedItem.name}</Text>
@@ -156,12 +156,14 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     formLabel: { fontFamily: fonts.sansMedium, fontSize: 12, color: colors.textSecondary, marginBottom: 4 },
     catChip: { backgroundColor: colors.background, paddingHorizontal: 10, paddingVertical: 6, borderRadius: radius.pill, borderWidth: 1, borderColor: colors.border },
     catChipRow: { flexDirection: 'row', alignItems: 'center' },
+    catChipEmoji: { fontSize: 13, marginRight: 4 },
     catChipActive: { backgroundColor: colors.primary, borderColor: colors.primary },
     catChipText: { fontFamily: fonts.sansMedium, fontSize: 11, color: colors.textSecondary },
     catChipTextActive: { fontFamily: fonts.sansBold, color: colors.textOnPrimary },
     itemDetailsCard: { backgroundColor: colors.surface, borderRadius: radius.xl, borderWidth: 1, borderColor: colors.border, padding: spacing.md },
     detailsHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md },
     detailsEmojiCircle: { width: 50, height: 50, borderRadius: 25, backgroundColor: colors.surfaceElevated, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+    detailsEmoji: { fontSize: 26, textAlign: 'center' },
     detailsTitle: { fontFamily: fonts.serif, fontSize: 18, color: colors.textPrimary },
     detailsSub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted },
     detailsExpiryBanner: { backgroundColor: colors.background, padding: spacing.md, borderRadius: radius.md, marginBottom: 12 },

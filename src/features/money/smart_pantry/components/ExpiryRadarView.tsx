@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, Pressable, ActivityIndicator, Alert } from 'react-native';
 import { PantryItem, StorageLocation } from '../types';
-import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../data/mockPantryData';
+import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS } from '../data/mockPantryData';
+import { getProductEmoji } from '../constants/productEmoji';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
@@ -79,10 +80,10 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes, onT
         <Text style={styles.noUrgentText}>{t('smart_pantry.no_urgent')}</Text>
       ) : (
         urgentItems.map((item) => {
-          const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+          const productEmoji = getProductEmoji(item.name, item.category);
           return (
           <View key={item.id} style={[styles.radarItemCard, styles.radarItemCardUrgent]}>
-            <CategoryIcon size={22} color={styles.radarItemName.color} strokeWidth={1.8} style={{ marginRight: 10 }} />
+            <Text style={styles.radarItemEmoji}>{productEmoji}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.radarItemName}>{item.name}</Text>
               <Text style={styles.radarItemSub}>
@@ -106,10 +107,10 @@ export const ExpiryRadarView: React.FC<Props> = ({ items, onNavigateRecipes, onT
         <Text style={styles.noUrgentText}>{t('smart_pantry.no_upcoming', { defaultValue: 'No upcoming expirations in 3-7 days.' })}</Text>
       ) : (
         upcomingItems.map((item) => {
-          const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+          const productEmoji = getProductEmoji(item.name, item.category);
           return (
           <View key={item.id} style={[styles.radarItemCard, styles.radarItemCardWarning]}>
-            <CategoryIcon size={22} color={styles.radarItemName.color} strokeWidth={1.8} style={{ marginRight: 10 }} />
+            <Text style={styles.radarItemEmoji}>{productEmoji}</Text>
             <View style={{ flex: 1 }}>
               <Text style={styles.radarItemName}>{item.name}</Text>
               <Text style={styles.radarItemSub}>
@@ -176,6 +177,7 @@ const makeStyles = ({ colors, fonts, radius, spacing }: ThemeTokens) =>
     radarItemCardUrgent: { borderLeftColor: colors.danger },
     radarItemCardWarning: { borderLeftColor: colors.turmeric },
     radarItemName: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary },
+    radarItemEmoji: { fontSize: 24, marginRight: 10 },
     radarItemSub: { fontFamily: fonts.sans, fontSize: 11, color: colors.textMuted, marginTop: 2 },
     cookActionBtn: { backgroundColor: colors.primary, paddingHorizontal: 10, paddingVertical: 4, borderRadius: radius.pill },
     cookActionBtnText: { fontFamily: fonts.sansBold, fontSize: 11, color: colors.textOnPrimary },

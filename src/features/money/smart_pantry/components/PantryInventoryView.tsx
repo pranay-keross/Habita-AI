@@ -2,7 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { View, Text, StyleSheet, Pressable, TextInput, ScrollView } from 'react-native';
 import Pagination from '../../../../components/Pagination';
 import { AllergenTag, PantryItem, StorageLocation } from '../types';
-import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS, PANTRY_CATEGORY_ICONS, DEFAULT_CATEGORY_ICON } from '../data/mockPantryData';
+import { ALLERGEN_DEFINITIONS, ALLERGEN_ICONS } from '../data/mockPantryData';
+import { getProductEmoji } from '../constants/productEmoji';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
@@ -185,7 +186,7 @@ export const PantryInventoryView: React.FC<Props> = ({
             const daysLeft = getDaysUntilExpiry(item.expiryDate);
             const isUrgent = daysLeft <= 2;
             const isWarning = daysLeft > 2 && daysLeft <= 5;
-            const CategoryIcon = PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+            const productEmoji = getProductEmoji(item.name, item.category);
             return (
               <Pressable
                 key={item.id}
@@ -193,7 +194,7 @@ export const PantryInventoryView: React.FC<Props> = ({
                 onPress={() => onSelectItem(item)}>
                 <View style={styles.inventoryMainRow}>
                   <View style={styles.categoryCircle}>
-                    <CategoryIcon size={22} color={styles.inventoryName.color} strokeWidth={1.8} />
+                    <Text style={styles.categoryEmoji}>{productEmoji}</Text>
                   </View>
                   <View style={{ flex: 1 }}>
                     <Text style={styles.inventoryName}>{item.name}</Text>
@@ -291,6 +292,7 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       justifyContent: 'center',
       marginRight: 10,
     },
+    categoryEmoji: { fontSize: 24, textAlign: 'center' },
     inventoryName: { fontFamily: fonts.sansBold, fontSize: 14, color: colors.textPrimary },
     inventorySub: { fontFamily: fonts.sans, fontSize: 12, color: colors.textMuted, marginTop: 2 },
     expiryPill: { paddingHorizontal: 8, paddingVertical: 4, borderRadius: radius.pill },

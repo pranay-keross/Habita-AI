@@ -1,11 +1,8 @@
 import React, { useMemo, useState } from 'react';
 import { View, Text, StyleSheet, Pressable } from 'react-native';
 import { PantryItem, ScreenTab, StorageLocation } from '../types';
-import {
-  ALLERGEN_DEFINITIONS,
-  PANTRY_CATEGORY_ICONS,
-  DEFAULT_CATEGORY_ICON,
-} from '../data/mockPantryData';
+import { ALLERGEN_DEFINITIONS } from '../data/mockPantryData';
+import { getProductEmoji } from '../constants/productEmoji';
 import { getDaysUntilExpiry } from '../services/pantryStorage';
 import { t } from '../../../../i18n';
 import type { ThemeTokens } from '../../../../theme';
@@ -498,8 +495,7 @@ export const PantryDashboardView: React.FC<Props> = ({
       {paginatedItems.length > 0 ? (
         <View style={styles.priorityList}>
           {paginatedItems.map((item) => {
-            const CategoryIcon =
-              PANTRY_CATEGORY_ICONS[item.category] || DEFAULT_CATEGORY_ICON;
+            const productEmoji = getProductEmoji(item.name, item.category);
             const daysLeft = getDaysUntilExpiry(item.expiryDate);
             const isUrgent = daysLeft <= 2;
             const isWarning = daysLeft > 2 && daysLeft <= 5;
@@ -519,11 +515,7 @@ export const PantryDashboardView: React.FC<Props> = ({
                   }
                 }}>
                 <View style={styles.itemIconCircle}>
-                  <CategoryIcon
-                    size={20}
-                    color={styles.categoryIconColor.color}
-                    strokeWidth={1.8}
-                  />
+                  <Text style={styles.itemEmoji}>{productEmoji}</Text>
                 </View>
 
                 <View style={styles.itemMainInfo}>
@@ -1152,8 +1144,9 @@ const makeStyles = ({ colors, fonts, radius, shadow, spacing }: ThemeTokens) =>
       borderWidth: 1,
       borderColor: colors.border,
     },
-    categoryIconColor: {
-      color: colors.primary,
+    itemEmoji: {
+      fontSize: 22,
+      textAlign: 'center',
     },
     itemMainInfo: {
       flex: 1,
